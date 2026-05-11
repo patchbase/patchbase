@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "cli",
+    srcs = [
+        "cli.go",
+        "enroll.go",
+        "sync.go",
+        "version.go",
+    ],
+    importpath = "go.patchbase.net/agent/internal/cli",
+    visibility = ["//agent:__subpackages__"],
+    deps = [
+        "//agent/internal/client",
+        "//agent/internal/collector",
+        "//agent/internal/config",
+        "@com_github_spf13_afero//:afero",
+        "@com_github_spf13_cobra//:cobra",
+        "@org_golang_google_protobuf//encoding/protojson",
+    ],
+)

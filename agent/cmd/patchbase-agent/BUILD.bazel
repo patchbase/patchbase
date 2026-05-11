@@ -1,0 +1,15 @@
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+go_library(
+    name = "patchbase-agent_lib",
+    srcs = ["main.go"],
+    importpath = "go.patchbase.net/agent/cmd/patchbase-agent",
+    visibility = ["//visibility:private"],
+    deps = ["//agent/internal/cli"],
+)
+
+go_binary(
+    name = "patchbase-agent",
+    embed = [":patchbase-agent_lib"],
+    visibility = ["//visibility:public"],
+)

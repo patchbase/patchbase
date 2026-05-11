@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "config",
+    srcs = ["config.go"],
+    importpath = "go.patchbase.net/agent/internal/config",
+    visibility = ["//agent:__subpackages__"],
+    deps = ["@com_github_spf13_afero//:afero"],
+)
+
+go_test(
+    name = "config_test",
+    size = "small",
+    srcs = ["config_test.go"],
+    deps = [
+        ":config",
+        "@com_github_spf13_afero//:afero",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

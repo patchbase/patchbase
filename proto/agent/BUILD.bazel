@@ -2,6 +2,8 @@ load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_go//go:def.bzl", "go_library")
 load("@rules_proto_grpc_go//:defs.bzl", "go_proto_compile")
 
+# gazelle:proto disable
+
 proto_library(
     name = "agent_proto",
     srcs = glob(["*.proto"]),
@@ -22,4 +24,16 @@ go_proto_compile(
     },
     protos = [":agent_proto"],
     visibility = ["//visibility:public"],
+)
+
+go_library(
+    name = "agent_proto_go",
+    srcs = glob(["*.pb.go"]),
+    importpath = "go.patchbase.net/proto/agent",
+    visibility = ["//visibility:public"],
+    deps = [
+        "@org_golang_google_protobuf//runtime/protoimpl",
+        "@org_golang_google_protobuf//reflect/protoreflect",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
 )
