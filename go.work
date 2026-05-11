@@ -1,3 +1,5 @@
 go 1.25.10
 
 use ./agent
+
+use ./proto/agent

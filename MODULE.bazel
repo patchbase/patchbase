@@ -27,4 +27,5 @@ go_deps.gazelle_default_attributes(
 )
 use_repo(
     go_deps,
+    "org_golang_google_protobuf",
 )
