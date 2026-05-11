@@ -1,12 +1,11 @@
 syntax = "proto3";
 
-package agent.v1;
-
-option go_package = "github.com/patchbase/patchbase/proto/agent/v1";
-
-import "proto/agent/v1/common.proto";
+package patchbase.agent;
 
 import "google/protobuf/timestamp.proto";
+import "patchbase/agent/common.proto";
+
+option go_package = "go.patchbase.net/proto/agent";
 
 message Host {
   string machine_id = 1;

@@ -1,0 +1,25 @@
+load("@protobuf//bazel:proto_library.bzl", "proto_library")
+load("@rules_go//go:def.bzl", "go_library")
+load("@rules_proto_grpc_go//:defs.bzl", "go_proto_compile")
+
+proto_library(
+    name = "agent_proto",
+    srcs = glob(["*.proto"]),
+    deps = [
+        "@protobuf//:timestamp_proto",
+    ],
+    import_prefix = "patchbase/agent",
+    strip_import_prefix = "",
+    visibility = ["//visibility:public"],
+)
+
+go_proto_compile(
+    name = "agent_go",
+    options = {
+        "*": [
+            "paths=source_relative",
+        ],
+    },
+    protos = [":agent_proto"],
+    visibility = ["//visibility:public"],
+)

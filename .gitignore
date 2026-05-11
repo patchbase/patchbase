@@ -1,0 +1,28 @@
+.envrc
+.env
+
+# Go artifacts
+bin/
+
+# Bazel artifacts
+bazel-bin
+bazel-patchbase*
+bazel-out
+bazel-testlogs
+.bazelrc.local
+
+# Config files
+config.yaml
+data/
+
+# Editor
+.vscode
+.history
+tags
+# vim Swap
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+

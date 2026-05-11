@@ -1,0 +1,19 @@
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+write_file(
+    name = "gen_update",
+    out = "update.sh",
+    content = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd \"$BUILD_WORKSPACE_DIRECTORY\"",
+        "cp -fv bazel-bin/proto/agent/agent_go/patchbase/agent/*pb.go proto/agent/",
+    ],
+)
+
+sh_binary(
+    name = "update",
+    srcs = ["update.sh"],
+    data = ["//proto/agent:agent_go"],
+)

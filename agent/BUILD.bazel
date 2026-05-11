@@ -1,0 +1,23 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@rules_go//go:def.bzl", "go_binary", "go_library")
+
+# gazelle:prefix go.patchbase.net/agent
+# gazelle:proto disable
+# gazelle:go_test file
+
+gazelle(
+    name = "gazelle",
+)
+
+go_library(
+    name = "agent_lib",
+    srcs = ["main.go"],
+    importpath = "go.patchbase.net/agent",
+    visibility = ["//visibility:private"],
+)
+
+go_binary(
+    name = "agent",
+    embed = [":agent_lib"],
+    visibility = ["//visibility:public"],
+)

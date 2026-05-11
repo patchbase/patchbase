@@ -1,15 +1,14 @@
 syntax = "proto3";
 
-package agent.v1;
-
-option go_package = "github.com/patchbase/patchbase/proto/agent/v1";
-
-import "proto/agent/v1/host.proto";
-import "proto/agent/v1/repo.proto";
-import "proto/agent/v1/package.proto";
-import "proto/agent/v1/runtime.proto";
+package patchbase.agent;
 
 import "google/protobuf/timestamp.proto";
+import "patchbase/agent/host.proto";
+import "patchbase/agent/package.proto";
+import "patchbase/agent/repo.proto";
+import "patchbase/agent/runtime.proto";
+
+option go_package = "go.patchbase.net/proto/agent";
 
 message AgentSnapshot {
   string schema_version = 1;

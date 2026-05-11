@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package agent.v1;
+package patchbase.agent;
 
-option go_package = "github.com/patchbase/patchbase/proto/agent/v0";
+option go_package = "go.patchbase.net/proto/agent";
 
 message Repo {
   string repo_id = 1;

@@ -1,0 +1,6 @@
+try-import %workspace%/.bazelrc.local
+
+common --enable_platform_specific_config
+
+build --@rules_go//go/config:pure
+build --@rules_go//go/config:static

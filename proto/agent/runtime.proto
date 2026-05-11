@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package agent.v1;
+package patchbase.agent;
 
-option go_package = "github.com/patchbase/patchbase/proto/agent/v1";
+option go_package = "go.patchbase.net/proto/agent";
 
 message Process {
   int32 pid = 1;
