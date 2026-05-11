@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/patchbase/patchbase/proto/agent/v1";
+
+import "proto/agent/v1/host.proto";
+import "proto/agent/v1/repo.proto";
+import "proto/agent/v1/package.proto";
+import "proto/agent/v1/runtime.proto";
+
+import "google/protobuf/timestamp.proto";
+
+message AgentSnapshot {
+  string schema_version = 1;
+  google.protobuf.Timestamp sent_at = 2;
+  Host host = 3;
+  repeated Repo repos = 4;
+  repeated Package packages = 5;
+  Runtime runtime = 6;
+}

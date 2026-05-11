@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/patchbase/patchbase/proto/agent/v1";
+
+import "proto/agent/v1/common.proto";
+
+import "google/protobuf/timestamp.proto";
+
+message Host {
+  string machine_id = 1;
+  string hostname = 2;
+  OsFamily os_family = 3;
+  string os_name = 4;
+  string os_version = 5;
+  int32 os_major = 6;
+  Architecture architecture = 7;
+  int32 available_package_update_count = 8;
+  string agent_version = 9;
+  google.protobuf.Timestamp boot_time = 10;
+  int64 uptime_seconds = 11;
+  VirtualizationRole virtualization_role = 12;
+  repeated string environment_tags = 13;
+  repeated string ip_addresses = 14;
+}

@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/patchbase/patchbase/proto/agent/v1";
+
+enum OsFamily {
+  OS_FAMILY_UNSPECIFIED = 0;
+  OS_FAMILY_RPM = 1;
+  OS_FAMILY_APT = 2;
+}
+
+enum Architecture {
+  ARCHITECTURE_UNSPECIFIED = 0;
+  ARCHITECTURE_X86_64 = 1;
+  ARCHITECTURE_AARCH64 = 2;
+  ARCHITECTURE_RISCV64 = 3;
+}
+
+enum VirtualizationRole {
+  VIRTUALIZATION_ROLE_UNSPECIFIED = 0;
+  VIRTUALIZATION_ROLE_BARE_METAL = 1;
+  VIRTUALIZATION_ROLE_VM = 2;
+  VIRTUALIZATION_ROLE_CONTAINER = 3;
+  VIRTUALIZATION_ROLE_UNKNOWN = 4;
+}

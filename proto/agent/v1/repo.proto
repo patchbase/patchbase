@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/patchbase/patchbase/proto/agent/v0";
+
+message Repo {
+  string repo_id = 1;
+  bool enabled = 2;
+  string repo_label = 3;
+  string baseurl = 4;
+  string metalink = 5;
+  string mirrorlist = 6;
+}

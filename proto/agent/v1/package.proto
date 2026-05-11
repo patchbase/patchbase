@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/patchbase/patchbase/proto/agent/v1";
+
+import "google/protobuf/timestamp.proto";
+
+message Package {
+  string name = 1;
+  int32 epoch = 2;
+  string version = 3;
+  string release = 4;
+  string arch = 5;
+  string source_rpm = 6;
+  string vendor = 7;
+  google.protobuf.Timestamp install_time = 8;
+  string repo_origin = 9;
+  string nevra = 10;
+}

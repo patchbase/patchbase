@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package agent.v1;
+
+option go_package = "github.com/patchbase/patchbase/proto/agent/v1";
+
+message Process {
+  int32 pid = 1;
+  string process_name = 2;
+  string service_name = 3;
+  string exe = 4;
+  repeated string package_names = 5;
+  repeated string library_packages = 6;
+}
+
+message Runtime {
+  string kernel_running = 1;
+  repeated Process processes = 2;
+}
