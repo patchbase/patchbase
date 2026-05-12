@@ -10,6 +10,7 @@ go_library(
 
 go_test(
     name = "id_test",
+    size = "small",
     srcs = ["id_test.go"],
     embed = [":id"],
     deps = ["@com_github_stretchr_testify//assert"],

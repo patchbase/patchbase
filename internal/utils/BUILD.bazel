@@ -19,6 +19,7 @@ go_library(
 
 go_test(
     name = "collections_test",
+    size = "small",
     srcs = ["collections_test.go"],
     embed = [":utils"],
     deps = [
@@ -29,6 +30,7 @@ go_test(
 
 go_test(
     name = "option_test",
+    size = "small",
     srcs = ["option_test.go"],
     embed = [":utils"],
     deps = ["@com_github_stretchr_testify//require"],
@@ -36,6 +38,7 @@ go_test(
 
 go_test(
     name = "password_test",
+    size = "small",
     srcs = ["password_test.go"],
     embed = [":utils"],
     deps = [

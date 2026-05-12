@@ -1,6 +1,6 @@
 - id: u_admin
   email: admin@patchbase.local
   name: Admin
-  password_hash: $2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy
+  password_hash: $2a$12$AcMrJEraN.je7kBs/5ErgeLgup23P6jp7hcnzvDDlVLx7TgLnkuFO
   is_admin: true
   password_reset_required: false

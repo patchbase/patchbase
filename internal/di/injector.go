@@ -31,6 +31,7 @@ func New(ctx context.Context, cfg config.Config) do.Injector {
 
 	// services
 	do.Provide[services.Auth](injector, services.NewAuth)
+	do.Provide[services.Settings](injector, services.NewSettings)
 
 	// api
 	do.Provide[auth.Auth](injector, auth.New)
