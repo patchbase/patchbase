@@ -2,6 +2,7 @@ load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@rules_go//go:def.bzl", "go_library")
+load(":defs.bzl", "exec_filegroup")
 
 # gazelle:prefix go.patchbase.net/dashboard
 # gazelle:proto disable
@@ -45,9 +46,9 @@ js_run_binary(
     execution_requirements = {"no-sandbox": "1"},
 )
 
-filegroup(
+exec_filegroup(
     name = "static",
-    srcs = [":build_dashboard_assets"],
+    src = ":build_dashboard_assets",
 )
 
 go_library(

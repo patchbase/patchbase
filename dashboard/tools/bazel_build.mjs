@@ -36,14 +36,14 @@ function findPackageScript(prefix, packageScriptPath) {
       }
       const candidate = path.join(base, entry, packageScriptPath);
       if (existsSync(candidate)) {
-        return candidate;
+        return path.resolve(candidate);
       }
     }
   }
 
   const direct = path.join("node_modules", packageScriptPath);
   if (existsSync(direct)) {
-    return direct;
+    return path.resolve(direct);
   }
 
   throw new Error(`unable to resolve script for ${prefix}${packageScriptPath}`);
