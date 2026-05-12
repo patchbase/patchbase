@@ -75,6 +75,8 @@ func NormalizeOsFamily(distroID string) (agent.OsFamily, error) {
 	switch strings.ToLower(distroID) {
 	case "rhel", "rocky", "almalinux", "centos", "ol":
 		return agent.OsFamily_OS_FAMILY_RPM, nil
+	case "debian", "ubuntu", "linuxmint", "pop", "raspbian":
+		return agent.OsFamily_OS_FAMILY_APT, nil
 	default:
 		return agent.OsFamily_OS_FAMILY_UNSPECIFIED, fmt.Errorf("unsupported os family: %s", distroID)
 	}
@@ -128,7 +130,18 @@ func DetectArchitecture(unameMachine string) (agent.Architecture, error) {
 	}
 }
 
-func RunningKernelNEVRA(ctx context.Context, runner ExecRunner, unameRelease string) (string, error) {
+func RunningKernelNEVRA(ctx context.Context, runner ExecRunner, osFamily agent.OsFamily, unameRelease string) (string, error) {
+	switch osFamily {
+	case agent.OsFamily_OS_FAMILY_RPM:
+		return runningRPMKernelNEVRA(ctx, runner, unameRelease)
+	case agent.OsFamily_OS_FAMILY_APT:
+		return fmt.Sprintf("0:%s", unameRelease), nil
+	default:
+		return "", fmt.Errorf("unsupported os family: %s", osFamily.String())
+	}
+}
+
+func runningRPMKernelNEVRA(ctx context.Context, runner ExecRunner, unameRelease string) (string, error) {
 	query := fmt.Sprintf("kernel-uname-r = %s", unameRelease)
 	output, err := runner.Run(ctx,
 		"rpm", "-q", "--whatprovides", query,

@@ -23,6 +23,7 @@ go_test(
     srcs = ["packages_test.go"],
     embed = [":collector"],
     deps = [
+        "//proto/agent:agent_proto_go",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
@@ -34,6 +35,8 @@ go_test(
     srcs = ["repos_test.go"],
     embed = [":collector"],
     deps = [
+        "//proto/agent:agent_proto_go",
+        "@com_github_spf13_afero//:afero",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],

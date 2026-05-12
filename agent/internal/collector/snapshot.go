@@ -41,7 +41,7 @@ func CollectSnapshot(ctx context.Context, fs afero.Fs, runner ExecRunner, versio
 		return nil, fmt.Errorf("read hostname: %w", err)
 	}
 
-	unameMachine, err := getUnameMachine()
+	unameMachine, unameRelease, err := getUnameInfo()
 	if err != nil {
 		return nil, fmt.Errorf("detect architecture: %w", err)
 	}
@@ -60,7 +60,7 @@ func CollectSnapshot(ctx context.Context, fs afero.Fs, runner ExecRunner, versio
 	bootTimePb := timestamppb.New(bootTime)
 
 	var availableUpdateCount int32
-	count, err := CollectAvailablePackageUpdateCount(ctx, runner)
+	count, err := CollectAvailablePackageUpdateCount(ctx, runner, osFamily)
 	if err == nil {
 		availableUpdateCount = count
 	}
@@ -68,20 +68,20 @@ func CollectSnapshot(ctx context.Context, fs afero.Fs, runner ExecRunner, versio
 	hostnameStr := hostname
 
 	host := &agent.Host{
-		MachineId:                  machineID,
-		Hostname:                   hostnameStr,
-		OsFamily:                   osFamily,
-		OsName:                     osRelease.Name,
-		OsVersion:                  osRelease.VersionID,
-		OsMajor:                    osMajor,
+		MachineId:                   machineID,
+		Hostname:                    hostnameStr,
+		OsFamily:                    osFamily,
+		OsName:                      osRelease.Name,
+		OsVersion:                   osRelease.VersionID,
+		OsMajor:                     osMajor,
 		Architecture:                arch,
 		AvailablePackageUpdateCount: availableUpdateCount,
-		AgentVersion:               version,
-		BootTime:                   bootTimePb,
-		UptimeSeconds:              uptimeSeconds,
+		AgentVersion:                version,
+		BootTime:                    bootTimePb,
+		UptimeSeconds:               uptimeSeconds,
 	}
 
-	kernelNEVRA, err := RunningKernelNEVRA(ctx, runner, unameMachine)
+	kernelNEVRA, err := RunningKernelNEVRA(ctx, runner, osFamily, unameRelease)
 	if err != nil {
 		return nil, fmt.Errorf("detect kernel: %w", err)
 	}
@@ -90,12 +90,12 @@ func CollectSnapshot(ctx context.Context, fs afero.Fs, runner ExecRunner, versio
 		KernelRunning: kernelNEVRA,
 	}
 
-	pkgs, err := CollectInstalledPackages(ctx, runner)
+	pkgs, err := CollectInstalledPackages(ctx, runner, osFamily)
 	if err != nil {
 		return nil, fmt.Errorf("collect packages: %w", err)
 	}
 
-	repos, err := CollectEnabledRepos(fs)
+	repos, err := CollectEnabledRepos(fs, osFamily)
 	if err != nil {
 		return nil, fmt.Errorf("collect repos: %w", err)
 	}
@@ -110,18 +110,27 @@ func CollectSnapshot(ctx context.Context, fs afero.Fs, runner ExecRunner, versio
 	}, nil
 }
 
-func getUnameMachine() (string, error) {
+func getUnameInfo() (machine string, release string, err error) {
 	var uname syscall.Utsname
 	if err := syscall.Uname(&uname); err != nil {
-		return "", fmt.Errorf("uname: %w", err)
+		return "", "", fmt.Errorf("uname: %w", err)
 	}
 
-	var machine []byte
+	var machineBytes []byte
 	for _, c := range uname.Machine {
 		if c == 0 {
 			break
 		}
-		machine = append(machine, byte(c))
+		machineBytes = append(machineBytes, byte(c))
 	}
-	return string(machine), nil
+
+	var releaseBytes []byte
+	for _, c := range uname.Release {
+		if c == 0 {
+			break
+		}
+		releaseBytes = append(releaseBytes, byte(c))
+	}
+
+	return string(machineBytes), string(releaseBytes), nil
 }

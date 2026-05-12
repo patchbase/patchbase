@@ -41,9 +41,11 @@ func TestNormalizeOsFamily(t *testing.T) {
 		{"almalinux", 1, false},
 		{"centos", 1, false},
 		{"ol", 1, false},
+		{"debian", 2, false},
+		{"ubuntu", 2, false},
 		{"RHEL", 1, false},
 		{"Rocky", 1, false},
-		{"ubuntu", 0, true},
+		{"suse", 0, true},
 	}
 
 	for _, tt := range tests {
