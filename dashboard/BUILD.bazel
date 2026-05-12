@@ -9,10 +9,16 @@ gazelle(
     name = "gazelle",
 )
 
+filegroup(
+    name = "static",
+    srcs = glob(["build/**"]),
+)
+
 go_library(
     name = "dashboard",
     srcs = ["embed.go"],
-    embedsrcs = ["dist/test.txt"],
+    # keep: managed manually; gazelle cannot merge filegroup/glob embedsrcs here.
+    embedsrcs = [":static"],
     importpath = "go.patchbase.net/dashboard",
     visibility = ["//visibility:public"],
 )

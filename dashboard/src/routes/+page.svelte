@@ -1,0 +1,73 @@
+<script lang="ts">
+	import AppLayout from '$lib/components/AppLayout.svelte';
+	import StatsRow from '$lib/components/StatsRow.svelte';
+	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import { api } from '$lib/mocks/api.js';
+	import { relativeTime } from '$lib/format';
+
+	let overview = $state<{ total_hosts: number; need_attention: number; reboot_queue: number; unknown_investigate: number; total_advisories: number; total_streams: number } | null>(null);
+	let recentHosts = $state<Awaited<ReturnType<typeof api.listHosts>>>([]);
+
+	$effect(() => {
+		api.getOverview().then((data) => (overview = data));
+		api.listHosts().then((data) => (recentHosts = data.slice(0, 5)));
+	});
+
+	let stats = $derived(
+		overview
+			? [
+					{ label: 'Total Hosts', value: overview.total_hosts, color: 'accent' },
+					{ label: 'Need Attention', value: overview.need_attention, color: 'red' },
+					{ label: 'Reboot Queue', value: overview.reboot_queue, color: 'orange' },
+					{ label: 'Advisories', value: overview.total_advisories, color: 'purple' },
+				]
+			: [],
+	);
+</script>
+
+<AppLayout page="dashboard" title="Dashboard">
+	<StatsRow {stats} />
+	<div class="table-container" style="margin-bottom:24px">
+		<div class="table-header">
+			<h2>Host Fleet</h2>
+			<a href="/hosts" class="btn btn-secondary btn-sm">View all</a>
+		</div>
+		<table>
+			<thead>
+				<tr>
+					<th>Host</th>
+					<th>Platform</th>
+					<th>Action</th>
+					<th>Critical</th>
+					<th>Updates</th>
+					<th>Last Seen</th>
+				</tr>
+			</thead>
+			<tbody>
+				{#each recentHosts as host}
+					<tr>
+						<td class="mono">
+							<a href="/hosts/{host.id}">{host.display_name || host.hostname}</a>
+						</td>
+						<td>{host.os_name} {host.os_version}</td>
+						<td><StatusBadge status={host.overall_action} /></td>
+						<td class="mono">{host.critical_count}</td>
+						<td class="mono">{host.available_updates}</td>
+						<td>{relativeTime(host.last_seen_at)}</td>
+					</tr>
+				{/each}
+			</tbody>
+		</table>
+	</div>
+	<div class="table-container">
+		<div class="table-header">
+			<h2>Recent Advisories</h2>
+			<a href="/advisories" class="btn btn-secondary btn-sm">View all</a>
+		</div>
+		{#if overview}
+			<p style="padding:20px;color:var(--text-secondary)">
+				Tracking {overview.total_advisories} advisories across {overview.total_streams} product streams.
+			</p>
+		{/if}
+	</div>
+</AppLayout>

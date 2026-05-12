@@ -97,7 +97,7 @@ func TestSecurityHeadersMiddlewareSetsHeaders(t *testing.T) {
 
 	handler.ServeHTTP(recorder, request)
 
-	assert.Equal(t, "default-src 'self'; style-src 'self' https://cdnjs.cloudflare.com; font-src https://cdnjs.cloudflare.com; frame-ancestors 'none'", recorder.Header().Get("Content-Security-Policy"))
+	assert.Equal(t, "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com; font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'", recorder.Header().Get("Content-Security-Policy"))
 	assert.Equal(t, "DENY", recorder.Header().Get("X-Frame-Options"))
 	assert.Equal(t, "nosniff", recorder.Header().Get("X-Content-Type-Options"))
 	assert.Equal(t, "strict-origin-when-cross-origin", recorder.Header().Get("Referrer-Policy"))

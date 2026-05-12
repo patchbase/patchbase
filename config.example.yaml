@@ -1,0 +1,4 @@
+api:
+  jwt_secret_key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+database:
+  url: "postgres://postgres:postgres@localhost:5432/patchbase?sslmode=disable"

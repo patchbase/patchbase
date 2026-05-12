@@ -2,10 +2,14 @@ load("@rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "queue",
-    srcs = ["river.go"],
+    srcs = [
+        "noop_worker.go",
+        "river.go",
+    ],
     importpath = "go.patchbase.net/server/internal/queue",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/sql",
         "@com_github_jackc_pgx_v5//:pgx",
         "@com_github_jackc_pgx_v5//pgxpool",
         "@com_github_riverqueue_river//:river",

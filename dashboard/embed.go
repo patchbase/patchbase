@@ -6,14 +6,14 @@ import (
 	"io/fs"
 )
 
-//go:embed dist/**
+//go:embed build/**
 var embeddedFiles embed.FS
 
-// Files returns the built dashboard assets rooted at dist/.
+// Files returns the built dashboard assets rooted at build/.
 func Files() (fs.FS, error) {
-	dist, err := fs.Sub(embeddedFiles, "dist")
+	dist, err := fs.Sub(embeddedFiles, "build")
 	if err != nil {
-		return nil, fmt.Errorf("sub dist fs: %w", err)
+		return nil, fmt.Errorf("sub build fs: %w", err)
 	}
 
 	return dist, nil

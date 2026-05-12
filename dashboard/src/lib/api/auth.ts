@@ -1,0 +1,53 @@
+export interface SetupStatusResponse {
+	completed: boolean;
+}
+
+export interface LoginResponse {
+	access_token: string;
+	setup_completed: boolean;
+	password_reset_needed: boolean;
+	user: {
+		id: string;
+		email: string;
+		name: string;
+	};
+}
+
+const jsonHeaders = {
+	'Content-Type': 'application/json',
+};
+
+export async function getSetupStatus(): Promise<SetupStatusResponse> {
+	return request('/api/v1/setup/status');
+}
+
+export async function login(email: string, password: string): Promise<LoginResponse> {
+	return request('/api/v1/auth/login', {
+		method: 'POST',
+		headers: jsonHeaders,
+		body: JSON.stringify({ email, password }),
+	});
+}
+
+export async function completeSetup(
+	accessToken: string,
+	payload: { name: string; email: string; password: string },
+): Promise<LoginResponse> {
+	return request('/api/v1/setup/complete', {
+		method: 'POST',
+		headers: {
+			...jsonHeaders,
+			Authorization: `Bearer ${accessToken}`,
+		},
+		body: JSON.stringify(payload),
+	});
+}
+
+async function request(path: string, init?: RequestInit): Promise<any> {
+	const response = await fetch(path, init);
+	const data = await response.json().catch(() => null);
+	if (!response.ok) {
+		throw new Error(data?.error || 'Request failed');
+	}
+	return data;
+}
