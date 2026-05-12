@@ -76,11 +76,8 @@ func (a *auth) Authenticate(ctx context.Context, token string) (sql.User, error)
 		return sql.User{}, ErrUnauthorized
 	}
 
-	user, err := a.sql.GetUserByID(ctx, userID)
+	user, err := sql.Required(a.sql.GetUserByID(ctx, userID))(ErrUnauthorized)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) { // FIXME
-			return sql.User{}, ErrUnauthorized
-		}
 		return sql.User{}, fmt.Errorf("get user by id: %w", err)
 	}
 

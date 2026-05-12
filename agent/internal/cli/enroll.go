@@ -15,9 +15,9 @@ func newEnrollCmd() *cobra.Command {
 		RunE:  enroll,
 	}
 
-	cmd.Flags().StringP("config", "-c", config.DefaultPath, "config file path")
+	cmd.Flags().StringP("config", "c", config.DefaultPath, "config file path")
 	cmd.Flags().String("ca-cert", "", "CA certificate path")
-	cmd.Flags().BoolP("allow-insecure-http", "-k", false, "allow plain HTTP")
+	cmd.Flags().BoolP("allow-insecure-http", "k", false, "allow plain HTTP")
 
 	return cmd
 }

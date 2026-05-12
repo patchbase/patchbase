@@ -5,5 +5,8 @@ go_api_library(
     srcs = ["health.go"],
     importpath = "go.patchbase.net/server/internal/api/v1/health",
     visibility = ["//:__subpackages__"],
-    deps = ["//internal/api/webutil"],
+    deps = [
+        "//internal/api/webutil",
+        "//internal/buildinfo",
+    ],
 )

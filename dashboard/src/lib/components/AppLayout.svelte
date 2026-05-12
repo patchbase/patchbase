@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
-	import Logo from '$lib/components/Logo.svelte';
+	import { getVersion } from '$lib/api/version.js';
 
 	interface NavItem {
 		page: string;
@@ -17,6 +17,13 @@
 	}
 
 	let { page, title, children, actions }: Props = $props();
+	let version = $state('...');
+
+	$effect(() => {
+		getVersion()
+			.then((value) => (version = value))
+			.catch(() => (version = 'unknown'));
+	});
 
 	const nav: { section: string; items: NavItem[] }[] = [
 		{
@@ -59,9 +66,9 @@
 
 <aside class="sidebar">
 	<div class="sidebar-brand">
-		<Logo size={28} />
-		<span>patchbase</span>
-		<span class="version">v0</span>
+		<img src="/logo.png" alt="" width={28} height={28} />
+		<span>PatchBase</span>
+		<span class="version">{version}</span>
 	</div>
 	<nav class="sidebar-nav">
 		{#each nav as group}

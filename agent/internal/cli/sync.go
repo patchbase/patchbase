@@ -18,11 +18,11 @@ func newSyncCmd() *cobra.Command {
 		RunE:  runSync,
 	}
 
-	cmd.Flags().StringP("config", "-c", config.DefaultPath, "config file path")
-	cmd.Flags().StringP("server-url", "-s", "", "server URL (overrides config)")
-	cmd.Flags().StringP("token", "-t", "", "host token (overrides config)")
+	cmd.Flags().StringP("config", "c", config.DefaultPath, "config file path")
+	cmd.Flags().StringP("server-url", "s", "", "server URL (overrides config)")
+	cmd.Flags().StringP("token", "t", "", "host token (overrides config)")
 	cmd.Flags().String("ca-cert", "", "CA certificate path")
-	cmd.Flags().BoolP("allow-insecure-http", "-k", false, "allow plain HTTP")
+	cmd.Flags().BoolP("allow-insecure-http", "k", false, "allow plain HTTP")
 	cmd.Flags().Bool("debug", false, "print snapshot JSON to stdout")
 
 	return cmd

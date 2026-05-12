@@ -793,7 +793,29 @@ select.form-input {
 	background: var(--bg-card);
 	border: 1px solid var(--border);
 	border-radius: 12px;
-	padding: 28px 28px 24px;
+	padding: 0 28px 24px;
+}
+
+.auth-brand {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 20px 0 16px;
+	margin-bottom: 18px;
+	border-bottom: 1px solid var(--border);
+}
+
+.auth-brand span {
+	font-size: 18px;
+	font-weight: 700;
+	letter-spacing: -0.01em;
+}
+
+.auth-brand .version {
+	font-size: 11px;
+	color: var(--text-dim);
+	font-family: var(--font-mono);
+	margin-left: auto;
 }
 
 .auth-card h1,

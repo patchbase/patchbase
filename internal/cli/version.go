@@ -4,12 +4,11 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"go.patchbase.net/server/internal/buildinfo"
 )
 
-var version = "v0.0.0-dev"
-
 func runVersion(cmd *cobra.Command, args []string) {
-	fmt.Println(version)
+	fmt.Println(buildinfo.Version)
 }
 
 func NewVersionCmd() *cobra.Command {
