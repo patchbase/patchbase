@@ -3,6 +3,10 @@
 	"private": true,
 	"version": "0.0.1",
 	"type": "module",
+	"packageManager": "pnpm@10.32.1",
+	"pnpm": {
+		"onlyBuiltDependencies": []
+	},
 	"scripts": {
 		"dev": "vite dev --host 0.0.0.0",
 		"build": "vite build",
@@ -10,7 +14,7 @@
 	},
 	"devDependencies": {
 		"@sveltejs/adapter-static": "^3.0.8",
-		"@sveltejs/kit": "^2.57.0",
+		"@sveltejs/kit": "^2.59.1",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"svelte": "^5.55.2",
 		"typescript": "^6.0.2",
