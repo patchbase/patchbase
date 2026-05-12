@@ -299,6 +299,25 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//third_party/bzlmod:deps.bzl%sqlc": {
+      "os:linux,arch:amd64": {
+        "bzlTransitiveDigest": "2vyZVmVvsqeVSx8BhKpsbDcPJdzeskq+Nc4gli47ENw=",
+        "usagesDigest": "9f4VGGNOF4gRx3QBCFMBzYygV4wOTUGI3P3OBWZKQFQ=",
+        "recordedInputs": [
+          "REPO_MAPPING:,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "sqlc": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://github.com/sqlc-dev/sqlc/releases/download/v1.30.0/sqlc_1.30.0_linux_amd64.tar.gz",
+              "sha256": "468aecee071bfe55e97fcbcac52ea0208eeca444f67736f3b8f0f3d6a106132e",
+              "build_file": "@@//third_party/sqlc:sqlc.BUILD"
+            }
+          }
+        }
+      }
+    },
     "@@rules_android+//rules/android_sdk_repository:rule.bzl%android_sdk_repository_extension": {
       "general": {
         "bzlTransitiveDigest": "NAy+0M15JNVEBb8Tny6t7j3lKqTnsAMjoBB6LJ+C370=",

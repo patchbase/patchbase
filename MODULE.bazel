@@ -32,3 +32,9 @@ use_repo(
     "com_github_stretchr_testify",
     "org_golang_google_protobuf",
 )
+
+###############################################################################
+# Development dependencies
+###############################################################################
+sqlc = use_extension("//third_party/bzlmod:deps.bzl", "sqlc")
+use_repo(sqlc, "sqlc")

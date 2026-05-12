@@ -1,0 +1,14 @@
+load("//third_party/bazel:archs.bzl", "LINUX_ARCHES")
+
+package(default_visibility = ["//visibility:public"])
+
+[
+    platform(
+        name = arch["platform"],
+        constraint_values = [
+            "@platforms//os:linux",
+            arch["constraint"],
+        ],
+    )
+    for arch in LINUX_ARCHES
+]
