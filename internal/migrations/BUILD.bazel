@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "migrations",
+    srcs = ["migrate.go"],
+    embedsrcs = [
+        "files/001_add_settings.sql",
+        "files/002_add_users.sql",
+    ],
+    importpath = "go.patchbase.net/server/internal/migrations",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@com_github_jackc_pgx_v5//stdlib",
+        "@com_github_pressly_goose_v3//:goose",
+        "@com_github_riverqueue_river//rivermigrate",
+        "@com_github_riverqueue_river_riverdriver_riverdatabasesql//:riverdatabasesql",
+    ],
+)

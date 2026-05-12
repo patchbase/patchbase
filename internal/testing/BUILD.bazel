@@ -1,0 +1,24 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "testing",
+    srcs = [
+        "backend.go",
+        "database.go",
+        "fixtures.go",
+        "http.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/testing",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/config",
+        "//internal/di",
+        "//internal/services",
+        "//internal/utils",
+        "@com_github_go_testfixtures_testfixtures_v3//:testfixtures",
+        "@com_github_jackc_pgx_v5//:pgx",
+        "@com_github_jackc_pgx_v5//pgxpool",
+        "@com_github_jackc_pgx_v5//stdlib",
+        "@com_github_samber_do_v2//:do",
+    ],
+)

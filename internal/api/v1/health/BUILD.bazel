@@ -1,0 +1,9 @@
+load("//third_party/bazel:go_rules.bzl", "go_api_library")
+
+go_api_library(
+    name = "health",
+    srcs = ["health.go"],
+    importpath = "go.patchbase.net/server/internal/api/v1/health",
+    visibility = ["//:__subpackages__"],
+    deps = ["//internal/api/webutil"],
+)

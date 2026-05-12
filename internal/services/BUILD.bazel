@@ -1,0 +1,20 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "services",
+    srcs = [
+        "auth.go",
+        "settings.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/services",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/sql",
+        "//internal/sql/id",
+        "//internal/utils",
+        "@com_github_golang_jwt_jwt_v5//:jwt",
+        "@com_github_jackc_pgx_v5//:pgx",
+        "@com_github_jackc_pgx_v5//pgxpool",
+        "@com_github_samber_do_v2//:do",
+    ],
+)

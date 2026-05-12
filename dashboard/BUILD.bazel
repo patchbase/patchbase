@@ -1,0 +1,18 @@
+load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@rules_go//go:def.bzl", "go_library")
+
+# gazelle:prefix go.patchbase.net/dashboard
+# gazelle:proto disable
+# gazelle:go_test file
+
+gazelle(
+    name = "gazelle",
+)
+
+go_library(
+    name = "dashboard",
+    srcs = ["embed.go"],
+    embedsrcs = ["dist/test.txt"],
+    importpath = "go.patchbase.net/dashboard",
+    visibility = ["//visibility:public"],
+)

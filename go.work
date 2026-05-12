@@ -1,7 +1,8 @@
-go 1.25
+go 1.25.10
 
-toolchain go1.25.10
-
-use ./agent
-
-use ./proto/agent
+use (
+	.
+	./agent
+	./dashboard
+	./proto/agent
+)

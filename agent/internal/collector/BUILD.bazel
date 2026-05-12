@@ -11,7 +11,7 @@ go_library(
     importpath = "go.patchbase.net/agent/internal/collector",
     visibility = ["//agent:__subpackages__"],
     deps = [
-        "//proto/agent:agent_proto_go",
+        "//proto/agent",
         "@com_github_spf13_afero//:afero",
         "@org_golang_google_protobuf//types/known/timestamppb",
     ],
@@ -23,7 +23,7 @@ go_test(
     srcs = ["packages_test.go"],
     embed = [":collector"],
     deps = [
-        "//proto/agent:agent_proto_go",
+        "//proto/agent",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
@@ -35,7 +35,7 @@ go_test(
     srcs = ["repos_test.go"],
     embed = [":collector"],
     deps = [
-        "//proto/agent:agent_proto_go",
+        "//proto/agent",
         "@com_github_spf13_afero//:afero",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",

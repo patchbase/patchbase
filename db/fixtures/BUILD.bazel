@@ -1,0 +1,11 @@
+filegroup(
+    name = "fixtures",
+    srcs = glob(
+        [
+            "*.yml",
+            "*.yaml",
+        ],
+        allow_empty = True,
+    ),
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,14 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "auth",
+    srcs = ["middleware.go"],
+    importpath = "go.patchbase.net/server/internal/api/auth",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/api/webutil",
+        "//internal/services",
+        "//internal/sql",
+        "@com_github_samber_do_v2//:do",
+    ],
+)

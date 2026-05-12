@@ -1,0 +1,12 @@
+load("//third_party/bazel:go_rules.bzl", "go_api_library")
+
+go_api_library(
+    name = "entities",
+    srcs = ["timestamp.go"],
+    importpath = "go.patchbase.net/server/internal/api/v1/entities",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/utils",
+        "@com_github_jackc_pgx_v5//pgtype",
+    ],
+)

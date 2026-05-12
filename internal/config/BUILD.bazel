@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "config",
+    srcs = [
+        "api.go",
+        "config.go",
+        "database.go",
+        "ssl.go",
+        "viper.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/config",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@com_github_samber_do_v2//:do",
+        "@com_github_spf13_viper//:viper",
+    ],
+)

@@ -1,0 +1,26 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "sql",
+    srcs = [
+        "db.go",
+        "extra.go",
+        "injector.go",
+        "models.go",
+        "querier.go",
+        "settings.sql.go",
+        "users.sql.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/sql",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/config",
+        "//internal/utils",
+        "@com_github_jackc_pgerrcode//:pgerrcode",
+        "@com_github_jackc_pgx_v5//:pgx",
+        "@com_github_jackc_pgx_v5//pgconn",
+        "@com_github_jackc_pgx_v5//pgtype",
+        "@com_github_jackc_pgx_v5//pgxpool",
+        "@com_github_samber_do_v2//:do",
+    ],
+)

@@ -1,0 +1,18 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "di",
+    srcs = ["injector.go"],
+    importpath = "go.patchbase.net/server/internal/di",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/api",
+        "//internal/api/auth",
+        "//internal/config",
+        "//internal/queue",
+        "//internal/services",
+        "//internal/sql",
+        "//internal/utils",
+        "@com_github_samber_do_v2//:do",
+    ],
+)

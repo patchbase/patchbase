@@ -6,7 +6,7 @@ go_library(
     importpath = "go.patchbase.net/agent/internal/client",
     visibility = ["//agent:__subpackages__"],
     deps = [
-        "//proto/agent:agent_proto_go",
+        "//proto/agent",
         "@org_golang_google_protobuf//proto",
     ],
 )

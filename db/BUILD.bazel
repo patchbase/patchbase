@@ -1,0 +1,122 @@
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+# gazelle:ignore
+
+filegroup(
+    name = "sqlc-config",
+    srcs = ["sqlc.yaml"],
+)
+
+filegroup(
+    name = "db-schema",
+    srcs = ["schema.sql"],
+    visibility = ["//:__subpackages__"],
+)
+
+genrule(
+    name = "sqlc_gen",
+    srcs = [
+        ":sqlc-config",
+        ":db-schema",
+        "//db/queries",
+    ],
+    outs = [
+        "gen/db.go",
+        "gen/models.go",
+        "gen/querier.go",
+        "gen/settings.sql.go",
+        "gen/users.sql.go",
+    ],
+    cmd = """
+    mkdir -p db/gen
+    $(location @sqlc//:sqlc) generate --file $(location :sqlc-config)
+
+    mv db/gen/*.go $(BINDIR)/db/gen
+    """,
+    tools = ["@sqlc"],
+)
+
+write_file(
+    name = "copy_sqlc",
+    out = "copy_sqlc.sh",
+    content = [
+        "#!/usr/bin/env bash",
+        "cd $BUILD_WORKSPACE_DIRECTORY",
+        "mkdir -p internal/sql",
+        "cp -fv bazel-bin/db/gen/*.go internal/sql/",
+    ],
+)
+
+sh_binary(
+    name = "sqlc",
+    srcs = ["copy_sqlc.sh"],
+    data = [
+        ":sqlc_gen",
+    ],
+)
+
+# `bazel run //db:regen_schema` regenerates db/schema.sql from the full migration chain:
+# - spin up a throwaway postgres container
+# - apply every internal/migrations/files/*.sql in order
+# - pg_dump the result
+# - strip pg_dump's non-deterministic header lines.
+# No sandbox inputs
+# the script reads live migration files from $BUILD_WORKSPACE_DIRECTORY and writes schema.sql back there.
+write_file(
+    name = "regen_schema_script",
+    out = "regen_schema.sh",
+    content = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd \"${BUILD_WORKSPACE_DIRECTORY:?must be run via bazel run}\"",
+        "PG_IMAGE=postgres:16.13",
+        "echo \"==> starting throwaway $PG_IMAGE\"",
+        # 5434 sits just above the compose.test.yaml ports (5433 postgres_test)
+        # Bound to loopback only so the throwaway DB isn't exposed off-host.
+        "HOST_PORT=5434",
+        "CONTAINER=$(docker run -d --rm -p 127.0.0.1:$HOST_PORT:5432 -e POSTGRES_PASSWORD=postgres \"$PG_IMAGE\")",
+        "trap 'docker rm -f \"$CONTAINER\" >/dev/null 2>&1 || true' EXIT",
+        "echo \"==> waiting for postgres (host port $HOST_PORT)\"",
+        # Postgres's docker entrypoint runs the bootstrapping server on a unix socket only (`listen_addresses=''`)
+        # to apply POSTGRES_PASSWORD and /docker-entrypoint-initdb.d/ then restarts for real with TCP enabled.
+        # Probing via TCP naturally blocks until the real server is up.
+        "for _ in $(seq 1 120); do",
+        "    if docker exec -e PGPASSWORD=postgres \"$CONTAINER\" \\",
+        "        psql -U postgres -h 127.0.0.1 -d postgres -c 'SELECT 1' >/dev/null 2>&1; then break; fi",
+        "    sleep 0.5",
+        "done",
+        "docker exec -e PGPASSWORD=postgres \"$CONTAINER\" \\",
+        "    psql -U postgres -h 127.0.0.1 -d postgres -c 'CREATE DATABASE schema_regen' >/dev/null",
+        "echo \"==> applying migrations via patchbase-server migrate\"",
+        # Run the same migrate code path production does.
+        # --database-url lets us point at the ephemeral DB without standing up a config file
+        # the binary gets built by bazel run's dep closure.
+        "DB_URL=\"postgres://postgres:postgres@127.0.0.1:$HOST_PORT/schema_regen?sslmode=disable\"",
+        "bazel run //cmd/patchbase-server -- migrate --database-url \"$DB_URL\"",
+        "echo \"==> dumping schema\"",
+        # --no-owner / --no-privileges match the baseline header's stripping
+        # list (ISO/RPM installs may not have a `postgres` role).
+        # Further strip the pg_dump version banner, goose-unfriendly search_path reset
+        # and the \\restrict/\\unrestrict tokens.
+        "docker exec \"$CONTAINER\" pg_dump -U postgres --schema-only --no-owner --no-privileges schema_regen \\",
+        "    | sed -E \\",
+        "        -e '/^-- Dumped (from|by)/d' \\",
+        "        -e \"/^SELECT pg_catalog\\\\.set_config\\\\('search_path'/d\" \\",
+        "        -e '/^\\\\(restrict|unrestrict) /d' \\",
+        "    > db/schema.sql",
+        "echo \"==> db/schema.sql regenerated\"",
+        # Chain sqlc so the generated bindings stay in step with the new
+        # schema. A common footgun was regenerating schema.sql and forgetting
+        # this, then wondering why sqlc types look stale.
+        "echo \"==> regenerating sqlc bindings\"",
+        "bazel run //db:sqlc",
+        "echo \"==> done — review: git diff db/schema.sql internal/sql/\"",
+    ],
+    is_executable = True,
+)
+
+sh_binary(
+    name = "regen_schema",
+    srcs = ["regen_schema.sh"],
+)

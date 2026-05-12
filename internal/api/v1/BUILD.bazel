@@ -1,0 +1,2 @@
+# gazelle:map_kind go_library go_api_library //third_party/bazel:go_rules.bzl
+# gazelle:map_kind go_test integration_test //third_party/bazel:go_rules.bzl

@@ -1,0 +1,20 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "cli",
+    srcs = [
+        "main.go",
+        "migrate.go",
+        "serve.go",
+        "version.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/cli",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/api",
+        "//internal/config",
+        "//internal/di",
+        "//internal/migrations",
+        "@com_github_spf13_cobra//:cobra",
+    ],
+)

@@ -1,0 +1,16 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "id",
+    srcs = ["id.go"],
+    importpath = "go.patchbase.net/server/internal/sql/id",
+    visibility = ["//:__subpackages__"],
+    deps = ["@com_github_matoous_go_nanoid_v2//:go-nanoid"],
+)
+
+go_test(
+    name = "id_test",
+    srcs = ["id_test.go"],
+    embed = [":id"],
+    deps = ["@com_github_stretchr_testify//assert"],
+)

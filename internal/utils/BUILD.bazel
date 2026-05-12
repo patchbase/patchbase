@@ -1,0 +1,45 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "utils",
+    srcs = [
+        "collections.go",
+        "log.go",
+        "option.go",
+        "password.go",
+        "random.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/utils",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "@in_gopkg_yaml_v3//:yaml_v3",
+        "@org_golang_x_crypto//bcrypt",
+    ],
+)
+
+go_test(
+    name = "collections_test",
+    srcs = ["collections_test.go"],
+    embed = [":utils"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "option_test",
+    srcs = ["option_test.go"],
+    embed = [":utils"],
+    deps = ["@com_github_stretchr_testify//require"],
+)
+
+go_test(
+    name = "password_test",
+    srcs = ["password_test.go"],
+    embed = [":utils"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

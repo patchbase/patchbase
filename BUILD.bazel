@@ -1,5 +1,6 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
 
+# gazelle:prefix go.patchbase.net/server
 # gazelle:proto disable
 # gazelle:go_test file
 
@@ -7,5 +8,7 @@ gazelle(
     name = "gazelle",
     args = [
         "agent",
+        "dashboard",
+        ".",
     ],
 )

@@ -1,0 +1,38 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "api",
+    srcs = [
+        "middleware.go",
+        "routes.go",
+        "server.go",
+        "web.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/api",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//dashboard",
+        "//internal/api/auth",
+        "//internal/api/v1/auth",
+        "//internal/api/v1/health",
+        "//internal/api/v1/setup",
+        "//internal/api/webutil",
+        "//internal/config",
+        "//internal/services",
+        "//internal/utils",
+        "@com_github_jackc_pgx_v5//:pgx",
+        "@com_github_riverqueue_river//:river",
+        "@com_github_samber_do_v2//:do",
+    ],
+)
+
+go_test(
+    name = "middleware_test",
+    size = "small",
+    srcs = ["middleware_test.go"],
+    embed = [":api"],
+    deps = [
+        "//internal/api/webutil",
+        "@com_github_stretchr_testify//assert",
+    ],
+)

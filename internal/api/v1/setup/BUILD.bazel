@@ -1,0 +1,29 @@
+load("//third_party/bazel:go_rules.bzl", "go_api_library", "integration_test")
+
+go_api_library(
+    name = "setup",
+    srcs = [
+        "complete.go",
+        "status.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/api/v1/setup",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/api/auth",
+        "//internal/api/webutil",
+        "//internal/services",
+        "@com_github_samber_do_v2//:do",
+    ],
+)
+
+integration_test(
+    name = "setup_test",
+    srcs = ["setup_test.go"],
+    deps = [
+        "//internal/services",
+        "//internal/testing",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
