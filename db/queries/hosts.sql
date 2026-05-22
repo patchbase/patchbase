@@ -68,7 +68,7 @@ new_ssh_pull AS (
     )
     RETURNING *
 )
-SELECT 
+SELECT
     sqlc.embed(hosts),
     nsp.pull_ssh_user,
     nsp.pull_frequency_minutes,
@@ -207,4 +207,22 @@ WHERE h.id = $1;
 -- name: GetSSHPullConfigByHostID :one
 SELECT *
 FROM host_ssh_pull
+WHERE host_id = $1;
+
+-- name: UpdateHostAdvisoryScopeKey :exec
+UPDATE hosts
+SET advisory_scope_key = $2
+WHERE id = $1;
+
+-- name: ListApprovedSSHHosts :many
+SELECT
+    h.id,
+    hp.pull_frequency_minutes
+FROM hosts h
+JOIN host_ssh_pull hp ON hp.host_id = h.id
+WHERE h.onboarding_mode = 'ssh' AND h.approval_status = 'approved' AND hp.onboarded = true;
+
+-- name: SetSSHPullOnboarded :exec
+UPDATE host_ssh_pull
+SET onboarded = $2
 WHERE host_id = $1;

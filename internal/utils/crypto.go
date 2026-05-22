@@ -6,12 +6,19 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"fmt"
 	"io"
 
 	"github.com/samber/do/v2"
 	"go.patchbase.net/server/internal/config"
 )
+
+// SHA256 returns the hexadecimal representation of the SHA-256 hash of the input string.
+func SHA256(input string) string {
+	sum := sha256.Sum256([]byte(input))
+	return hex.EncodeToString(sum[:])
+}
 
 type Crypto interface {
 	Encrypt(plainText string) (string, error)

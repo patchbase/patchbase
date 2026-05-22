@@ -84,6 +84,26 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: advisory_scopes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.advisory_scopes (
+    scope_key text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    last_sync_at timestamp with time zone,
+    last_success_at timestamp with time zone,
+    last_error text,
+    advisory_count integer DEFAULT 0 NOT NULL,
+    sha256 text,
+    size_bytes bigint DEFAULT 0 NOT NULL,
+    local_path text,
+    next_refresh_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: goose_db_version; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -175,7 +195,8 @@ CREATE TABLE public.host_ssh_pull (
     pull_private_key text,
     pull_last_run_at timestamp with time zone,
     pull_last_run_status text,
-    pull_last_run_error text
+    pull_last_run_error text,
+    onboarded boolean DEFAULT false NOT NULL
 );
 
 
@@ -218,6 +239,7 @@ CREATE TABLE public.hosts (
     last_snapshot_id text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    advisory_scope_key text,
     CONSTRAINT hosts_approval_status_check CHECK ((approval_status = ANY (ARRAY['waiting_approval'::text, 'approved'::text, 'rejected'::text]))),
     CONSTRAINT hosts_id_prefix_check CHECK ((id ~~ like_escape('h\_%'::text, '\'::text))),
     CONSTRAINT hosts_onboarding_mode_check CHECK ((onboarding_mode = ANY (ARRAY['agent'::text, 'ssh'::text])))
@@ -402,6 +424,14 @@ ALTER TABLE ONLY public.river_job ALTER COLUMN id SET DEFAULT nextval('public.ri
 
 
 --
+-- Name: advisory_scopes advisory_scopes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.advisory_scopes
+    ADD CONSTRAINT advisory_scopes_pkey PRIMARY KEY (scope_key);
+
+
+--
 -- Name: goose_db_version goose_db_version_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -558,6 +588,13 @@ CREATE INDEX host_snapshots_host_collected_idx ON public.host_snapshots USING bt
 
 
 --
+-- Name: hosts_advisory_scope_key_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX hosts_advisory_scope_key_idx ON public.hosts USING btree (advisory_scope_key);
+
+
+--
 -- Name: hosts_approval_status_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -635,6 +672,13 @@ CREATE UNIQUE INDEX users_email_active_unique_idx ON public.users USING btree (e
 
 
 --
+-- Name: advisory_scopes advisory_scopes_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER advisory_scopes_set_updated_at BEFORE UPDATE ON public.advisory_scopes FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
 -- Name: hosts hosts_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -701,6 +745,14 @@ ALTER TABLE ONLY public.host_ssh_pull
 
 ALTER TABLE ONLY public.host_ssh_pull_jobs
     ADD CONSTRAINT host_ssh_pull_jobs_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: hosts hosts_advisory_scope_key_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosts
+    ADD CONSTRAINT hosts_advisory_scope_key_fkey FOREIGN KEY (advisory_scope_key) REFERENCES public.advisory_scopes(scope_key) ON DELETE SET NULL;
 
 
 --

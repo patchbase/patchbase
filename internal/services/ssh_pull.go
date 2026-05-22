@@ -182,9 +182,10 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 	var availableUpdates int32
 	if len(parts) >= 2 && osFamily != "unknown" {
 		updatesSection := parts[1]
-		if osFamily == "apt" {
+		switch osFamily {
+		case "apt":
 			availableUpdates = countAptPackageUpdates(updatesSection)
-		} else if osFamily == "rpm" {
+		case "rpm":
 			availableUpdates = countRpmPackageUpdates(updatesSection)
 		}
 	}

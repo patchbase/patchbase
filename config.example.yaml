@@ -3,3 +3,5 @@ api:
 database:
   url: "postgres://postgres:postgres@localhost:5432/patchbase?sslmode=disable"
 encryption_key: "this-is-not-a-real-encryption-key-please-provide-one"
+advisory_sync:
+  storage_dir: "/tmp/patchbase-dev"

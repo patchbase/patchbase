@@ -3,14 +3,17 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "services",
     srcs = [
+        "advisory_sync.go",
         "auth.go",
         "hosts.go",
+        "periodic.go",
         "settings.go",
         "ssh_pull.go",
     ],
     importpath = "go.patchbase.net/server/internal/services",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/config",
         "//internal/sql",
         "//internal/sql/id",
         "//internal/utils",
@@ -22,7 +25,9 @@ go_library(
         "@com_github_riverqueue_river//:river",
         "@com_github_riverqueue_river_rivertype//:rivertype",
         "@com_github_samber_do_v2//:do",
+        "@com_github_spf13_afero//:afero",
         "@org_golang_google_protobuf//proto",
+        "@org_modernc_sqlite//:sqlite",
     ],
 )
 
@@ -32,4 +37,42 @@ go_test(
     srcs = ["ssh_pull_test.go"],
     embed = [":services"],
     deps = ["@com_github_stretchr_testify//assert"],
+)
+
+go_test(
+    name = "advisory_sync_test",
+    size = "small",
+    srcs = ["advisory_sync_test.go"],
+    deps = [
+        ":services",
+        "//internal/sql",
+        "//internal/testing",
+        "//internal/utils",
+        "@com_github_jackc_pgx_v5//pgtype",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "hosts_test",
+    size = "small",
+    srcs = ["hosts_test.go"],
+    data = ["//db/fixtures"],
+    deps = [
+        ":services",
+        "//internal/sql",
+        "//internal/sql/id",
+        "//internal/testing",
+        "//internal/utils",
+        "//proto/agent",
+        "@com_github_jackc_pgx_v5//:pgx",
+        "@com_github_jackc_pgx_v5//pgxpool",
+        "@com_github_riverqueue_river//:river",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
 )

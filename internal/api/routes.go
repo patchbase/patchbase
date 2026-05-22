@@ -6,6 +6,7 @@ import (
 
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
+	advisoriesv1 "go.patchbase.net/server/internal/api/v1/advisories"
 	agentv1 "go.patchbase.net/server/internal/api/v1/agent"
 	authv1 "go.patchbase.net/server/internal/api/v1/auth"
 	"go.patchbase.net/server/internal/api/v1/health"
@@ -30,6 +31,10 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 	mux.HandleFunc("POST /api/v1/setup/complete", auth.Required(setupv1.Complete(i)))
 	mux.HandleFunc("POST /api/v1/agent/register", agentv1.Register(i))
 	mux.HandleFunc("POST /api/v1/agent/snapshots", agentv1.Snapshots(i))
+
+	mux.HandleFunc("GET /api/v1/advisories/scopes", auth.Required(advisoriesv1.GetScopeStatuses(i)))
+	mux.HandleFunc("POST /api/v1/advisories/scopes/{scopeKey}/sync", auth.Required(advisoriesv1.TriggerSync(i)))
+	mux.HandleFunc("GET /api/v1/advisories/overview", auth.Required(advisoriesv1.GetOverview(i)))
 
 	mux.HandleFunc("GET /api/v1/hosts", auth.Required(hostsv1.ListHosts(i)))
 	mux.HandleFunc("GET /api/v1/hosts/pending", auth.Required(hostsv1.ListPending(i)))

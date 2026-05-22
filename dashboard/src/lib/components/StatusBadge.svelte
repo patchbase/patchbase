@@ -31,6 +31,7 @@
 		success: 'green',
 		failed: 'red',
 		running: 'blue',
+		pending: 'purple',
 	};
 
 	let color = $derived(colors[status] || 'purple');
@@ -48,6 +49,7 @@
 		success: 'Success',
 		failed: 'Failed',
 		running: 'Running',
+		pending: 'Pending',
 	};
 
 	let display = $derived(labels[status] || status.replace(/_/g, ' '));

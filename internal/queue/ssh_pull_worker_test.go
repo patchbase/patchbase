@@ -26,7 +26,7 @@ func (m *mockHosts) RunSSHPull(ctx context.Context, hostID string) error {
 func TestSSHPullWorker_Work_HostNotFound(t *testing.T) {
 	injector := do.New()
 	do.ProvideValue[*slog.Logger](injector, slog.Default())
-	
+
 	mock := &mockHosts{
 		RunSSHPullFunc: func(ctx context.Context, hostID string) error {
 			return services.ErrHostNotFound
@@ -50,13 +50,13 @@ func TestSSHPullWorker_Work_HostNotFound(t *testing.T) {
 func TestSSHPullWorker_Work_CommandErrorCancel(t *testing.T) {
 	injector := do.New()
 	do.ProvideValue[*slog.Logger](injector, slog.Default())
-	
+
 	sshErr := &services.SSHPullError{
 		ExitCode: 1,
 		Message:  "bash: command not found",
 		Err:      errors.New("exit status 1"),
 	}
-	
+
 	mock := &mockHosts{
 		RunSSHPullFunc: func(ctx context.Context, hostID string) error {
 			return sshErr
@@ -80,13 +80,13 @@ func TestSSHPullWorker_Work_CommandErrorCancel(t *testing.T) {
 func TestSSHPullWorker_Work_ConnectionErrorRetry(t *testing.T) {
 	injector := do.New()
 	do.ProvideValue[*slog.Logger](injector, slog.Default())
-	
+
 	sshErr := &services.SSHPullError{
 		ExitCode: 255,
 		Message:  "ssh: connect to host myhost port 22: Connection timed out",
 		Err:      errors.New("exit status 255"),
 	}
-	
+
 	mock := &mockHosts{
 		RunSSHPullFunc: func(ctx context.Context, hostID string) error {
 			return sshErr

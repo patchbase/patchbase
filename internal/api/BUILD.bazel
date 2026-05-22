@@ -13,6 +13,7 @@ go_library(
     deps = [
         "//dashboard",
         "//internal/api/auth",
+        "//internal/api/v1/advisories",
         "//internal/api/v1/agent",
         "//internal/api/v1/auth",
         "//internal/api/v1/health",

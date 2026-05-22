@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	gotesting "testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/do/v2"
@@ -81,6 +82,9 @@ func NewBackend(t *gotesting.T, opts ...Option) *Backend {
 		Database: config.Database{
 			URL:      options.databaseURL,
 			LogLevel: config.DefaultDatabaseLogLevel,
+		},
+		AdvisorySync: config.AdvisorySync{
+			RefreshInterval: 1 * time.Hour,
 		},
 		EncryptionKey: "test-encryption-key-for-unit-tests",
 	}

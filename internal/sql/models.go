@@ -60,6 +60,21 @@ func (ns NullRiverJobState) Value() (driver.Value, error) {
 	return string(ns.RiverJobState), nil
 }
 
+type AdvisoryScope struct {
+	ScopeKey      string
+	Status        string
+	LastSyncAt    pgtype.Timestamptz
+	LastSuccessAt pgtype.Timestamptz
+	LastError     utils.Option[string]
+	AdvisoryCount int32
+	Sha256        utils.Option[string]
+	SizeBytes     int64
+	LocalPath     utils.Option[string]
+	NextRefreshAt pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+	UpdatedAt     pgtype.Timestamptz
+}
+
 type GooseDbVersion struct {
 	ID        int32
 	VersionID int64
@@ -88,6 +103,7 @@ type Host struct {
 	LastSnapshotID      utils.Option[string]
 	CreatedAt           pgtype.Timestamptz
 	UpdatedAt           pgtype.Timestamptz
+	AdvisoryScopeKey    utils.Option[string]
 }
 
 type HostAccessToken struct {
@@ -136,6 +152,7 @@ type HostSshPull struct {
 	PullLastRunAt        pgtype.Timestamptz
 	PullLastRunStatus    utils.Option[string]
 	PullLastRunError     utils.Option[string]
+	Onboarded            bool
 }
 
 type HostSshPullJob struct {

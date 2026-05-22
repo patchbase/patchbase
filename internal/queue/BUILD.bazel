@@ -3,19 +3,23 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "queue",
     srcs = [
+        "advisory_sync_worker.go",
         "noop_worker.go",
+        "periodic.go",
         "river.go",
         "ssh_pull_worker.go",
     ],
     importpath = "go.patchbase.net/server/internal/queue",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/config",
         "//internal/services",
         "//internal/sql",
         "@com_github_jackc_pgx_v5//:pgx",
         "@com_github_jackc_pgx_v5//pgxpool",
         "@com_github_riverqueue_river//:river",
         "@com_github_riverqueue_river_riverdriver_riverpgxv5//:riverpgxv5",
+        "@com_github_riverqueue_river_rivertype//:rivertype",
         "@com_github_samber_do_v2//:do",
     ],
 )
@@ -27,6 +31,36 @@ go_test(
     deps = [
         ":queue",
         "//internal/services",
+        "@com_github_riverqueue_river//:river",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "advisory_sync_worker_test",
+    size = "small",
+    srcs = ["advisory_sync_worker_test.go"],
+    deps = [
+        ":queue",
+        "//internal/services",
+        "@com_github_riverqueue_river//:river",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "periodic_test",
+    size = "small",
+    srcs = ["periodic_test.go"],
+    deps = [
+        ":queue",
+        "//internal/testing",
+        "@com_github_jackc_pgx_v5//:pgx",
+        "@com_github_jackc_pgx_v5//pgxpool",
         "@com_github_riverqueue_river//:river",
         "@com_github_samber_do_v2//:do",
         "@com_github_stretchr_testify//assert",

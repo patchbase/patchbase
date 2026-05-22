@@ -34,6 +34,11 @@ func New(ctx context.Context, injector do.Injector) (*Server, error) {
 		return nil, fmt.Errorf("initial setup: %w", err)
 	}
 
+	periodicJobManager := do.MustInvoke[services.PeriodicJobManager](injector)
+	if err := periodicJobManager.Initialize(ctx); err != nil {
+		return nil, fmt.Errorf("failed to initialize periodic jobs: %w", err)
+	}
+
 	addr := fmt.Sprintf("%s:%d", cfg.API.ListenAddress, cfg.API.Port)
 
 	return &Server{

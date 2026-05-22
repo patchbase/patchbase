@@ -22,6 +22,7 @@ type Querier interface {
 	GetActiveHostAccessTokenByHash(ctx context.Context, tokenHash string) (HostAccessToken, error)
 	GetActiveRegistrationTokenByHash(ctx context.Context, tokenHash string) (RegistrationToken, error)
 	GetAdminUser(ctx context.Context) (User, error)
+	GetAdvisoryScope(ctx context.Context, scopeKey string) (AdvisoryScope, error)
 	GetHostByID(ctx context.Context, id string) (Host, error)
 	GetHostWithStateByID(ctx context.Context, id string) (GetHostWithStateByIDRow, error)
 	GetLatestHostSnapshotByHostID(ctx context.Context, hostID string) (HostSnapshot, error)
@@ -29,22 +30,31 @@ type Querier interface {
 	GetSetting(ctx context.Context, key string) (Setting, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
+	InsertAdvisoryScopeIfNotExists(ctx context.Context, arg InsertAdvisoryScopeIfNotExistsParams) error
 	InsertAgentHost(ctx context.Context, arg InsertAgentHostParams) (Host, error)
 	InsertHostAccessToken(ctx context.Context, arg InsertHostAccessTokenParams) (HostAccessToken, error)
 	InsertHostSSHPullJob(ctx context.Context, arg InsertHostSSHPullJobParams) (HostSshPullJob, error)
 	InsertHostSnapshot(ctx context.Context, arg InsertHostSnapshotParams) (HostSnapshot, error)
 	InsertRegistrationToken(ctx context.Context, arg InsertRegistrationTokenParams) (RegistrationToken, error)
 	InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (InsertSSHHostRow, error)
+	ListAdvisoryScopeStats(ctx context.Context) ([]ListAdvisoryScopeStatsRow, error)
+	ListAdvisoryScopes(ctx context.Context) ([]AdvisoryScope, error)
+	ListApprovedSSHHosts(ctx context.Context) ([]ListApprovedSSHHostsRow, error)
 	ListHostSSHPullJobsByHostID(ctx context.Context, arg ListHostSSHPullJobsByHostIDParams) ([]HostSshPullJob, error)
 	ListHostsWithState(ctx context.Context) ([]ListHostsWithStateRow, error)
 	ListPendingHosts(ctx context.Context) ([]Host, error)
 	ListRegistrationTokens(ctx context.Context) ([]RegistrationToken, error)
 	RevokeRegistrationToken(ctx context.Context, id string) (RegistrationToken, error)
+	SetSSHPullOnboarded(ctx context.Context, arg SetSSHPullOnboardedParams) error
 	TouchHostAccessTokenLastUsed(ctx context.Context, id string) error
 	TouchRegistrationTokenLastUsed(ctx context.Context, id string) error
+	UpdateAdvisoryScopeStatus(ctx context.Context, arg UpdateAdvisoryScopeStatusParams) (AdvisoryScope, error)
+	UpdateHostAdvisoryScopeKey(ctx context.Context, arg UpdateHostAdvisoryScopeKeyParams) error
 	UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFromSnapshotParams) (Host, error)
 	UpdateHostSSHPullJob(ctx context.Context, arg UpdateHostSSHPullJobParams) (HostSshPullJob, error)
 	UpdateSSHPullRun(ctx context.Context, arg UpdateSSHPullRunParams) error
+	UpsertAdvisoryScope(ctx context.Context, arg UpsertAdvisoryScopeParams) (AdvisoryScope, error)
+	UpsertAdvisoryScopeStatus(ctx context.Context, arg UpsertAdvisoryScopeStatusParams) (AdvisoryScope, error)
 	UpsertHostCurrentState(ctx context.Context, arg UpsertHostCurrentStateParams) error
 	UpsertSetting(ctx context.Context, arg UpsertSettingParams) (Setting, error)
 }

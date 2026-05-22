@@ -22,6 +22,7 @@ genrule(
         "//db/queries",
     ],
     outs = [
+        "gen/advisories.sql.go",
         "gen/db.go",
         "gen/host_access_tokens.sql.go",
         "gen/host_snapshots.sql.go",

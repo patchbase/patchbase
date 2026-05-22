@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "sql",
     srcs = [
+        "advisories.sql.go",
         "db.go",
         "extra.go",
         "host_access_tokens.sql.go",

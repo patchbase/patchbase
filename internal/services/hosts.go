@@ -2,8 +2,6 @@ package services
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net"
@@ -19,9 +17,6 @@ import (
 	"go.patchbase.net/server/internal/sql/id"
 	"go.patchbase.net/server/internal/utils"
 	"google.golang.org/protobuf/proto"
-
-	"github.com/riverqueue/river"
-	"github.com/riverqueue/river/rivertype"
 )
 
 const (
@@ -65,12 +60,13 @@ type Hosts interface {
 }
 
 type hosts struct {
-	pool      *pgxpool.Pool
-	sql       sql.Querier
-	random    utils.RandomStringGenerator
-	sshRunner SSHPullRunner
-	crypto    utils.Crypto
-	injector  do.Injector
+	pool               *pgxpool.Pool
+	sql                sql.Querier
+	random             utils.RandomStringGenerator
+	sshRunner          SSHPullRunner
+	crypto             utils.Crypto
+	injector           do.Injector
+	periodicJobManager PeriodicJobManager
 }
 
 type CreatedRegistrationToken struct {
@@ -175,14 +171,19 @@ func NewHosts(i do.Injector) (Hosts, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get crypto: %w", err)
 	}
+	periodicJobManager, err := do.Invoke[PeriodicJobManager](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get periodic job manager: %w", err)
+	}
 
 	return &hosts{
-		pool:      pool,
-		sql:       queries,
-		random:    random,
-		sshRunner: defaultSSHPullRunner{},
-		crypto:    crypto,
-		injector:  i,
+		pool:               pool,
+		sql:                queries,
+		random:             random,
+		sshRunner:          defaultSSHPullRunner{},
+		crypto:             crypto,
+		injector:           i,
+		periodicJobManager: periodicJobManager,
 	}, nil
 }
 
@@ -196,7 +197,7 @@ func (s *hosts) CreateRegistrationToken(ctx context.Context, userID string, name
 	created, err := s.sql.InsertRegistrationToken(ctx, sql.InsertRegistrationTokenParams{
 		ID:              id.New("rtok"),
 		Name:            trimmed,
-		TokenHash:       hashToken(plain),
+		TokenHash:       utils.SHA256(plain),
 		CreatedByUserID: userID,
 	})
 	if err != nil {
@@ -253,7 +254,7 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
-	regToken, err := queries.GetActiveRegistrationTokenByHash(ctx, hashToken(registrationToken))
+	regToken, err := queries.GetActiveRegistrationTokenByHash(ctx, utils.SHA256(registrationToken))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvalidRegistrationToken
@@ -299,7 +300,7 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 	_, err = queries.InsertHostAccessToken(ctx, sql.InsertHostAccessTokenParams{
 		ID:        id.New("htok"),
 		HostID:    host.ID,
-		TokenHash: hashToken(hostAccessToken),
+		TokenHash: utils.SHA256(hostAccessToken),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("insert host access token: %w", err)
@@ -333,7 +334,7 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
-	tokenRow, err := queries.GetActiveHostAccessTokenByHash(ctx, hashToken(trimmedToken))
+	tokenRow, err := queries.GetActiveHostAccessTokenByHash(ctx, utils.SHA256(trimmedToken))
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrInvalidHostAccessToken
@@ -458,6 +459,34 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 		return nil, fmt.Errorf("commit snapshot transaction: %w", err)
 	}
 
+	// Resolve and update advisory scope key (post-commit, outside the transaction using s.sql)
+	advisoriesService, err := do.Invoke[AdvisorySyncService](s.injector)
+	if err == nil {
+		scopeKey, err := advisoriesService.ResolveScopeKey(ctx, osFamily, osName, osVersion, osMajor, architecture)
+		if err == nil {
+			var registerErr error
+			if scopeKey != "" {
+				registerErr = advisoriesService.RegisterScopeDemand(ctx, scopeKey)
+				if registerErr != nil {
+					utils.GetLogger(ctx).Warn("register scope demand failed", "error", registerErr)
+				}
+			}
+			if registerErr == nil {
+				err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
+					ID:               host.ID,
+					AdvisoryScopeKey: optionString(scopeKey),
+				})
+				if err != nil {
+					utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
+				}
+			}
+		} else {
+			utils.GetLogger(ctx).Warn("resolve scope key failed", "error", err)
+		}
+	} else {
+		utils.GetLogger(ctx).Warn("invoke advisory sync service failed", "error", err)
+	}
+
 	return &agentpb.SyncResponse{
 		Accepted:           true,
 		HostId:             host.ID,
@@ -561,34 +590,25 @@ func (s *hosts) OnboardSSHHost(ctx context.Context, hostID string) error {
 		return fmt.Errorf("host is not an SSH host")
 	}
 
-	riverClient, err := do.Invoke[*river.Client[pgx.Tx]](s.injector)
+	cfg, err := s.sql.GetSSHPullConfigByHostID(ctx, hostID)
 	if err != nil {
-		return fmt.Errorf("failed to invoke river client: %w", err)
+		return fmt.Errorf("get ssh pull config: %w", err)
 	}
 
-	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return fmt.Errorf("begin transaction: %w", err)
-	}
-	defer tx.Rollback(ctx) // nolint:errcheck
-
-	_, err = riverClient.InsertTx(ctx, tx, SSHPullArgs{HostID: hostID}, &river.InsertOpts{
-		UniqueOpts: river.UniqueOpts{
-			ByArgs: true,
-			ByState: []rivertype.JobState{
-				rivertype.JobStateAvailable,
-				rivertype.JobStatePending,
-				rivertype.JobStateRunning,
-				rivertype.JobStateScheduled,
-			},
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("failed to enqueue initial ssh pull job: %w", err)
+	frequency := int32(defaultSSHPullFrequency)
+	if cfg.PullFrequencyMinutes != nil && *cfg.PullFrequencyMinutes > 0 {
+		frequency = *cfg.PullFrequencyMinutes
 	}
 
-	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("commit onboard transaction: %w", err)
+	if err := s.sql.SetSSHPullOnboarded(ctx, sql.SetSSHPullOnboardedParams{
+		HostID:    hostID,
+		Onboarded: true,
+	}); err != nil {
+		return fmt.Errorf("set ssh pull onboarded: %w", err)
+	}
+
+	if err := s.periodicJobManager.AddSSHPullJob(ctx, hostID, frequency); err != nil {
+		return fmt.Errorf("add periodic job: %w", err)
 	}
 
 	return nil
@@ -680,6 +700,11 @@ func (s *hosts) DeleteHost(ctx context.Context, hostID string) error {
 		return fmt.Errorf("commit delete host transaction: %w", err)
 	}
 
+	if err := s.periodicJobManager.RemoveSSHPullJob(ctx, trimmedHostID); err != nil {
+		utils.GetLogger(ctx).
+			ErrorContext(ctx, "failed to remove periodic SSH pull job after host deletion", "host_id", trimmedHostID, "error", err)
+	}
+
 	return nil
 }
 
@@ -705,11 +730,6 @@ func normalizeArchitecture(value agentpb.Architecture) string {
 	default:
 		return "unknown"
 	}
-}
-
-func hashToken(token string) string {
-	sum := sha256.Sum256([]byte(token))
-	return hex.EncodeToString(sum[:])
 }
 
 func optionString(value string) utils.Option[string] {
@@ -896,39 +916,6 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 		return fmt.Errorf("get ssh pull config: %w", err)
 	}
 
-	frequencyMinutes := int32(defaultSSHPullFrequency)
-	if cfg.PullFrequencyMinutes != nil && *cfg.PullFrequencyMinutes > 0 {
-		frequencyMinutes = *cfg.PullFrequencyMinutes
-	}
-
-	defer func() {
-		riverClient, err := do.Invoke[*river.Client[pgx.Tx]](s.injector)
-		if err != nil {
-			return
-		}
-
-		tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
-		if err != nil {
-			return
-		}
-		defer tx.Rollback(ctx) // nolint:errcheck
-
-		scheduledAt := time.Now().Add(time.Duration(frequencyMinutes) * time.Minute)
-		_, _ = riverClient.InsertTx(ctx, tx, SSHPullArgs{HostID: hostID}, &river.InsertOpts{
-			ScheduledAt: scheduledAt,
-			UniqueOpts: river.UniqueOpts{
-				ByArgs: true,
-				ByState: []rivertype.JobState{
-					rivertype.JobStateAvailable,
-					rivertype.JobStatePending,
-					rivertype.JobStateRunning,
-					rivertype.JobStateScheduled,
-				},
-			},
-		})
-		_ = tx.Commit(ctx)
-	}()
-
 	jobID := id.New("spjob")
 	_, err = s.sql.InsertHostSSHPullJob(ctx, sql.InsertHostSSHPullJobParams{
 		ID:        jobID,
@@ -1019,6 +1006,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 			if err != nil {
 				return fmt.Errorf("upsert host current state: %w", err)
 			}
+
 		} else {
 			err = queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
 				ID:                hostID,
@@ -1042,6 +1030,37 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 		if err := tx.Commit(ctx); err != nil {
 			return fmt.Errorf("commit job results update transaction: %w", err)
 		}
+
+		// Resolve and update advisory scope key (post-commit, outside the transaction using s.sql)
+		if status == "success" && res != nil {
+			advisoriesService, err := do.Invoke[AdvisorySyncService](s.injector)
+			if err == nil {
+				scopeKey, err := advisoriesService.ResolveScopeKey(ctx, res.OSFamily, res.OSName, res.OSVersion, res.OSMajor, res.Architecture)
+				if err == nil {
+					var registerErr error
+					if scopeKey != "" {
+						registerErr = advisoriesService.RegisterScopeDemand(ctx, scopeKey)
+						if registerErr != nil {
+							utils.GetLogger(ctx).Warn("register scope demand failed", "error", registerErr)
+						}
+					}
+					if registerErr == nil {
+						err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
+							ID:               hostID,
+							AdvisoryScopeKey: optionString(scopeKey),
+						})
+						if err != nil {
+							utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
+						}
+					}
+				} else {
+					utils.GetLogger(ctx).Warn("resolve scope key failed", "error", err)
+				}
+			} else {
+				utils.GetLogger(ctx).Warn("invoke advisory sync service failed", "error", err)
+			}
+		}
+
 		return nil
 	}
 
@@ -1117,4 +1136,3 @@ func (s *hosts) ListSSHPullJobs(ctx context.Context, hostID string) ([]HostSSHPu
 	}
 	return jobs, nil
 }
-

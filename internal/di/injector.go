@@ -29,11 +29,13 @@ func New(ctx context.Context, cfg config.Config) do.Injector {
 	do.Provide(injector, sql.NewPGXPool)
 	do.Provide(injector, sql.NewWithInjector)
 	do.Provide(injector, queue.NewRiverClient)
+	do.Provide(injector, queue.NewPeriodicJobManager)
 
 	// services
 	do.Provide[services.Auth](injector, services.NewAuth)
 	do.Provide[services.Hosts](injector, services.NewHosts)
 	do.Provide[services.Settings](injector, services.NewSettings)
+	do.Provide[services.AdvisorySyncService](injector, services.NewAdvisorySync)
 
 	// api
 	do.Provide[auth.Auth](injector, auth.New)
