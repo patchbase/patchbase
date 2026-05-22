@@ -122,3 +122,61 @@ sh_binary(
         ":node_modules",
     ],
 )
+
+write_file(
+    name = "lint_check_sh",
+    out = "lint_check.sh",
+    content = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd dashboard",
+        "TMP_DIR=$(mktemp -d)",
+        "trap 'rm -rf \"$TMP_DIR\"' EXIT",
+        "cp -rL src \"$TMP_DIR/src\"",
+        "cp -rL static \"$TMP_DIR/static\"",
+        "cp -L package.json \"$TMP_DIR/package.json\"",
+        "cp -L tsconfig.json \"$TMP_DIR/tsconfig.json\"",
+        "cp -L vite.config.ts \"$TMP_DIR/vite.config.ts\"",
+        "cp -L svelte.config.js \"$TMP_DIR/svelte.config.js\"",
+        "node node_modules/oxlint/bin/oxlint --deny-warnings \"$TMP_DIR\"",
+    ],
+)
+
+sh_test(
+    name = "lint_check",
+    size = "small",
+    srcs = ["lint_check.sh"],
+    data = glob([
+        "src/**",
+        "static/**",
+        "*.ts",
+        "*.js",
+        "*.json",
+    ]) + [
+        ":node_modules",
+    ],
+)
+
+write_file(
+    name = "lint_sh",
+    out = "lint.sh",
+    content = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "if [ -n \"${BUILD_WORKSPACE_DIRECTORY:-}\" ]; then",
+        "  cd \"$BUILD_WORKSPACE_DIRECTORY/dashboard\"",
+        "else",
+        "  echo \"Error: This target must be run via 'bazel run'\" >&2",
+        "  exit 1",
+        "fi",
+        "exec node node_modules/oxlint/bin/oxlint --fix .",
+    ],
+)
+
+sh_binary(
+    name = "lint",
+    srcs = ["lint.sh"],
+    data = [
+        ":node_modules",
+    ],
+)
