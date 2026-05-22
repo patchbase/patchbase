@@ -12,7 +12,7 @@
 
 	let { open = false, title, children, footer, onclose, dismissible = true }: Props = $props();
 
-	let dialog: HTMLDialogElement;
+	let dialog: HTMLDialogElement | undefined = undefined;
 
 	$effect(() => {
 		if (dialog) {

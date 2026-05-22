@@ -47,7 +47,7 @@ async function authenticatedRequest(path: string, init?: RequestInit): Promise<a
   return request(path, {
     ...init,
     headers: {
-      ...(init?.headers || {}),
+      ...init?.headers,
       Authorization: `Bearer ${accessToken}`,
     },
   });
