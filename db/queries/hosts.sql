@@ -28,35 +28,57 @@ VALUES (
 RETURNING *;
 
 -- name: InsertSSHHost :one
-INSERT INTO hosts (
-    id,
-    onboarding_mode,
-    approval_status,
-    approved_at,
-    display_name,
-    hostname,
-    ip_address,
-    status,
-    pull_ssh_user,
-    pull_frequency_minutes,
-    pull_public_key,
-    pull_private_key
+WITH new_host AS (
+    INSERT INTO hosts (
+        id,
+        onboarding_mode,
+        approval_status,
+        approved_at,
+        display_name,
+        hostname,
+        ip_address,
+        status
+    )
+    VALUES (
+        $1,
+        'ssh',
+        'approved',
+        now(),
+        $2,
+        $3,
+        $4,
+        'active'
+    )
+    RETURNING *
+),
+new_ssh_pull AS (
+    INSERT INTO host_ssh_pull (
+        host_id,
+        pull_ssh_user,
+        pull_frequency_minutes,
+        pull_public_key,
+        pull_private_key
+    )
+    VALUES (
+        $1,
+        $5,
+        $6,
+        $7,
+        $8
+    )
+    RETURNING *
 )
-VALUES (
-    $1,
-    'ssh',
-    'approved',
-    now(),
-    $2,
-    $3,
-    $4,
-    'active',
-    $5,
-    $6,
-    $7,
-    $8
-)
-RETURNING *;
+SELECT 
+    sqlc.embed(hosts),
+    nsp.pull_ssh_user,
+    nsp.pull_frequency_minutes,
+    nsp.pull_public_key,
+    nsp.pull_private_key,
+    nsp.pull_last_run_at,
+    nsp.pull_last_run_status,
+    nsp.pull_last_run_error
+FROM new_host hosts
+JOIN new_ssh_pull nsp ON nsp.host_id = hosts.id;
 
 -- name: GetHostByID :one
 SELECT *
@@ -106,11 +128,16 @@ WHERE id = $1
 RETURNING *;
 
 -- name: UpdateSSHPullRun :exec
+WITH updated_pull AS (
+    UPDATE host_ssh_pull
+    SET
+        pull_last_run_at = $2,
+        pull_last_run_status = $3,
+        pull_last_run_error = $4
+    WHERE host_id = $1
+)
 UPDATE hosts
 SET
-    pull_last_run_at = $2,
-    pull_last_run_status = $3,
-    pull_last_run_error = $4,
     last_advisory_check_at = $2,
     machine_id = COALESCE($5, machine_id),
     hostname = COALESCE($6, hostname),
@@ -126,6 +153,9 @@ WHERE id = $1;
 -- name: ListHostsWithState :many
 SELECT
     sqlc.embed(h),
+    hp.pull_last_run_at,
+    hp.pull_last_run_status,
+    hp.pull_last_run_error,
     COALESCE(hcs.overall_action, 'none') AS overall_action,
     COALESCE(hcs.critical_count, 0) AS critical_count,
     COALESCE(hcs.important_count, 0) AS important_count,
@@ -138,6 +168,7 @@ SELECT
     COALESCE(hcs.unknown, 0) AS unknown,
     hcs.updated_at AS state_updated_at
 FROM hosts h
+LEFT JOIN host_ssh_pull hp ON hp.host_id = h.id
 LEFT JOIN host_current_state hcs ON hcs.host_id = h.id
 ORDER BY
     CASE COALESCE(hcs.overall_action, 'none')
@@ -154,6 +185,9 @@ ORDER BY
 -- name: GetHostWithStateByID :one
 SELECT
     sqlc.embed(h),
+    hp.pull_last_run_at,
+    hp.pull_last_run_status,
+    hp.pull_last_run_error,
     COALESCE(hcs.overall_action, 'none') AS overall_action,
     COALESCE(hcs.critical_count, 0) AS critical_count,
     COALESCE(hcs.important_count, 0) AS important_count,
@@ -166,5 +200,6 @@ SELECT
     COALESCE(hcs.unknown, 0) AS unknown,
     hcs.updated_at AS state_updated_at
 FROM hosts h
+LEFT JOIN host_ssh_pull hp ON hp.host_id = h.id
 LEFT JOIN host_current_state hcs ON hcs.host_id = h.id
 WHERE h.id = $1;

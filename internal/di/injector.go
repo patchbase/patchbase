@@ -22,6 +22,7 @@ func New(ctx context.Context, cfg config.Config) do.Injector {
 	do.ProvideValue[config.Config](injector, cfg)
 	do.ProvideValue[*slog.Logger](injector, logger)
 	do.ProvideValue[utils.RandomStringGenerator](injector, utils.NewRandomStringGenerator())
+	do.Provide[utils.Crypto](injector, utils.NewCrypto)
 	do.Provide[*http.ServeMux](injector, api.NewMux)
 
 	// database

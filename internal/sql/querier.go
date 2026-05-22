@@ -32,7 +32,7 @@ type Querier interface {
 	InsertHostAccessToken(ctx context.Context, arg InsertHostAccessTokenParams) (HostAccessToken, error)
 	InsertHostSnapshot(ctx context.Context, arg InsertHostSnapshotParams) (HostSnapshot, error)
 	InsertRegistrationToken(ctx context.Context, arg InsertRegistrationTokenParams) (RegistrationToken, error)
-	InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (Host, error)
+	InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (InsertSSHHostRow, error)
 	ListHostsWithState(ctx context.Context) ([]ListHostsWithStateRow, error)
 	ListPendingHosts(ctx context.Context) ([]Host, error)
 	ListRegistrationTokens(ctx context.Context) ([]RegistrationToken, error)

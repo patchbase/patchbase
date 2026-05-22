@@ -18,7 +18,7 @@ SET
     approval_status = 'approved',
     approved_at = now()
 WHERE id = $1
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, created_at, updated_at
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at
 `
 
 func (q *Queries) ApproveHostByID(ctx context.Context, id string) (Host, error) {
@@ -43,13 +43,6 @@ func (q *Queries) ApproveHostByID(ctx context.Context, id string) (Host, error) 
 		&i.LastAdvisoryCheckAt,
 		&i.FirstSeenAt,
 		&i.LastSnapshotID,
-		&i.PullSshUser,
-		&i.PullFrequencyMinutes,
-		&i.PullPublicKey,
-		&i.PullPrivateKey,
-		&i.PullLastRunAt,
-		&i.PullLastRunStatus,
-		&i.PullLastRunError,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -70,7 +63,7 @@ func (q *Queries) ClearHostLastSnapshotByID(ctx context.Context, id string) erro
 const deleteHostByID = `-- name: DeleteHostByID :one
 DELETE FROM hosts
 WHERE id = $1
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, created_at, updated_at
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at
 `
 
 func (q *Queries) DeleteHostByID(ctx context.Context, id string) (Host, error) {
@@ -95,13 +88,6 @@ func (q *Queries) DeleteHostByID(ctx context.Context, id string) (Host, error) {
 		&i.LastAdvisoryCheckAt,
 		&i.FirstSeenAt,
 		&i.LastSnapshotID,
-		&i.PullSshUser,
-		&i.PullFrequencyMinutes,
-		&i.PullPublicKey,
-		&i.PullPrivateKey,
-		&i.PullLastRunAt,
-		&i.PullLastRunStatus,
-		&i.PullLastRunError,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -109,7 +95,7 @@ func (q *Queries) DeleteHostByID(ctx context.Context, id string) (Host, error) {
 }
 
 const getHostByID = `-- name: GetHostByID :one
-SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, created_at, updated_at
+SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at
 FROM hosts
 WHERE id = $1
 `
@@ -136,13 +122,6 @@ func (q *Queries) GetHostByID(ctx context.Context, id string) (Host, error) {
 		&i.LastAdvisoryCheckAt,
 		&i.FirstSeenAt,
 		&i.LastSnapshotID,
-		&i.PullSshUser,
-		&i.PullFrequencyMinutes,
-		&i.PullPublicKey,
-		&i.PullPrivateKey,
-		&i.PullLastRunAt,
-		&i.PullLastRunStatus,
-		&i.PullLastRunError,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -151,7 +130,10 @@ func (q *Queries) GetHostByID(ctx context.Context, id string) (Host, error) {
 
 const getHostWithStateByID = `-- name: GetHostWithStateByID :one
 SELECT
-    h.id, h.onboarding_mode, h.approval_status, h.approved_at, h.display_name, h.machine_id, h.hostname, h.ip_address, h.os_family, h.os_name, h.os_major, h.os_version, h.architecture, h.status, h.last_seen_at, h.last_advisory_check_at, h.first_seen_at, h.last_snapshot_id, h.pull_ssh_user, h.pull_frequency_minutes, h.pull_public_key, h.pull_private_key, h.pull_last_run_at, h.pull_last_run_status, h.pull_last_run_error, h.created_at, h.updated_at,
+    h.id, h.onboarding_mode, h.approval_status, h.approved_at, h.display_name, h.machine_id, h.hostname, h.ip_address, h.os_family, h.os_name, h.os_major, h.os_version, h.architecture, h.status, h.last_seen_at, h.last_advisory_check_at, h.first_seen_at, h.last_snapshot_id, h.created_at, h.updated_at,
+    hp.pull_last_run_at,
+    hp.pull_last_run_status,
+    hp.pull_last_run_error,
     COALESCE(hcs.overall_action, 'none') AS overall_action,
     COALESCE(hcs.critical_count, 0) AS critical_count,
     COALESCE(hcs.important_count, 0) AS important_count,
@@ -164,23 +146,27 @@ SELECT
     COALESCE(hcs.unknown, 0) AS unknown,
     hcs.updated_at AS state_updated_at
 FROM hosts h
+LEFT JOIN host_ssh_pull hp ON hp.host_id = h.id
 LEFT JOIN host_current_state hcs ON hcs.host_id = h.id
 WHERE h.id = $1
 `
 
 type GetHostWithStateByIDRow struct {
-	Host             Host
-	OverallAction    string
-	CriticalCount    int32
-	ImportantCount   int32
-	ModerateCount    int32
-	ActionableCount  int32
-	AvailableUpdates int32
-	NeedsReboot      int32
-	NeedsRestart     int32
-	NoFix            int32
-	Unknown          int32
-	StateUpdatedAt   pgtype.Timestamptz
+	Host              Host
+	PullLastRunAt     pgtype.Timestamptz
+	PullLastRunStatus utils.Option[string]
+	PullLastRunError  utils.Option[string]
+	OverallAction     string
+	CriticalCount     int32
+	ImportantCount    int32
+	ModerateCount     int32
+	ActionableCount   int32
+	AvailableUpdates  int32
+	NeedsReboot       int32
+	NeedsRestart      int32
+	NoFix             int32
+	Unknown           int32
+	StateUpdatedAt    pgtype.Timestamptz
 }
 
 func (q *Queries) GetHostWithStateByID(ctx context.Context, id string) (GetHostWithStateByIDRow, error) {
@@ -205,15 +191,11 @@ func (q *Queries) GetHostWithStateByID(ctx context.Context, id string) (GetHostW
 		&i.Host.LastAdvisoryCheckAt,
 		&i.Host.FirstSeenAt,
 		&i.Host.LastSnapshotID,
-		&i.Host.PullSshUser,
-		&i.Host.PullFrequencyMinutes,
-		&i.Host.PullPublicKey,
-		&i.Host.PullPrivateKey,
-		&i.Host.PullLastRunAt,
-		&i.Host.PullLastRunStatus,
-		&i.Host.PullLastRunError,
 		&i.Host.CreatedAt,
 		&i.Host.UpdatedAt,
+		&i.PullLastRunAt,
+		&i.PullLastRunStatus,
+		&i.PullLastRunError,
 		&i.OverallAction,
 		&i.CriticalCount,
 		&i.ImportantCount,
@@ -256,7 +238,7 @@ VALUES (
     $8,
     'active'
 )
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, created_at, updated_at
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at
 `
 
 type InsertAgentHostParams struct {
@@ -301,13 +283,6 @@ func (q *Queries) InsertAgentHost(ctx context.Context, arg InsertAgentHostParams
 		&i.LastAdvisoryCheckAt,
 		&i.FirstSeenAt,
 		&i.LastSnapshotID,
-		&i.PullSshUser,
-		&i.PullFrequencyMinutes,
-		&i.PullPublicKey,
-		&i.PullPrivateKey,
-		&i.PullLastRunAt,
-		&i.PullLastRunStatus,
-		&i.PullLastRunError,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -315,35 +290,57 @@ func (q *Queries) InsertAgentHost(ctx context.Context, arg InsertAgentHostParams
 }
 
 const insertSSHHost = `-- name: InsertSSHHost :one
-INSERT INTO hosts (
-    id,
-    onboarding_mode,
-    approval_status,
-    approved_at,
-    display_name,
-    hostname,
-    ip_address,
-    status,
-    pull_ssh_user,
-    pull_frequency_minutes,
-    pull_public_key,
-    pull_private_key
+WITH new_host AS (
+    INSERT INTO hosts (
+        id,
+        onboarding_mode,
+        approval_status,
+        approved_at,
+        display_name,
+        hostname,
+        ip_address,
+        status
+    )
+    VALUES (
+        $1,
+        'ssh',
+        'approved',
+        now(),
+        $2,
+        $3,
+        $4,
+        'active'
+    )
+    RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at
+),
+new_ssh_pull AS (
+    INSERT INTO host_ssh_pull (
+        host_id,
+        pull_ssh_user,
+        pull_frequency_minutes,
+        pull_public_key,
+        pull_private_key
+    )
+    VALUES (
+        $1,
+        $5,
+        $6,
+        $7,
+        $8
+    )
+    RETURNING host_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error
 )
-VALUES (
-    $1,
-    'ssh',
-    'approved',
-    now(),
-    $2,
-    $3,
-    $4,
-    'active',
-    $5,
-    $6,
-    $7,
-    $8
-)
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, created_at, updated_at
+SELECT 
+    hosts.id, hosts.onboarding_mode, hosts.approval_status, hosts.approved_at, hosts.display_name, hosts.machine_id, hosts.hostname, hosts.ip_address, hosts.os_family, hosts.os_name, hosts.os_major, hosts.os_version, hosts.architecture, hosts.status, hosts.last_seen_at, hosts.last_advisory_check_at, hosts.first_seen_at, hosts.last_snapshot_id, hosts.created_at, hosts.updated_at,
+    nsp.pull_ssh_user,
+    nsp.pull_frequency_minutes,
+    nsp.pull_public_key,
+    nsp.pull_private_key,
+    nsp.pull_last_run_at,
+    nsp.pull_last_run_status,
+    nsp.pull_last_run_error
+FROM new_host hosts
+JOIN new_ssh_pull nsp ON nsp.host_id = hosts.id
 `
 
 type InsertSSHHostParams struct {
@@ -357,7 +354,18 @@ type InsertSSHHostParams struct {
 	PullPrivateKey       utils.Option[string]
 }
 
-func (q *Queries) InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (Host, error) {
+type InsertSSHHostRow struct {
+	Host                 Host
+	PullSshUser          utils.Option[string]
+	PullFrequencyMinutes *int32
+	PullPublicKey        utils.Option[string]
+	PullPrivateKey       utils.Option[string]
+	PullLastRunAt        pgtype.Timestamptz
+	PullLastRunStatus    utils.Option[string]
+	PullLastRunError     utils.Option[string]
+}
+
+func (q *Queries) InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (InsertSSHHostRow, error) {
 	row := q.db.QueryRow(ctx, insertSSHHost,
 		arg.ID,
 		arg.DisplayName,
@@ -368,26 +376,28 @@ func (q *Queries) InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (H
 		arg.PullPublicKey,
 		arg.PullPrivateKey,
 	)
-	var i Host
+	var i InsertSSHHostRow
 	err := row.Scan(
-		&i.ID,
-		&i.OnboardingMode,
-		&i.ApprovalStatus,
-		&i.ApprovedAt,
-		&i.DisplayName,
-		&i.MachineID,
-		&i.Hostname,
-		&i.IpAddress,
-		&i.OsFamily,
-		&i.OsName,
-		&i.OsMajor,
-		&i.OsVersion,
-		&i.Architecture,
-		&i.Status,
-		&i.LastSeenAt,
-		&i.LastAdvisoryCheckAt,
-		&i.FirstSeenAt,
-		&i.LastSnapshotID,
+		&i.Host.ID,
+		&i.Host.OnboardingMode,
+		&i.Host.ApprovalStatus,
+		&i.Host.ApprovedAt,
+		&i.Host.DisplayName,
+		&i.Host.MachineID,
+		&i.Host.Hostname,
+		&i.Host.IpAddress,
+		&i.Host.OsFamily,
+		&i.Host.OsName,
+		&i.Host.OsMajor,
+		&i.Host.OsVersion,
+		&i.Host.Architecture,
+		&i.Host.Status,
+		&i.Host.LastSeenAt,
+		&i.Host.LastAdvisoryCheckAt,
+		&i.Host.FirstSeenAt,
+		&i.Host.LastSnapshotID,
+		&i.Host.CreatedAt,
+		&i.Host.UpdatedAt,
 		&i.PullSshUser,
 		&i.PullFrequencyMinutes,
 		&i.PullPublicKey,
@@ -395,15 +405,16 @@ func (q *Queries) InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (H
 		&i.PullLastRunAt,
 		&i.PullLastRunStatus,
 		&i.PullLastRunError,
-		&i.CreatedAt,
-		&i.UpdatedAt,
 	)
 	return i, err
 }
 
 const listHostsWithState = `-- name: ListHostsWithState :many
 SELECT
-    h.id, h.onboarding_mode, h.approval_status, h.approved_at, h.display_name, h.machine_id, h.hostname, h.ip_address, h.os_family, h.os_name, h.os_major, h.os_version, h.architecture, h.status, h.last_seen_at, h.last_advisory_check_at, h.first_seen_at, h.last_snapshot_id, h.pull_ssh_user, h.pull_frequency_minutes, h.pull_public_key, h.pull_private_key, h.pull_last_run_at, h.pull_last_run_status, h.pull_last_run_error, h.created_at, h.updated_at,
+    h.id, h.onboarding_mode, h.approval_status, h.approved_at, h.display_name, h.machine_id, h.hostname, h.ip_address, h.os_family, h.os_name, h.os_major, h.os_version, h.architecture, h.status, h.last_seen_at, h.last_advisory_check_at, h.first_seen_at, h.last_snapshot_id, h.created_at, h.updated_at,
+    hp.pull_last_run_at,
+    hp.pull_last_run_status,
+    hp.pull_last_run_error,
     COALESCE(hcs.overall_action, 'none') AS overall_action,
     COALESCE(hcs.critical_count, 0) AS critical_count,
     COALESCE(hcs.important_count, 0) AS important_count,
@@ -416,6 +427,7 @@ SELECT
     COALESCE(hcs.unknown, 0) AS unknown,
     hcs.updated_at AS state_updated_at
 FROM hosts h
+LEFT JOIN host_ssh_pull hp ON hp.host_id = h.id
 LEFT JOIN host_current_state hcs ON hcs.host_id = h.id
 ORDER BY
     CASE COALESCE(hcs.overall_action, 'none')
@@ -431,18 +443,21 @@ ORDER BY
 `
 
 type ListHostsWithStateRow struct {
-	Host             Host
-	OverallAction    string
-	CriticalCount    int32
-	ImportantCount   int32
-	ModerateCount    int32
-	ActionableCount  int32
-	AvailableUpdates int32
-	NeedsReboot      int32
-	NeedsRestart     int32
-	NoFix            int32
-	Unknown          int32
-	StateUpdatedAt   pgtype.Timestamptz
+	Host              Host
+	PullLastRunAt     pgtype.Timestamptz
+	PullLastRunStatus utils.Option[string]
+	PullLastRunError  utils.Option[string]
+	OverallAction     string
+	CriticalCount     int32
+	ImportantCount    int32
+	ModerateCount     int32
+	ActionableCount   int32
+	AvailableUpdates  int32
+	NeedsReboot       int32
+	NeedsRestart      int32
+	NoFix             int32
+	Unknown           int32
+	StateUpdatedAt    pgtype.Timestamptz
 }
 
 func (q *Queries) ListHostsWithState(ctx context.Context) ([]ListHostsWithStateRow, error) {
@@ -473,15 +488,11 @@ func (q *Queries) ListHostsWithState(ctx context.Context) ([]ListHostsWithStateR
 			&i.Host.LastAdvisoryCheckAt,
 			&i.Host.FirstSeenAt,
 			&i.Host.LastSnapshotID,
-			&i.Host.PullSshUser,
-			&i.Host.PullFrequencyMinutes,
-			&i.Host.PullPublicKey,
-			&i.Host.PullPrivateKey,
-			&i.Host.PullLastRunAt,
-			&i.Host.PullLastRunStatus,
-			&i.Host.PullLastRunError,
 			&i.Host.CreatedAt,
 			&i.Host.UpdatedAt,
+			&i.PullLastRunAt,
+			&i.PullLastRunStatus,
+			&i.PullLastRunError,
 			&i.OverallAction,
 			&i.CriticalCount,
 			&i.ImportantCount,
@@ -505,7 +516,7 @@ func (q *Queries) ListHostsWithState(ctx context.Context) ([]ListHostsWithStateR
 }
 
 const listPendingHosts = `-- name: ListPendingHosts :many
-SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, created_at, updated_at
+SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at
 FROM hosts
 WHERE approval_status = 'waiting_approval'
 ORDER BY created_at DESC, id DESC
@@ -539,13 +550,6 @@ func (q *Queries) ListPendingHosts(ctx context.Context) ([]Host, error) {
 			&i.LastAdvisoryCheckAt,
 			&i.FirstSeenAt,
 			&i.LastSnapshotID,
-			&i.PullSshUser,
-			&i.PullFrequencyMinutes,
-			&i.PullPublicKey,
-			&i.PullPrivateKey,
-			&i.PullLastRunAt,
-			&i.PullLastRunStatus,
-			&i.PullLastRunError,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -575,7 +579,7 @@ SET
     last_advisory_check_at = $10,
     last_snapshot_id = $11
 WHERE id = $1
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, created_at, updated_at
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at
 `
 
 type UpdateHostFromSnapshotParams struct {
@@ -626,13 +630,6 @@ func (q *Queries) UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFrom
 		&i.LastAdvisoryCheckAt,
 		&i.FirstSeenAt,
 		&i.LastSnapshotID,
-		&i.PullSshUser,
-		&i.PullFrequencyMinutes,
-		&i.PullPublicKey,
-		&i.PullPrivateKey,
-		&i.PullLastRunAt,
-		&i.PullLastRunStatus,
-		&i.PullLastRunError,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -640,11 +637,16 @@ func (q *Queries) UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFrom
 }
 
 const updateSSHPullRun = `-- name: UpdateSSHPullRun :exec
+WITH updated_pull AS (
+    UPDATE host_ssh_pull
+    SET
+        pull_last_run_at = $2,
+        pull_last_run_status = $3,
+        pull_last_run_error = $4
+    WHERE host_id = $1
+)
 UPDATE hosts
 SET
-    pull_last_run_at = $2,
-    pull_last_run_status = $3,
-    pull_last_run_error = $4,
     last_advisory_check_at = $2,
     machine_id = COALESCE($5, machine_id),
     hostname = COALESCE($6, hostname),
@@ -659,24 +661,24 @@ WHERE id = $1
 `
 
 type UpdateSSHPullRunParams struct {
-	ID                string
-	PullLastRunAt     pgtype.Timestamptz
-	PullLastRunStatus utils.Option[string]
-	PullLastRunError  utils.Option[string]
-	MachineID         utils.Option[string]
-	Hostname          utils.Option[string]
-	IpAddress         utils.Option[string]
-	OsFamily          string
-	OsName            string
-	OsMajor           int32
-	OsVersion         string
-	Architecture      string
+	ID                  string
+	LastAdvisoryCheckAt pgtype.Timestamptz
+	PullLastRunStatus   utils.Option[string]
+	PullLastRunError    utils.Option[string]
+	MachineID           utils.Option[string]
+	Hostname            utils.Option[string]
+	IpAddress           utils.Option[string]
+	OsFamily            string
+	OsName              string
+	OsMajor             int32
+	OsVersion           string
+	Architecture        string
 }
 
 func (q *Queries) UpdateSSHPullRun(ctx context.Context, arg UpdateSSHPullRunParams) error {
 	_, err := q.db.Exec(ctx, updateSSHPullRun,
 		arg.ID,
-		arg.PullLastRunAt,
+		arg.LastAdvisoryCheckAt,
 		arg.PullLastRunStatus,
 		arg.PullLastRunError,
 		arg.MachineID,

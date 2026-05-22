@@ -82,6 +82,7 @@ func NewBackend(t *gotesting.T, opts ...Option) *Backend {
 			URL:      options.databaseURL,
 			LogLevel: config.DefaultDatabaseLogLevel,
 		},
+		EncryptionKey: "test-encryption-key-for-unit-tests",
 	}
 
 	testDBURL, err := createEphemeralDatabase(t, cfg.Database.URL)

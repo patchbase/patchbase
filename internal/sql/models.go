@@ -60,50 +60,6 @@ func (ns NullRiverJobState) Value() (driver.Value, error) {
 	return string(ns.RiverJobState), nil
 }
 
-type RuntimeStatus string
-
-const (
-	RuntimeStatusPending            RuntimeStatus = "pending"
-	RuntimeStatusActive             RuntimeStatus = "active"
-	RuntimeStatusDisabled           RuntimeStatus = "disabled"
-	RuntimeStatusVerificationFailed RuntimeStatus = "verification_failed"
-)
-
-func (e *RuntimeStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = RuntimeStatus(s)
-	case string:
-		*e = RuntimeStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for RuntimeStatus: %T", src)
-	}
-	return nil
-}
-
-type NullRuntimeStatus struct {
-	RuntimeStatus RuntimeStatus
-	Valid         bool // Valid is true if RuntimeStatus is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullRuntimeStatus) Scan(value interface{}) error {
-	if value == nil {
-		ns.RuntimeStatus, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.RuntimeStatus.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullRuntimeStatus) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.RuntimeStatus), nil
-}
-
 type GooseDbVersion struct {
 	ID        int32
 	VersionID int64
@@ -112,33 +68,26 @@ type GooseDbVersion struct {
 }
 
 type Host struct {
-	ID                   string
-	OnboardingMode       string
-	ApprovalStatus       string
-	ApprovedAt           pgtype.Timestamptz
-	DisplayName          utils.Option[string]
-	MachineID            utils.Option[string]
-	Hostname             utils.Option[string]
-	IpAddress            utils.Option[string]
-	OsFamily             string
-	OsName               string
-	OsMajor              int32
-	OsVersion            string
-	Architecture         string
-	Status               string
-	LastSeenAt           pgtype.Timestamptz
-	LastAdvisoryCheckAt  pgtype.Timestamptz
-	FirstSeenAt          pgtype.Timestamptz
-	LastSnapshotID       utils.Option[string]
-	PullSshUser          utils.Option[string]
-	PullFrequencyMinutes *int32
-	PullPublicKey        utils.Option[string]
-	PullPrivateKey       utils.Option[string]
-	PullLastRunAt        pgtype.Timestamptz
-	PullLastRunStatus    utils.Option[string]
-	PullLastRunError     utils.Option[string]
-	CreatedAt            pgtype.Timestamptz
-	UpdatedAt            pgtype.Timestamptz
+	ID                  string
+	OnboardingMode      string
+	ApprovalStatus      string
+	ApprovedAt          pgtype.Timestamptz
+	DisplayName         utils.Option[string]
+	MachineID           utils.Option[string]
+	Hostname            utils.Option[string]
+	IpAddress           utils.Option[string]
+	OsFamily            string
+	OsName              string
+	OsMajor             int32
+	OsVersion           string
+	Architecture        string
+	Status              string
+	LastSeenAt          pgtype.Timestamptz
+	LastAdvisoryCheckAt pgtype.Timestamptz
+	FirstSeenAt         pgtype.Timestamptz
+	LastSnapshotID      utils.Option[string]
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
 }
 
 type HostAccessToken struct {
@@ -176,6 +125,17 @@ type HostSnapshot struct {
 	BootTime           pgtype.Timestamptz
 	HasProcessData     bool
 	CreatedAt          pgtype.Timestamptz
+}
+
+type HostSshPull struct {
+	HostID               string
+	PullSshUser          utils.Option[string]
+	PullFrequencyMinutes *int32
+	PullPublicKey        utils.Option[string]
+	PullPrivateKey       utils.Option[string]
+	PullLastRunAt        pgtype.Timestamptz
+	PullLastRunStatus    utils.Option[string]
+	PullLastRunError     utils.Option[string]
 }
 
 type RegistrationToken struct {
@@ -247,22 +207,6 @@ type RiverQueue struct {
 	Metadata  []byte
 	PausedAt  pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
-}
-
-type Runtime struct {
-	ID             string
-	Name           string
-	ImageRef       string
-	Status         RuntimeStatus
-	SdkVersion     utils.Option[string]
-	Capabilities   []string
-	DeclaredLimits []byte
-	Metadata       []byte
-	Description    utils.Option[string]
-	LastVerifiedAt pgtype.Timestamptz
-	ArchivedAt     pgtype.Timestamptz
-	CreatedAt      pgtype.Timestamptz
-	UpdatedAt      pgtype.Timestamptz
 }
 
 type Setting struct {

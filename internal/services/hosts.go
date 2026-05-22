@@ -55,6 +55,7 @@ type hosts struct {
 	sql       sql.Querier
 	random    utils.RandomStringGenerator
 	sshRunner SSHPullRunner
+	crypto    utils.Crypto
 }
 
 type CreatedRegistrationToken struct {
@@ -146,12 +147,17 @@ func NewHosts(i do.Injector) (Hosts, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get random generator: %w", err)
 	}
+	crypto, err := do.Invoke[utils.Crypto](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get crypto: %w", err)
+	}
 
 	return &hosts{
 		pool:      pool,
 		sql:       queries,
 		random:    random,
 		sshRunner: defaultSSHPullRunner{},
+		crypto:    crypto,
 	}, nil
 }
 
@@ -477,6 +483,11 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 		return CreateSSHHostResult{}, fmt.Errorf("generate ssh key pair: %w", err)
 	}
 
+	encryptedPrivateKey, err := s.crypto.Encrypt(privateKey)
+	if err != nil {
+		return CreateSSHHostResult{}, fmt.Errorf("encrypt private key: %w", err)
+	}
+
 	host, err := s.sql.InsertSSHHost(ctx, sql.InsertSSHHostParams{
 		ID:                   id.New("h"),
 		DisplayName:          optionString(strings.TrimSpace(input.DisplayName)),
@@ -485,7 +496,7 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 		PullSshUser:          optionString(sshUser),
 		PullFrequencyMinutes: &frequency,
 		PullPublicKey:        optionString(publicKey),
-		PullPrivateKey:       optionString(privateKey),
+		PullPrivateKey:       optionString(encryptedPrivateKey),
 	})
 	if err != nil {
 		return CreateSSHHostResult{}, fmt.Errorf("insert ssh host: %w", err)
@@ -498,9 +509,9 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 	runStatus, runError := s.sshRunner.TryConnect(ctx, address)
 
 	return CreateSSHHostResult{
-		HostID:         host.ID,
+		HostID:         host.Host.ID,
 		PublicKey:      publicKey,
-		ApprovalStatus: host.ApprovalStatus,
+		ApprovalStatus: host.Host.ApprovalStatus,
 		LastRunStatus:  runStatus,
 		LastRunError:   runError,
 	}, nil
@@ -712,9 +723,9 @@ func mapHost(host sql.Host, state *sql.HostCurrentState) HostInfo {
 		LastSeenAt:          toTimePtr(host.LastSeenAt),
 		LastAdvisoryCheckAt: toTimePtr(host.LastAdvisoryCheckAt),
 		StateUpdatedAt:      stateUpdatedAt,
-		PullLastRunAt:       toTimePtr(host.PullLastRunAt),
-		PullLastRunStatus:   host.PullLastRunStatus.UnwrapOr(""),
-		PullLastRunError:    host.PullLastRunError.UnwrapOr(""),
+		PullLastRunAt:       nil,
+		PullLastRunStatus:   "",
+		PullLastRunError:    "",
 		CreatedAt:           createdAt,
 		UpdatedAt:           updatedAt,
 	}
@@ -749,9 +760,9 @@ func mapHostWithState(row sql.ListHostsWithStateRow) HostInfo {
 		LastSeenAt:          toTimePtr(row.Host.LastSeenAt),
 		LastAdvisoryCheckAt: toTimePtr(row.Host.LastAdvisoryCheckAt),
 		StateUpdatedAt:      toTimePtr(row.StateUpdatedAt),
-		PullLastRunAt:       toTimePtr(row.Host.PullLastRunAt),
-		PullLastRunStatus:   row.Host.PullLastRunStatus.UnwrapOr(""),
-		PullLastRunError:    row.Host.PullLastRunError.UnwrapOr(""),
+		PullLastRunAt:       toTimePtr(row.PullLastRunAt),
+		PullLastRunStatus:   row.PullLastRunStatus.UnwrapOr(""),
+		PullLastRunError:    row.PullLastRunError.UnwrapOr(""),
 		CreatedAt:           createdAt,
 		UpdatedAt:           updatedAt,
 	}
@@ -786,9 +797,9 @@ func mapHostWithStateByID(row sql.GetHostWithStateByIDRow) HostInfo {
 		LastSeenAt:          toTimePtr(row.Host.LastSeenAt),
 		LastAdvisoryCheckAt: toTimePtr(row.Host.LastAdvisoryCheckAt),
 		StateUpdatedAt:      toTimePtr(row.StateUpdatedAt),
-		PullLastRunAt:       toTimePtr(row.Host.PullLastRunAt),
-		PullLastRunStatus:   row.Host.PullLastRunStatus.UnwrapOr(""),
-		PullLastRunError:    row.Host.PullLastRunError.UnwrapOr(""),
+		PullLastRunAt:       toTimePtr(row.PullLastRunAt),
+		PullLastRunStatus:   row.PullLastRunStatus.UnwrapOr(""),
+		PullLastRunError:    row.PullLastRunError.UnwrapOr(""),
 		CreatedAt:           createdAt,
 		UpdatedAt:           updatedAt,
 	}

@@ -2,3 +2,4 @@ api:
   jwt_secret_key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
 database:
   url: "postgres://postgres:postgres@localhost:5432/patchbase?sslmode=disable"
+encryption_key: "this-is-not-a-real-encryption-key-please-provide-one"
