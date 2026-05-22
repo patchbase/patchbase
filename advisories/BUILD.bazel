@@ -1,0 +1,63 @@
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+# gazelle:prefix go.patchbase.net/advisories
+# gazelle:proto disable
+# gazelle:go_test file
+# gazelle:ignore
+
+filegroup(
+    name = "sqlc-config",
+    srcs = ["sqlc.yaml"],
+)
+
+filegroup(
+    name = "db-schema",
+    srcs = ["schema/schema.sql"],
+    visibility = ["//:__subpackages__"],
+)
+
+genrule(
+    name = "sqlc_gen",
+    srcs = [
+        ":sqlc-config",
+        ":db-schema",
+        "//advisories/queries",
+    ],
+    outs = [
+        "gen/db.go",
+        "gen/models.go",
+        "gen/querier.go",
+        "gen/queries.sql.go",
+    ],
+    cmd = """
+    mkdir -p advisories/gen
+    $(location @sqlc//:sqlc) generate --file $(location :sqlc-config)
+
+    mv advisories/gen/*.go $(BINDIR)/advisories/gen
+    """,
+    tools = ["@sqlc"],
+)
+
+write_file(
+    name = "copy_sqlc",
+    out = "copy_sqlc.sh",
+    content = [
+        "#!/usr/bin/env bash",
+        "cd $BUILD_WORKSPACE_DIRECTORY",
+        "mkdir -p advisories/sql",
+        "cp -fv bazel-bin/advisories/gen/*.go advisories/sql/",
+        "chmod 0644 advisories/sql/*.go",
+    ],
+)
+
+sh_binary(
+    name = "sqlc",
+    srcs = ["copy_sqlc.sh"],
+    data = [":sqlc_gen"],
+)
+
+gazelle(
+    name = "gazelle",
+)

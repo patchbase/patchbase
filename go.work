@@ -2,6 +2,7 @@ go 1.25.10
 
 use (
 	.
+	./advisories
 	./agent
 	./dashboard
 	./proto/agent
