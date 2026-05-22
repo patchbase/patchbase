@@ -12,6 +12,7 @@ require (
 	github.com/riverqueue/river v0.37.0
 	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.37.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.37.0
+	github.com/riverqueue/river/rivertype v0.37.0
 	github.com/samber/do/v2 v2.0.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
@@ -39,7 +40,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/riverqueue/river/riverdriver v0.37.0 // indirect
 	github.com/riverqueue/river/rivershared v0.37.0 // indirect
-	github.com/riverqueue/river/rivertype v0.37.0 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/samber/go-type-to-string v1.8.0 // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect

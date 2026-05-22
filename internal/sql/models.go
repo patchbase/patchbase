@@ -138,6 +138,15 @@ type HostSshPull struct {
 	PullLastRunError     utils.Option[string]
 }
 
+type HostSshPullJob struct {
+	ID          string
+	HostID      string
+	Status      string
+	StartedAt   pgtype.Timestamptz
+	CompletedAt pgtype.Timestamptz
+	Error       utils.Option[string]
+}
+
 type RegistrationToken struct {
 	ID              string
 	Name            string

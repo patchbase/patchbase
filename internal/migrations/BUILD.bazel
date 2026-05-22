@@ -8,6 +8,7 @@ go_library(
         "files/002_add_users.sql",
         "files/003_add_hosts.sql",
         "files/004_create_host_ssh_pull.sql",
+        "files/005_add_host_ssh_pull_jobs.sql",
     ],
     importpath = "go.patchbase.net/server/internal/migrations",
     visibility = ["//:__subpackages__"],

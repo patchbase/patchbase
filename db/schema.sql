@@ -180,6 +180,20 @@ CREATE TABLE public.host_ssh_pull (
 
 
 --
+-- Name: host_ssh_pull_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.host_ssh_pull_jobs (
+    id text NOT NULL,
+    host_id text NOT NULL,
+    status text NOT NULL,
+    started_at timestamp with time zone DEFAULT now() NOT NULL,
+    completed_at timestamp with time zone,
+    error text
+);
+
+
+--
 -- Name: hosts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -417,6 +431,14 @@ ALTER TABLE ONLY public.host_current_state
 
 ALTER TABLE ONLY public.host_snapshots
     ADD CONSTRAINT host_snapshots_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: host_ssh_pull_jobs host_ssh_pull_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_ssh_pull_jobs
+    ADD CONSTRAINT host_ssh_pull_jobs_pkey PRIMARY KEY (id);
 
 
 --
@@ -671,6 +693,14 @@ ALTER TABLE ONLY public.host_snapshots
 
 ALTER TABLE ONLY public.host_ssh_pull
     ADD CONSTRAINT host_ssh_pull_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: host_ssh_pull_jobs host_ssh_pull_jobs_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_ssh_pull_jobs
+    ADD CONSTRAINT host_ssh_pull_jobs_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
 
 
 --

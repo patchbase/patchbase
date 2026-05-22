@@ -25,6 +25,7 @@ genrule(
         "gen/db.go",
         "gen/host_access_tokens.sql.go",
         "gen/host_snapshots.sql.go",
+        "gen/host_ssh_pull_jobs.sql.go",
         "gen/hosts.sql.go",
         "gen/models.go",
         "gen/querier.go",

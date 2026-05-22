@@ -40,6 +40,7 @@ use_repo(
     "com_github_riverqueue_river",
     "com_github_riverqueue_river_riverdriver_riverdatabasesql",
     "com_github_riverqueue_river_riverdriver_riverpgxv5",
+    "com_github_riverqueue_river_rivertype",
     "com_github_samber_do_v2",
     "com_github_spf13_afero",
     "com_github_spf13_cobra",
@@ -64,11 +65,6 @@ use_repo(pnpm, "pnpm")
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
 npm.npm_translate_lock(
     name = "npm",
-    lifecycle_hooks = {
-        "*": [],
-    },
-    npmrc = "//dashboard:.npmrc",
-    pnpm_lock = "//dashboard:pnpm-lock.yaml",
     custom_postinstalls = {
         "@sveltejs/kit": """
         set -eu
@@ -79,8 +75,13 @@ npm.npm_translate_lock(
         printf '%s\n' 'Public environment variables available at runtime.' > 'src/types/synthetic/$env+dynamic+public.md'
         printf '%s\n' 'SvelteKit app types.' > 'src/types/synthetic/$app+types.md'
         printf '%s\n' 'The $lib alias.' > 'src/types/synthetic/$lib.md'
-        """
-    }
+        """,
+    },
+    lifecycle_hooks = {
+        "*": [],
+    },
+    npmrc = "//dashboard:.npmrc",
+    pnpm_lock = "//dashboard:pnpm-lock.yaml",
 )
 use_repo(npm, "npm")
 

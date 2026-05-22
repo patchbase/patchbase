@@ -11,6 +11,7 @@ go_api_library(
         "get_latest_snapshot.go",
         "list_hosts.go",
         "list_pending_hosts.go",
+        "list_pull_jobs.go",
         "list_tokens.go",
         "revoke_token.go",
     ],

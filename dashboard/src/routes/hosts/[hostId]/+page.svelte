@@ -1,12 +1,13 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import AppLayout from '$lib/components/AppLayout.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import ApproveHostButton from '$lib/components/ApproveHostButton.svelte';
 	import DeleteHostButton from '$lib/components/DeleteHostButton.svelte';
-	import { getHost, getHostSnapshot } from '$lib/api/hosts.js';
-	import { formatTime } from '$lib/format';
+	import { getHost, getHostSnapshot, listPullJobs } from '$lib/api/hosts.js';
+	import { formatTime, formatDuration } from '$lib/format';
 	import { goto } from '$app/navigation';
-	import type { Host, HostSnapshot } from '$lib/types';
+	import type { Host, HostSnapshot, HostPullJob } from '$lib/types';
 
 	interface Props {
 		params: { hostId: string };
@@ -16,27 +17,49 @@
 
 	let host = $state<Host | null>(null);
 	let snapshot = $state<HostSnapshot | null>(null);
+	let pullJobs = $state<HostPullJob[]>([]);
 	let loading = $state(true);
 	let error = $state('');
 
-	$effect(() => {
+	async function loadData(silent = false) {
 		const id = params.hostId;
-		loading = true;
-		error = '';
-		Promise.all([
-			getHost(id),
-			getHostSnapshot(id).catch(() => null)
-		])
-			.then(([hostData, snapshotData]) => {
+		if (!silent) {
+			loading = true;
+			error = '';
+		}
+		try {
+			const [hostData, snapshotData, jobsData] = await Promise.all([
+				getHost(id),
+				getHostSnapshot(id).catch(() => null),
+				listPullJobs(id).catch(() => [] as HostPullJob[])
+			]);
+
+			if (JSON.stringify(host) !== JSON.stringify(hostData)) {
 				host = hostData;
+			}
+			if (JSON.stringify(snapshot) !== JSON.stringify(snapshotData)) {
 				snapshot = snapshotData;
-			})
-			.catch((err) => {
+			}
+			if (JSON.stringify(pullJobs) !== JSON.stringify(jobsData)) {
+				pullJobs = jobsData;
+			}
+		} catch (err) {
+			if (!silent) {
 				error = err instanceof Error ? err.message : 'Failed to load host details.';
-			})
-			.finally(() => {
+			}
+		} finally {
+			if (!silent) {
 				loading = false;
-			});
+			}
+		}
+	}
+
+	onMount(() => {
+		void loadData();
+		const interval = setInterval(() => {
+			void loadData(true);
+		}, 5000);
+		return () => clearInterval(interval);
 	});
 </script>
 
@@ -127,6 +150,46 @@
 		{:else}
 			<div class="detail-card" style="margin-bottom:24px; padding: 32px; text-align: center;">
 				<p style="color: var(--text-muted); margin: 0;">No snapshot processed yet.</p>
+			</div>
+		{/if}
+
+		{#if host.onboarding_mode === 'ssh'}
+			<div style="margin-top:24px; margin-bottom:24px">
+				<h3 style="font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-dim); margin-bottom:12px">
+					SSH Pull History
+				</h3>
+				<div class="table-container">
+					{#if pullJobs.length === 0}
+						<div style="padding: 24px; text-align: center; color: var(--text-dim);">
+							No pull jobs recorded yet.
+						</div>
+					{:else}
+						<table>
+							<thead>
+								<tr>
+									<th>Job ID</th>
+									<th>Status</th>
+									<th>Started At</th>
+									<th>Duration</th>
+									<th>Error</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each pullJobs as job}
+									<tr>
+										<td class="mono">{job.id}</td>
+										<td><StatusBadge status={job.status} /></td>
+										<td>{formatTime(job.started_at)}</td>
+										<td>{formatDuration(job.started_at, job.completed_at)}</td>
+										<td style="max-width:300px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap" title={job.error || ''}>
+											{job.error || '-'}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					{/if}
+				</div>
 			</div>
 		{/if}
 	</AppLayout>

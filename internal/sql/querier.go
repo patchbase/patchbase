@@ -25,14 +25,17 @@ type Querier interface {
 	GetHostByID(ctx context.Context, id string) (Host, error)
 	GetHostWithStateByID(ctx context.Context, id string) (GetHostWithStateByIDRow, error)
 	GetLatestHostSnapshotByHostID(ctx context.Context, hostID string) (HostSnapshot, error)
+	GetSSHPullConfigByHostID(ctx context.Context, hostID string) (HostSshPull, error)
 	GetSetting(ctx context.Context, key string) (Setting, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
 	InsertAgentHost(ctx context.Context, arg InsertAgentHostParams) (Host, error)
 	InsertHostAccessToken(ctx context.Context, arg InsertHostAccessTokenParams) (HostAccessToken, error)
+	InsertHostSSHPullJob(ctx context.Context, arg InsertHostSSHPullJobParams) (HostSshPullJob, error)
 	InsertHostSnapshot(ctx context.Context, arg InsertHostSnapshotParams) (HostSnapshot, error)
 	InsertRegistrationToken(ctx context.Context, arg InsertRegistrationTokenParams) (RegistrationToken, error)
 	InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (InsertSSHHostRow, error)
+	ListHostSSHPullJobsByHostID(ctx context.Context, arg ListHostSSHPullJobsByHostIDParams) ([]HostSshPullJob, error)
 	ListHostsWithState(ctx context.Context) ([]ListHostsWithStateRow, error)
 	ListPendingHosts(ctx context.Context) ([]Host, error)
 	ListRegistrationTokens(ctx context.Context) ([]RegistrationToken, error)
@@ -40,6 +43,7 @@ type Querier interface {
 	TouchHostAccessTokenLastUsed(ctx context.Context, id string) error
 	TouchRegistrationTokenLastUsed(ctx context.Context, id string) error
 	UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFromSnapshotParams) (Host, error)
+	UpdateHostSSHPullJob(ctx context.Context, arg UpdateHostSSHPullJobParams) (HostSshPullJob, error)
 	UpdateSSHPullRun(ctx context.Context, arg UpdateSSHPullRunParams) error
 	UpsertHostCurrentState(ctx context.Context, arg UpsertHostCurrentStateParams) error
 	UpsertSetting(ctx context.Context, arg UpsertSettingParams) (Setting, error)

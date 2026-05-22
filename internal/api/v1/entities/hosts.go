@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"go.patchbase.net/server/internal/services"
+	"go.patchbase.net/server/internal/utils"
 )
 
 const apiTimeLayout = "2006-01-02T15:04:05.000000Z"
@@ -112,4 +113,28 @@ func formatTimePtr(value *time.Time) *string {
 	}
 	formatted := value.UTC().Format(apiTimeLayout)
 	return &formatted
+}
+
+type HostSSHPullJob struct {
+	ID          string  `json:"id"`
+	HostID      string  `json:"host_id"`
+	Status      string  `json:"status"`
+	StartedAt   string  `json:"started_at"`
+	CompletedAt *string `json:"completed_at"`
+	Error       *string `json:"error"`
+}
+
+func NewHostSSHPullJob(value services.HostSSHPullJobInfo) HostSSHPullJob {
+	return HostSSHPullJob{
+		ID:          value.ID,
+		HostID:      value.HostID,
+		Status:      value.Status,
+		StartedAt:   value.StartedAt.UTC().Format(apiTimeLayout),
+		CompletedAt: formatTimePtr(value.CompletedAt),
+		Error:       value.Error,
+	}
+}
+
+func NewHostSSHPullJobs(values []services.HostSSHPullJobInfo) []HostSSHPullJob {
+	return utils.Map(values, NewHostSSHPullJob)
 }

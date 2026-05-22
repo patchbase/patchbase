@@ -104,3 +104,12 @@ export interface SourceSync {
   last_sync: string | null;
   status: string;
 }
+
+export interface HostPullJob {
+  id: string;
+  host_id: string;
+  status: string;
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+}

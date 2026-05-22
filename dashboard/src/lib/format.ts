@@ -23,3 +23,25 @@ export function prettyJson(value: string | null | undefined): string | null {
     return value;
   }
 }
+
+export function formatDuration(
+  startedAt: string | null | undefined,
+  completedAt: string | null | undefined,
+): string {
+  if (!startedAt || !completedAt) return "-";
+  const start = new Date(startedAt).getTime();
+  const end = new Date(completedAt).getTime();
+  const diffMs = end - start;
+  if (diffMs < 0) return "0s";
+  if (diffMs < 1000) {
+    return `${(diffMs / 1000).toFixed(2)}s`;
+  }
+  const diffSecs = Math.floor(diffMs / 1000);
+  if (diffSecs < 60) {
+    return `${diffSecs}s`;
+  }
+  const mins = Math.floor(diffSecs / 60);
+  const secs = diffSecs % 60;
+  if (secs === 0) return `${mins}m`;
+  return `${mins}m ${secs}s`;
+}

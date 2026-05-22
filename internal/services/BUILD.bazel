@@ -19,6 +19,8 @@ go_library(
         "@com_github_jackc_pgx_v5//:pgx",
         "@com_github_jackc_pgx_v5//pgtype",
         "@com_github_jackc_pgx_v5//pgxpool",
+        "@com_github_riverqueue_river//:river",
+        "@com_github_riverqueue_river_rivertype//:rivertype",
         "@com_github_samber_do_v2//:do",
         "@org_golang_google_protobuf//proto",
     ],

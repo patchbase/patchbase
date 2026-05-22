@@ -28,6 +28,9 @@
 		enhancement: 'blue',
 		synced: 'green',
 		not_configured: 'purple',
+		success: 'green',
+		failed: 'red',
+		running: 'blue',
 	};
 
 	let color = $derived(colors[status] || 'purple');
@@ -42,6 +45,9 @@
 		affected_no_fix: 'No fix',
 		fixed_package_installed_pending_activation: 'Pending activation',
 		resolved: 'Resolved',
+		success: 'Success',
+		failed: 'Failed',
+		running: 'Running',
 	};
 
 	let display = $derived(labels[status] || status.replace(/_/g, ' '));

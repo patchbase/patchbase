@@ -211,6 +211,28 @@ func (q *Queries) GetHostWithStateByID(ctx context.Context, id string) (GetHostW
 	return i, err
 }
 
+const getSSHPullConfigByHostID = `-- name: GetSSHPullConfigByHostID :one
+SELECT host_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error
+FROM host_ssh_pull
+WHERE host_id = $1
+`
+
+func (q *Queries) GetSSHPullConfigByHostID(ctx context.Context, hostID string) (HostSshPull, error) {
+	row := q.db.QueryRow(ctx, getSSHPullConfigByHostID, hostID)
+	var i HostSshPull
+	err := row.Scan(
+		&i.HostID,
+		&i.PullSshUser,
+		&i.PullFrequencyMinutes,
+		&i.PullPublicKey,
+		&i.PullPrivateKey,
+		&i.PullLastRunAt,
+		&i.PullLastRunStatus,
+		&i.PullLastRunError,
+	)
+	return i, err
+}
+
 const insertAgentHost = `-- name: InsertAgentHost :one
 INSERT INTO hosts (
     id,

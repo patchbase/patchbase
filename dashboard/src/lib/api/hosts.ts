@@ -1,6 +1,6 @@
 import { request } from "$lib/api/request.js";
 import { getSession } from "$lib/auth/session.js";
-import type { Host, HostSnapshot } from "$lib/types";
+import type { Host, HostSnapshot, HostPullJob } from "$lib/types";
 
 export interface RegistrationTokenInfo {
   id: string;
@@ -109,4 +109,8 @@ export async function createSSHHost(payload: CreateSSHHostPayload): Promise<Crea
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
   });
+}
+
+export async function listPullJobs(id: string): Promise<HostPullJob[]> {
+  return authenticatedRequest(`/api/v1/hosts/${id}/pull-jobs`);
 }

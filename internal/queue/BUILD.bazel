@@ -5,10 +5,12 @@ go_library(
     srcs = [
         "noop_worker.go",
         "river.go",
+        "ssh_pull_worker.go",
     ],
     importpath = "go.patchbase.net/server/internal/queue",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/services",
         "//internal/sql",
         "@com_github_jackc_pgx_v5//:pgx",
         "@com_github_jackc_pgx_v5//pgxpool",

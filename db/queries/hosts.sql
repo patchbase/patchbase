@@ -203,3 +203,8 @@ FROM hosts h
 LEFT JOIN host_ssh_pull hp ON hp.host_id = h.id
 LEFT JOIN host_current_state hcs ON hcs.host_id = h.id
 WHERE h.id = $1;
+
+-- name: GetSSHPullConfigByHostID :one
+SELECT *
+FROM host_ssh_pull
+WHERE host_id = $1;

@@ -28,8 +28,14 @@ func NewRiverClient(i do.Injector) (*river.Client[pgx.Tx], error) {
 		return nil, fmt.Errorf("failed to get *slog.Logger: %w", err)
 	}
 
+	sshWorker, err := NewSSHPullWorker(i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create ssh pull worker: %w", err)
+	}
+
 	workers := river.NewWorkers()
 	river.AddWorker(workers, NewNoopWorker(queries, logger))
+	river.AddWorker(workers, sshWorker)
 
 	client, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
 		Logger:  logger.With("source", "river"),

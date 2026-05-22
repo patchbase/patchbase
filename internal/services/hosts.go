@@ -19,6 +19,9 @@ import (
 	"go.patchbase.net/server/internal/sql/id"
 	"go.patchbase.net/server/internal/utils"
 	"google.golang.org/protobuf/proto"
+
+	"github.com/riverqueue/river"
+	"github.com/riverqueue/river/rivertype"
 )
 
 const (
@@ -35,6 +38,14 @@ var (
 	ErrInvalidSnapshotPayload   = errors.New("invalid snapshot payload")
 )
 
+type SSHPullArgs struct {
+	HostID string `json:"host_id"`
+}
+
+func (SSHPullArgs) Kind() string {
+	return "ssh_pull"
+}
+
 type Hosts interface {
 	CreateRegistrationToken(ctx context.Context, userID string, name string) (CreatedRegistrationToken, error)
 	ListRegistrationTokens(ctx context.Context) ([]RegistrationTokenInfo, error)
@@ -48,6 +59,8 @@ type Hosts interface {
 	ListHosts(ctx context.Context) ([]HostInfo, error)
 	GetHost(ctx context.Context, hostID string) (HostInfo, error)
 	GetLatestSnapshot(ctx context.Context, hostID string) (HostSnapshotInfo, error)
+	RunSSHPull(ctx context.Context, hostID string) error
+	ListSSHPullJobs(ctx context.Context, hostID string) ([]HostSSHPullJobInfo, error)
 }
 
 type hosts struct {
@@ -56,6 +69,7 @@ type hosts struct {
 	random    utils.RandomStringGenerator
 	sshRunner SSHPullRunner
 	crypto    utils.Crypto
+	injector  do.Injector
 }
 
 type CreatedRegistrationToken struct {
@@ -117,6 +131,15 @@ type HostSnapshotInfo struct {
 	HasProcessData     bool       `json:"has_process_data"`
 }
 
+type HostSSHPullJobInfo struct {
+	ID          string     `json:"id"`
+	HostID      string     `json:"host_id"`
+	Status      string     `json:"status"`
+	StartedAt   time.Time  `json:"started_at"`
+	CompletedAt *time.Time `json:"completed_at"`
+	Error       *string    `json:"error"`
+}
+
 type CreateSSHHostInput struct {
 	DisplayName      string
 	Hostname         string
@@ -158,6 +181,7 @@ func NewHosts(i do.Injector) (Hosts, error) {
 		random:    random,
 		sshRunner: defaultSSHPullRunner{},
 		crypto:    crypto,
+		injector:  i,
 	}, nil
 }
 
@@ -488,7 +512,15 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 		return CreateSSHHostResult{}, fmt.Errorf("encrypt private key: %w", err)
 	}
 
-	host, err := s.sql.InsertSSHHost(ctx, sql.InsertSSHHostParams{
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return CreateSSHHostResult{}, fmt.Errorf("begin create ssh host transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) // nolint:errcheck
+
+	queries := sql.New(tx)
+
+	host, err := queries.InsertSSHHost(ctx, sql.InsertSSHHostParams{
 		ID:                   id.New("h"),
 		DisplayName:          optionString(strings.TrimSpace(input.DisplayName)),
 		Hostname:             optionString(hostname),
@@ -500,6 +532,30 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 	})
 	if err != nil {
 		return CreateSSHHostResult{}, fmt.Errorf("insert ssh host: %w", err)
+	}
+
+	riverClient, err := do.Invoke[*river.Client[pgx.Tx]](s.injector)
+	if err != nil {
+		return CreateSSHHostResult{}, fmt.Errorf("failed to invoke river client: %w", err)
+	}
+
+	_, err = riverClient.InsertTx(ctx, tx, SSHPullArgs{HostID: host.Host.ID}, &river.InsertOpts{
+		UniqueOpts: river.UniqueOpts{
+			ByArgs: true,
+			ByState: []rivertype.JobState{
+				rivertype.JobStateAvailable,
+				rivertype.JobStatePending,
+				rivertype.JobStateRunning,
+				rivertype.JobStateScheduled,
+			},
+		},
+	})
+	if err != nil {
+		return CreateSSHHostResult{}, fmt.Errorf("failed to enqueue initial ssh pull job: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return CreateSSHHostResult{}, fmt.Errorf("commit create ssh host transaction: %w", err)
 	}
 
 	address := hostname
@@ -804,3 +860,240 @@ func mapHostWithStateByID(row sql.GetHostWithStateByIDRow) HostInfo {
 		UpdatedAt:           updatedAt,
 	}
 }
+
+func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
+	host, err := s.sql.GetHostByID(ctx, hostID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrHostNotFound
+		}
+		return fmt.Errorf("get host: %w", err)
+	}
+
+	cfg, err := s.sql.GetSSHPullConfigByHostID(ctx, hostID)
+	if err != nil {
+		return fmt.Errorf("get ssh pull config: %w", err)
+	}
+
+	frequencyMinutes := int32(defaultSSHPullFrequency)
+	if cfg.PullFrequencyMinutes != nil && *cfg.PullFrequencyMinutes > 0 {
+		frequencyMinutes = *cfg.PullFrequencyMinutes
+	}
+
+	defer func() {
+		riverClient, err := do.Invoke[*river.Client[pgx.Tx]](s.injector)
+		if err != nil {
+			return
+		}
+
+		tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+		if err != nil {
+			return
+		}
+		defer tx.Rollback(ctx) // nolint:errcheck
+
+		scheduledAt := time.Now().Add(time.Duration(frequencyMinutes) * time.Minute)
+		_, _ = riverClient.InsertTx(ctx, tx, SSHPullArgs{HostID: hostID}, &river.InsertOpts{
+			ScheduledAt: scheduledAt,
+			UniqueOpts: river.UniqueOpts{
+				ByArgs: true,
+				ByState: []rivertype.JobState{
+					rivertype.JobStateAvailable,
+					rivertype.JobStatePending,
+					rivertype.JobStateRunning,
+					rivertype.JobStateScheduled,
+				},
+			},
+		})
+		_ = tx.Commit(ctx)
+	}()
+
+	jobID := id.New("spjob")
+	_, err = s.sql.InsertHostSSHPullJob(ctx, sql.InsertHostSSHPullJobParams{
+		ID:        jobID,
+		HostID:    hostID,
+		Status:    "running",
+		StartedAt: pgTime(time.Now()),
+	})
+	if err != nil {
+		return fmt.Errorf("insert host ssh pull job: %w", err)
+	}
+
+	updateJobResult := func(status string, errMsg string, res *SSHPullResult) error {
+		tx, txErr := s.pool.BeginTx(ctx, pgx.TxOptions{})
+		if txErr != nil {
+			return fmt.Errorf("begin transaction: %w", txErr)
+		}
+		defer tx.Rollback(ctx) // nolint:errcheck
+
+		queries := sql.New(tx)
+
+		var optErr utils.Option[string]
+		if errMsg != "" {
+			optErr = utils.Some(errMsg)
+		}
+		_, err = queries.UpdateHostSSHPullJob(ctx, sql.UpdateHostSSHPullJobParams{
+			ID:          jobID,
+			Status:      status,
+			CompletedAt: pgTime(time.Now()),
+			Error:       optErr,
+		})
+		if err != nil {
+			return fmt.Errorf("update host ssh pull job: %w", err)
+		}
+
+		statusOpt := utils.Some(status)
+		errOpt := optErr
+
+		if status == "success" && res != nil {
+			bootTime := pgtype.Timestamptz{}
+			if res.BootTime != nil {
+				bootTime = pgTime(*res.BootTime)
+			}
+			snapshotRow, err := queries.InsertHostSnapshot(ctx, sql.InsertHostSnapshotParams{
+				ID:                 id.New("snap"),
+				HostID:             hostID,
+				CollectedAt:        pgTime(res.CollectedAt),
+				Payload:            res.Payload,
+				RunningKernelNevra: res.RunningKernel,
+				BootTime:           bootTime,
+				HasProcessData:     res.HasProcessData,
+			})
+			if err != nil {
+				return fmt.Errorf("insert host snapshot: %w", err)
+			}
+
+			err = queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
+				ID:                  hostID,
+				LastAdvisoryCheckAt: pgTime(res.CollectedAt),
+				PullLastRunStatus:   statusOpt,
+				PullLastRunError:    errOpt,
+				MachineID:           utils.Some(res.MachineID),
+				Hostname:            utils.Some(res.Hostname),
+				IpAddress:           utils.Some(res.IPAddress),
+				OsFamily:            res.OSFamily,
+				OsName:              res.OSName,
+				OsMajor:             res.OSMajor,
+				OsVersion:           res.OSVersion,
+				Architecture:        res.Architecture,
+			})
+			if err != nil {
+				return fmt.Errorf("update ssh pull run success: %w", err)
+			}
+
+			err = queries.UpsertHostCurrentState(ctx, sql.UpsertHostCurrentStateParams{
+				HostID:           hostID,
+				SnapshotID:       snapshotRow.ID,
+				OverallAction:    res.OverallAction,
+				CriticalCount:    res.CriticalCount,
+				ImportantCount:   res.ImportantCount,
+				ModerateCount:    res.ModerateCount,
+				ActionableCount:  res.ActionableCount,
+				AvailableUpdates: res.AvailableUpdates,
+				NeedsReboot:      res.NeedsReboot,
+				NeedsRestart:     res.NeedsRestart,
+				NoFix:            res.NoFix,
+				Unknown:          res.Unknown,
+			})
+			if err != nil {
+				return fmt.Errorf("upsert host current state: %w", err)
+			}
+		} else {
+			err = queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
+				ID:                  hostID,
+				LastAdvisoryCheckAt: pgTime(time.Now()),
+				PullLastRunStatus:   statusOpt,
+				PullLastRunError:    errOpt,
+				MachineID:           utils.None[string](),
+				Hostname:            utils.None[string](),
+				IpAddress:           utils.None[string](),
+				OsFamily:            host.OsFamily,
+				OsName:              host.OsName,
+				OsMajor:             host.OsMajor,
+				OsVersion:           host.OsVersion,
+				Architecture:        host.Architecture,
+			})
+			if err != nil {
+				return fmt.Errorf("update ssh pull run failure: %w", err)
+			}
+		}
+
+		if err := tx.Commit(ctx); err != nil {
+			return fmt.Errorf("commit job results update transaction: %w", err)
+		}
+		return nil
+	}
+
+	decryptedKey, err := s.crypto.Decrypt(cfg.PullPrivateKey.UnwrapOr(""))
+	if err != nil {
+		upErr := updateJobResult("failed", fmt.Sprintf("decrypt private key: %v", err), nil)
+		if upErr != nil {
+			return fmt.Errorf("decrypt private key failed (%v), and job update failed: %w", err, upErr)
+		}
+		return fmt.Errorf("decrypt private key: %w", err)
+	}
+
+	hostname := host.Hostname.UnwrapOr("")
+	if hostname == "" {
+		upErr := updateJobResult("failed", "hostname is empty", nil)
+		if upErr != nil {
+			return fmt.Errorf("empty hostname, and job update failed: %w", upErr)
+		}
+		return fmt.Errorf("hostname is empty")
+	}
+
+	address := hostname
+	if !strings.Contains(address, ":") {
+		address = net.JoinHostPort(address, "22")
+	}
+
+	res, err := s.sshRunner.Collect(ctx, decryptedKey, cfg.PullSshUser.UnwrapOr(""), address)
+	if err != nil {
+		upErr := updateJobResult("failed", err.Error(), nil)
+		if upErr != nil {
+			return fmt.Errorf("collect snapshot failed (%v), and job update failed: %w", err, upErr)
+		}
+		return fmt.Errorf("collect snapshot: %w", err)
+	}
+
+	if err := updateJobResult("success", "", &res); err != nil {
+		return fmt.Errorf("update job results for success: %w", err)
+	}
+
+	return nil
+}
+
+func (s *hosts) ListSSHPullJobs(ctx context.Context, hostID string) ([]HostSSHPullJobInfo, error) {
+	rows, err := s.sql.ListHostSSHPullJobsByHostID(ctx, sql.ListHostSSHPullJobsByHostIDParams{
+		HostID: hostID,
+		Limit:  50,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list host ssh pull jobs by host id: %w", err)
+	}
+
+	jobs := make([]HostSSHPullJobInfo, 0, len(rows))
+	for _, row := range rows {
+		var compAt *time.Time
+		if row.CompletedAt.Valid {
+			t := row.CompletedAt.Time.UTC()
+			compAt = &t
+		}
+		var errStr *string
+		if row.Error.IsPresent() {
+			val := row.Error.Unwrap()
+			errStr = &val
+		}
+
+		jobs = append(jobs, HostSSHPullJobInfo{
+			ID:          row.ID,
+			HostID:      row.HostID,
+			Status:      row.Status,
+			StartedAt:   row.StartedAt.Time.UTC(),
+			CompletedAt: compAt,
+			Error:       errStr,
+		})
+	}
+	return jobs, nil
+}
+
