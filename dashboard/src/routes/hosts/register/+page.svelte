@@ -9,6 +9,7 @@
 		listPendingHosts,
 		listRegistrationTokens,
 		revokeRegistrationToken,
+		onboardSSHHost,
 		type RegistrationTokenInfo,
 	} from '$lib/api/hosts.js';
 	import type { Host } from '$lib/types';
@@ -28,7 +29,7 @@
 	let sshUser = $state('root');
 	let sshFrequencyMinutes = $state(360);
 	let sshPublicKey = $state('');
-	let sshResult = $state('');
+	let sshHostID = $state('');
 	let showSSHModal = $state(false);
 	let sshCopied = $state(false);
 
@@ -86,7 +87,7 @@
 		event.preventDefault();
 		error = '';
 		sshPublicKey = '';
-		sshResult = '';
+		sshHostID = '';
 		sshCopied = false;
 		try {
 			const result = await createSSHHost({
@@ -95,10 +96,8 @@
 				ssh_user: sshUser,
 				frequency_minutes: sshFrequencyMinutes,
 			});
+			sshHostID = result.host_id;
 			sshPublicKey = result.public_key;
-			sshResult = result.last_run_status === 'success'
-				? `Successfully verified SSH access to the host.`
-				: `Failed to verify SSH access to the host: ${result.last_run_error}`;
 			showSSHModal = true;
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to create SSH host.';
@@ -116,9 +115,15 @@
 		}
 	}
 
-	function finishSSHRegistration() {
-		showSSHModal = false;
-		void goto('/hosts');
+	async function finishSSHRegistration(): Promise<void> {
+		try {
+			await onboardSSHHost(sshHostID);
+			showSSHModal = false;
+			void goto('/hosts');
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to onboard SSH host.';
+			showSSHModal = false;
+		}
 	}
 </script>
 
@@ -256,9 +261,7 @@
 				</button>
 			</div>
 
-			{#if sshResult}
-				<div class="auth-message" style="margin-bottom:16px">{sshResult}</div>
-			{/if}
+
 
 			{#snippet footer()}
 				{#if sshCopied}

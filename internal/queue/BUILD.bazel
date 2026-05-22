@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "queue",
@@ -17,5 +17,18 @@ go_library(
         "@com_github_riverqueue_river//:river",
         "@com_github_riverqueue_river_riverdriver_riverpgxv5//:riverpgxv5",
         "@com_github_samber_do_v2//:do",
+    ],
+)
+
+go_test(
+    name = "ssh_pull_worker_test",
+    srcs = ["ssh_pull_worker_test.go"],
+    deps = [
+        ":queue",
+        "//internal/services",
+        "@com_github_riverqueue_river//:river",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
     ],
 )

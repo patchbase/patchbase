@@ -196,8 +196,17 @@ func TestCreateSSHHost(t *testing.T) {
 
 	var payload map[string]any
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
-	assert.NotEmpty(t, payload["host_id"])
+	hostID := payload["host_id"].(string)
+	assert.NotEmpty(t, hostID)
 	assert.NotEmpty(t, payload["public_key"])
 	assert.Equal(t, "approved", payload["approval_status"])
-	assert.NotEmpty(t, payload["last_run_status"])
+	assert.Empty(t, payload["last_run_status"])
+
+	// Test onboarding endpoint
+	onboardRecorder := backend.HTTPPost(
+		fmt.Sprintf("/api/v1/hosts/%s/onboard-ssh", hostID),
+		`{}`,
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusNoContent, onboardRecorder.Code)
 }

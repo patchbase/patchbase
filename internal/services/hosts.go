@@ -56,6 +56,7 @@ type Hosts interface {
 	ApproveHost(ctx context.Context, hostID string) (HostInfo, error)
 	DeleteHost(ctx context.Context, hostID string) error
 	CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (CreateSSHHostResult, error)
+	OnboardSSHHost(ctx context.Context, hostID string) error
 	ListHosts(ctx context.Context) ([]HostInfo, error)
 	GetHost(ctx context.Context, hostID string) (HostInfo, error)
 	GetLatestSnapshot(ctx context.Context, hostID string) (HostSnapshotInfo, error)
@@ -534,12 +535,44 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 		return CreateSSHHostResult{}, fmt.Errorf("insert ssh host: %w", err)
 	}
 
-	riverClient, err := do.Invoke[*river.Client[pgx.Tx]](s.injector)
-	if err != nil {
-		return CreateSSHHostResult{}, fmt.Errorf("failed to invoke river client: %w", err)
+	if err := tx.Commit(ctx); err != nil {
+		return CreateSSHHostResult{}, fmt.Errorf("commit create ssh host transaction: %w", err)
 	}
 
-	_, err = riverClient.InsertTx(ctx, tx, SSHPullArgs{HostID: host.Host.ID}, &river.InsertOpts{
+	return CreateSSHHostResult{
+		HostID:         host.Host.ID,
+		PublicKey:      publicKey,
+		ApprovalStatus: host.Host.ApprovalStatus,
+		LastRunStatus:  "",
+		LastRunError:   "",
+	}, nil
+}
+
+func (s *hosts) OnboardSSHHost(ctx context.Context, hostID string) error {
+	host, err := s.sql.GetHostByID(ctx, hostID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrHostNotFound
+		}
+		return fmt.Errorf("get host: %w", err)
+	}
+
+	if host.OnboardingMode != "ssh" {
+		return fmt.Errorf("host is not an SSH host")
+	}
+
+	riverClient, err := do.Invoke[*river.Client[pgx.Tx]](s.injector)
+	if err != nil {
+		return fmt.Errorf("failed to invoke river client: %w", err)
+	}
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) // nolint:errcheck
+
+	_, err = riverClient.InsertTx(ctx, tx, SSHPullArgs{HostID: hostID}, &river.InsertOpts{
 		UniqueOpts: river.UniqueOpts{
 			ByArgs: true,
 			ByState: []rivertype.JobState{
@@ -551,26 +584,14 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 		},
 	})
 	if err != nil {
-		return CreateSSHHostResult{}, fmt.Errorf("failed to enqueue initial ssh pull job: %w", err)
+		return fmt.Errorf("failed to enqueue initial ssh pull job: %w", err)
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return CreateSSHHostResult{}, fmt.Errorf("commit create ssh host transaction: %w", err)
+		return fmt.Errorf("commit onboard transaction: %w", err)
 	}
 
-	address := hostname
-	if !strings.Contains(address, ":") {
-		address = net.JoinHostPort(hostname, "22")
-	}
-	runStatus, runError := s.sshRunner.TryConnect(ctx, address)
-
-	return CreateSSHHostResult{
-		HostID:         host.Host.ID,
-		PublicKey:      publicKey,
-		ApprovalStatus: host.Host.ApprovalStatus,
-		LastRunStatus:  runStatus,
-		LastRunError:   runError,
-	}, nil
+	return nil
 }
 
 func (s *hosts) ListHosts(ctx context.Context) ([]HostInfo, error) {

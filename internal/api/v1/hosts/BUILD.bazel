@@ -13,6 +13,7 @@ go_api_library(
         "list_pending_hosts.go",
         "list_pull_jobs.go",
         "list_tokens.go",
+        "onboard_ssh_host.go",
         "revoke_token.go",
     ],
     importpath = "go.patchbase.net/server/internal/api/v1/hosts",

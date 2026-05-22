@@ -114,3 +114,9 @@ export async function createSSHHost(payload: CreateSSHHostPayload): Promise<Crea
 export async function listPullJobs(id: string): Promise<HostPullJob[]> {
   return authenticatedRequest(`/api/v1/hosts/${id}/pull-jobs`);
 }
+
+export async function onboardSSHHost(id: string): Promise<void> {
+  await authenticatedRequest(`/api/v1/hosts/${id}/onboard-ssh`, {
+    method: "POST",
+  });
+}

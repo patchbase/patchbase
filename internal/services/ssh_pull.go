@@ -43,6 +43,20 @@ type SSHPullRunner interface {
 	TryConnect(ctx context.Context, address string) (string, string)
 }
 
+type SSHPullError struct {
+	ExitCode int
+	Message  string
+	Err      error
+}
+
+func (e *SSHPullError) Error() string {
+	return fmt.Sprintf("ssh collection failed (exit status %d): %s", e.ExitCode, e.Message)
+}
+
+func (e *SSHPullError) Unwrap() error {
+	return e.Err
+}
+
 type defaultSSHPullRunner struct{}
 
 func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string, user string, host string) (SSHPullResult, error) {
@@ -63,15 +77,22 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 		return SSHPullResult{}, fmt.Errorf("chmod temporary private key file: %w", err)
 	}
 
+	sshHost, sshPort, err := net.SplitHostPort(host)
+	if err != nil {
+		sshHost = host
+		sshPort = "22"
+	}
+
 	cmd := exec.CommandContext(
 		ctx,
 		"ssh",
+		"-p", sshPort,
 		"-o", "BatchMode=yes",
 		"-o", "ConnectTimeout=20",
 		"-o", "StrictHostKeyChecking=no",
 		"-o", "UserKnownHostsFile=/dev/null",
 		"-i", tmpFile.Name(),
-		fmt.Sprintf("%s@%s", user, host),
+		fmt.Sprintf("%s@%s", user, sshHost),
 		"sh", "-lc",
 		`h=$(hostname 2>/dev/null || true); a=$(uname -m 2>/dev/null || true); k=$(uname -r 2>/dev/null || true); m=$(cat /etc/machine-id 2>/dev/null || true); ip=$(hostname -I 2>/dev/null | awk '{print $1}'); b=$(awk '/^btime / {print $2}' /proc/stat 2>/dev/null || true); . /etc/os-release 2>/dev/null || true; echo "HOSTNAME=$h"; echo "ARCH=$a"; echo "KERNEL=$k"; echo "MACHINE_ID=$m"; echo "IP=$ip"; echo "BOOT_TIME=$b"; echo "OS_ID=${ID:-unknown}"; echo "OS_NAME=${NAME:-Unknown}"; echo "OS_VERSION=${VERSION_ID:-unknown}"`,
 	)
@@ -81,7 +102,15 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 		if message == "" {
 			message = err.Error()
 		}
-		return SSHPullResult{}, fmt.Errorf("ssh collection failed: %s", message)
+		exitCode := -1
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			exitCode = exitErr.ExitCode()
+		}
+		return SSHPullResult{}, &SSHPullError{
+			ExitCode: exitCode,
+			Message:  message,
+			Err:      err,
+		}
 	}
 
 	fields := map[string]string{}
