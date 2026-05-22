@@ -18,15 +18,26 @@
 	let viewMode = $state<ViewMode>('grid');
 	let openActionsHostID = $state<string | null>(null);
 
-	async function loadHosts(): Promise<void> {
-		loading = true;
-		error = '';
+	async function loadHosts(silent = false): Promise<void> {
+		if (!silent) {
+			loading = true;
+			error = '';
+		}
 		try {
-			hosts = await listHosts();
+			const newHosts = await listHosts();
+			if (JSON.stringify(hosts) !== JSON.stringify(newHosts)) {
+				hosts = newHosts;
+			}
 		} catch (err) {
-			error = err instanceof Error ? err.message : 'Failed to load hosts.';
+			if (!silent) {
+				error = err instanceof Error ? err.message : 'Failed to load hosts.';
+			} else {
+				console.error('Failed to poll hosts:', err);
+			}
 		} finally {
-			loading = false;
+			if (!silent) {
+				loading = false;
+			}
 		}
 	}
 
@@ -36,6 +47,10 @@
 			viewMode = saved;
 		}
 		void loadHosts();
+
+		const interval = setInterval(() => {
+			void loadHosts(true);
+		}, 5000);
 
 		const onDocumentClick = (event: MouseEvent): void => {
 			const target = event.target as HTMLElement | null;
@@ -47,6 +62,7 @@
 
 		document.addEventListener('click', onDocumentClick);
 		return () => {
+			clearInterval(interval);
 			document.removeEventListener('click', onDocumentClick);
 		};
 	});
