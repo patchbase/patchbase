@@ -662,47 +662,44 @@ const updateSSHPullRun = `-- name: UpdateSSHPullRun :exec
 WITH updated_pull AS (
     UPDATE host_ssh_pull
     SET
-        pull_last_run_at = $2,
-        pull_last_run_status = $3,
-        pull_last_run_error = $4
-    WHERE host_id = $1
+        pull_last_run_at = $1,
+        pull_last_run_status = $11,
+        pull_last_run_error = $12
+    WHERE host_id = $10
 )
 UPDATE hosts
 SET
-    last_advisory_check_at = $2,
-    machine_id = COALESCE($5, machine_id),
-    hostname = COALESCE($6, hostname),
-    ip_address = COALESCE($7, ip_address),
-    os_family = COALESCE($8, os_family),
-    os_name = COALESCE($9, os_name),
-    os_major = COALESCE($10, os_major),
-    os_version = COALESCE($11, os_version),
-    architecture = COALESCE($12, architecture),
-    last_seen_at = COALESCE($2, last_seen_at)
-WHERE id = $1
+    last_advisory_check_at = $1,
+    machine_id = COALESCE($2, machine_id),
+    hostname = COALESCE($3, hostname),
+    ip_address = COALESCE($4, ip_address),
+    os_family = CASE WHEN $5::text <> '' AND $5::text <> 'unknown' THEN $5 ELSE os_family END,
+    os_name = CASE WHEN $6::text <> '' AND $6::text <> 'Unknown' THEN $6 ELSE os_name END,
+    os_major = CASE WHEN $7::integer <> 0 THEN $7 ELSE os_major END,
+    os_version = CASE WHEN $8::text <> '' AND $8::text <> 'unknown' THEN $8 ELSE os_version END,
+    architecture = CASE WHEN $9::text <> '' AND $9::text <> 'unknown' THEN $9 ELSE architecture END,
+    last_seen_at = COALESCE($1, last_seen_at)
+WHERE id = $10
 `
 
 type UpdateSSHPullRunParams struct {
-	ID                  string
-	LastAdvisoryCheckAt pgtype.Timestamptz
-	PullLastRunStatus   utils.Option[string]
-	PullLastRunError    utils.Option[string]
-	MachineID           utils.Option[string]
-	Hostname            utils.Option[string]
-	IpAddress           utils.Option[string]
-	OsFamily            string
-	OsName              string
-	OsMajor             int32
-	OsVersion           string
-	Architecture        string
+	PullLastRunAt     pgtype.Timestamptz
+	MachineID         utils.Option[string]
+	Hostname          utils.Option[string]
+	IpAddress         utils.Option[string]
+	OsFamily          string
+	OsName            string
+	OsMajor           int32
+	OsVersion         string
+	Architecture      string
+	ID                string
+	PullLastRunStatus utils.Option[string]
+	PullLastRunError  utils.Option[string]
 }
 
 func (q *Queries) UpdateSSHPullRun(ctx context.Context, arg UpdateSSHPullRunParams) error {
 	_, err := q.db.Exec(ctx, updateSSHPullRun,
-		arg.ID,
-		arg.LastAdvisoryCheckAt,
-		arg.PullLastRunStatus,
-		arg.PullLastRunError,
+		arg.PullLastRunAt,
 		arg.MachineID,
 		arg.Hostname,
 		arg.IpAddress,
@@ -711,6 +708,9 @@ func (q *Queries) UpdateSSHPullRun(ctx context.Context, arg UpdateSSHPullRunPara
 		arg.OsMajor,
 		arg.OsVersion,
 		arg.Architecture,
+		arg.ID,
+		arg.PullLastRunStatus,
+		arg.PullLastRunError,
 	)
 	return err
 }

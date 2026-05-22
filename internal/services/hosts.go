@@ -985,18 +985,18 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 			}
 
 			err = queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
-				ID:                  hostID,
-				LastAdvisoryCheckAt: pgTime(res.CollectedAt),
-				PullLastRunStatus:   statusOpt,
-				PullLastRunError:    errOpt,
-				MachineID:           utils.Some(res.MachineID),
-				Hostname:            utils.Some(res.Hostname),
-				IpAddress:           utils.Some(res.IPAddress),
-				OsFamily:            res.OSFamily,
-				OsName:              res.OSName,
-				OsMajor:             res.OSMajor,
-				OsVersion:           res.OSVersion,
-				Architecture:        res.Architecture,
+				ID:                hostID,
+				PullLastRunAt:     pgTime(res.CollectedAt),
+				PullLastRunStatus: statusOpt,
+				PullLastRunError:  errOpt,
+				MachineID:         optionString(res.MachineID),
+				Hostname:          optionString(res.Hostname),
+				IpAddress:         optionString(res.IPAddress),
+				OsFamily:          res.OSFamily,
+				OsName:            res.OSName,
+				OsMajor:           res.OSMajor,
+				OsVersion:         res.OSVersion,
+				Architecture:      res.Architecture,
 			})
 			if err != nil {
 				return fmt.Errorf("update ssh pull run success: %w", err)
@@ -1021,18 +1021,18 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 			}
 		} else {
 			err = queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
-				ID:                  hostID,
-				LastAdvisoryCheckAt: pgTime(time.Now()),
-				PullLastRunStatus:   statusOpt,
-				PullLastRunError:    errOpt,
-				MachineID:           utils.None[string](),
-				Hostname:            utils.None[string](),
-				IpAddress:           utils.None[string](),
-				OsFamily:            host.OsFamily,
-				OsName:              host.OsName,
-				OsMajor:             host.OsMajor,
-				OsVersion:           host.OsVersion,
-				Architecture:        host.Architecture,
+				ID:                hostID,
+				PullLastRunAt:     pgTime(time.Now()),
+				PullLastRunStatus: statusOpt,
+				PullLastRunError:  errOpt,
+				MachineID:         utils.None[string](),
+				Hostname:          utils.None[string](),
+				IpAddress:         utils.None[string](),
+				OsFamily:          host.OsFamily,
+				OsName:            host.OsName,
+				OsMajor:           host.OsMajor,
+				OsVersion:         host.OsVersion,
+				Architecture:      host.Architecture,
 			})
 			if err != nil {
 				return fmt.Errorf("update ssh pull run failure: %w", err)

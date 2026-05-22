@@ -131,24 +131,24 @@ RETURNING *;
 WITH updated_pull AS (
     UPDATE host_ssh_pull
     SET
-        pull_last_run_at = $2,
-        pull_last_run_status = $3,
-        pull_last_run_error = $4
-    WHERE host_id = $1
+        pull_last_run_at = @pull_last_run_at,
+        pull_last_run_status = @pull_last_run_status,
+        pull_last_run_error = @pull_last_run_error
+    WHERE host_id = @id
 )
 UPDATE hosts
 SET
-    last_advisory_check_at = $2,
-    machine_id = COALESCE($5, machine_id),
-    hostname = COALESCE($6, hostname),
-    ip_address = COALESCE($7, ip_address),
-    os_family = COALESCE($8, os_family),
-    os_name = COALESCE($9, os_name),
-    os_major = COALESCE($10, os_major),
-    os_version = COALESCE($11, os_version),
-    architecture = COALESCE($12, architecture),
-    last_seen_at = COALESCE($2, last_seen_at)
-WHERE id = $1;
+    last_advisory_check_at = @pull_last_run_at,
+    machine_id = COALESCE(@machine_id, machine_id),
+    hostname = COALESCE(@hostname, hostname),
+    ip_address = COALESCE(@ip_address, ip_address),
+    os_family = CASE WHEN @os_family::text <> '' AND @os_family::text <> 'unknown' THEN @os_family ELSE os_family END,
+    os_name = CASE WHEN @os_name::text <> '' AND @os_name::text <> 'Unknown' THEN @os_name ELSE os_name END,
+    os_major = CASE WHEN @os_major::integer <> 0 THEN @os_major ELSE os_major END,
+    os_version = CASE WHEN @os_version::text <> '' AND @os_version::text <> 'unknown' THEN @os_version ELSE os_version END,
+    architecture = CASE WHEN @architecture::text <> '' AND @architecture::text <> 'unknown' THEN @architecture ELSE architecture END,
+    last_seen_at = COALESCE(@pull_last_run_at, last_seen_at)
+WHERE id = @id;
 
 -- name: ListHostsWithState :many
 SELECT

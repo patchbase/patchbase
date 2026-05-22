@@ -1,4 +1,4 @@
-load("@rules_go//go:def.bzl", "go_library")
+load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "services",
@@ -24,4 +24,12 @@ go_library(
         "@com_github_samber_do_v2//:do",
         "@org_golang_google_protobuf//proto",
     ],
+)
+
+go_test(
+    name = "ssh_pull_test",
+    size = "small",
+    srcs = ["ssh_pull_test.go"],
+    embed = [":services"],
+    deps = ["@com_github_stretchr_testify//assert"],
 )

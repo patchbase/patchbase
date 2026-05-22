@@ -22,6 +22,7 @@ go_library(
 
 go_test(
     name = "ssh_pull_worker_test",
+    size = "small",
     srcs = ["ssh_pull_worker_test.go"],
     deps = [
         ":queue",

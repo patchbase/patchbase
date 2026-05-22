@@ -116,6 +116,10 @@
 				<div class="detail-row"><span class="label">Host ID</span><span class="value mono">{host.id}</span></div>
 				<div class="detail-row"><span class="label">Hostname</span><span class="value">{host.hostname || '-'}</span></div>
 				<div class="detail-row"><span class="label">IP</span><span class="value mono">{host.ip_address || '-'}</span></div>
+				<div class="detail-row"><span class="label">OS Family</span><span class="value">{host.os_family || '-'}</span></div>
+				<div class="detail-row"><span class="label">OS Name</span><span class="value">{host.os_name || '-'}</span></div>
+				<div class="detail-row"><span class="label">OS Version</span><span class="value">{host.os_version || '-'}</span></div>
+				<div class="detail-row"><span class="label">Architecture</span><span class="value mono">{host.architecture || '-'}</span></div>
 				<div class="detail-row"><span class="label">Mode</span><span class="value"><StatusBadge status={host.onboarding_mode || 'unknown'} /></span></div>
 				<div class="detail-row"><span class="label">Approval</span><span class="value"><StatusBadge status={host.approval_status || 'unknown'} /></span></div>
 				<div class="detail-row"><span class="label">Host Status</span><span class="value"><StatusBadge status={host.status} /></span></div>

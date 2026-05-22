@@ -1,6 +1,7 @@
 package services
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -94,7 +95,7 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 		"-i", tmpFile.Name(),
 		fmt.Sprintf("%s@%s", user, sshHost),
 		"sh", "-lc",
-		`h=$(hostname 2>/dev/null || true); a=$(uname -m 2>/dev/null || true); k=$(uname -r 2>/dev/null || true); m=$(cat /etc/machine-id 2>/dev/null || true); ip=$(hostname -I 2>/dev/null | awk '{print $1}'); b=$(awk '/^btime / {print $2}' /proc/stat 2>/dev/null || true); . /etc/os-release 2>/dev/null || true; echo "HOSTNAME=$h"; echo "ARCH=$a"; echo "KERNEL=$k"; echo "MACHINE_ID=$m"; echo "IP=$ip"; echo "BOOT_TIME=$b"; echo "OS_ID=${ID:-unknown}"; echo "OS_NAME=${NAME:-Unknown}"; echo "OS_VERSION=${VERSION_ID:-unknown}"`,
+		`h=$(hostname 2>/dev/null || true); a=$(uname -m 2>/dev/null || true); k=$(uname -r 2>/dev/null || true); m=$(cat /etc/machine-id 2>/dev/null || true); ip=$(hostname -I 2>/dev/null | awk '{print $1}'); b=$(awk '/^btime / {print $2}' /proc/stat 2>/dev/null || true); . /etc/os-release 2>/dev/null || true; echo "_PB_METADATA_HOSTNAME=$h"; echo "_PB_METADATA_ARCH=$a"; echo "_PB_METADATA_KERNEL=$k"; echo "_PB_METADATA_MACHINE_ID=$m"; echo "_PB_METADATA_IP=$ip"; echo "_PB_METADATA_BOOT_TIME=$b"; echo "_PB_METADATA_OS_ID=${ID:-unknown}"; echo "_PB_METADATA_OS_NAME=${NAME:-Unknown}"; echo "_PB_METADATA_OS_VERSION=${VERSION_ID:-unknown}"; echo "---UPDATES_START---"; if command -v apt >/dev/null 2>&1; then apt list --upgradable 2>/dev/null; elif command -v dnf >/dev/null 2>&1; then dnf -q --cacheonly check-update 2>/dev/null || true; elif command -v yum >/dev/null 2>&1; then yum check-update -q 2>/dev/null || true; fi`,
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -113,13 +114,25 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 		}
 	}
 
+	outputStr := string(output)
+	parts := strings.Split(outputStr, "---UPDATES_START---\n")
+	if len(parts) < 2 {
+		parts = strings.Split(outputStr, "---UPDATES_START---")
+	}
+
 	fields := map[string]string{}
-	for _, line := range strings.Split(strings.TrimSpace(string(output)), "\n") {
-		key, value, ok := strings.Cut(strings.TrimSpace(line), "=")
+	firstPartLines := strings.Split(parts[0], "\n")
+	for _, line := range firstPartLines {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "_PB_METADATA_") {
+			continue
+		}
+		trimmedLine := strings.TrimPrefix(line, "_PB_METADATA_")
+		key, value, ok := strings.Cut(trimmedLine, "=")
 		if !ok {
 			continue
 		}
-		fields[key] = strings.TrimSpace(value)
+		fields[key] = cleanQuote(value)
 	}
 
 	bootPtr := (*time.Time)(nil)
@@ -166,6 +179,21 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 		"collected_at": collectedAt,
 	})
 
+	var availableUpdates int32
+	if len(parts) >= 2 && osFamily != "unknown" {
+		updatesSection := parts[1]
+		if osFamily == "apt" {
+			availableUpdates = countAptPackageUpdates(updatesSection)
+		} else if osFamily == "rpm" {
+			availableUpdates = countRpmPackageUpdates(updatesSection)
+		}
+	}
+
+	overallAction := "none"
+	if availableUpdates > 0 {
+		overallAction = "update_package"
+	}
+
 	return SSHPullResult{
 		MachineID:        strings.TrimSpace(fields["MACHINE_ID"]),
 		Hostname:         strings.TrimSpace(fields["HOSTNAME"]),
@@ -178,19 +206,83 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 		RunningKernel:    strings.TrimSpace(fields["KERNEL"]),
 		CollectedAt:      collectedAt,
 		BootTime:         bootPtr,
-		AvailableUpdates: 0,
+		AvailableUpdates: availableUpdates,
 		HasProcessData:   false,
 		Payload:          payload,
-		OverallAction:    "none",
+		OverallAction:    overallAction,
 		CriticalCount:    0,
 		ImportantCount:   0,
 		ModerateCount:    0,
-		ActionableCount:  0,
+		ActionableCount:  availableUpdates,
 		NeedsReboot:      0,
 		NeedsRestart:     0,
 		NoFix:            0,
 		Unknown:          0,
 	}, nil
+}
+
+func cleanQuote(s string) string {
+	s = strings.TrimSpace(s)
+	if len(s) >= 2 && ((s[0] == '"' && s[len(s)-1] == '"') || (s[0] == '\'' && s[len(s)-1] == '\'')) {
+		return s[1 : len(s)-1]
+	}
+	return s
+}
+
+func countAptPackageUpdates(output string) int32 {
+	var count int32
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "Listing...") || strings.HasPrefix(line, "WARNING:") || strings.HasPrefix(line, "N:") {
+			continue
+		}
+		if !strings.Contains(line, "/") {
+			continue
+		}
+		if !strings.Contains(line, "[upgradable from:") {
+			continue
+		}
+		count++
+	}
+	return count
+}
+
+func countRpmPackageUpdates(output string) int32 {
+	var count int32
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		if strings.HasPrefix(line, "Last metadata expiration check:") {
+			continue
+		}
+		if line == "Obsoleting Packages" || line == "Obsoleted Packages" {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) < 3 {
+			continue
+		}
+		first := fields[0]
+		second := fields[1]
+
+		if !strings.Contains(first, ".") {
+			continue
+		}
+		if !strings.ContainsAny(second, "0123456789") {
+			continue
+		}
+
+		count++
+	}
+	return count
 }
 
 func fallback(value string, defaultValue string) string {
