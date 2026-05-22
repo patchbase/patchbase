@@ -35,7 +35,7 @@ func createEphemeralDatabase(t *gotesting.T, baseURL string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("connect admin database: %w", err)
 	}
-	defer conn.Close(ctx)
+	defer conn.Close(ctx) // nolint:errcheck
 
 	createSQL := fmt.Sprintf(`CREATE DATABASE %s TEMPLATE %s`, quoteIdent(dbName), quoteIdent(templateDB))
 	if _, err := conn.Exec(ctx, createSQL); err != nil {
@@ -58,16 +58,17 @@ func dropEphemeralDatabase(adminURL string, dbName string) {
 	if err != nil {
 		return
 	}
-	defer conn.Close(ctx)
+	defer conn.Close(ctx) // nolint:errcheck
 
-	_, _ = conn.Exec(ctx, `
+	// nolint:errcheck
+	conn.Exec(ctx, `
 		SELECT pg_terminate_backend(pid)
 		FROM pg_stat_activity
 		WHERE datname = $1
 		  AND pid <> pg_backend_pid()
 	`, dbName)
 
-	_, _ = conn.Exec(ctx, fmt.Sprintf(`DROP DATABASE IF EXISTS %s`, quoteIdent(dbName)))
+	conn.Exec(ctx, fmt.Sprintf(`DROP DATABASE IF EXISTS %s`, quoteIdent(dbName))) // nolint:errcheck
 }
 
 func quoteIdent(value string) string {

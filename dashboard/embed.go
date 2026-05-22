@@ -6,7 +6,7 @@ import (
 	"io/fs"
 )
 
-//go:embed build/**
+//go:embed all:build
 var embeddedFiles embed.FS
 
 // Files returns the built dashboard assets rooted at build/.

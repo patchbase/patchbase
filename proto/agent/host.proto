@@ -4,6 +4,7 @@ package patchbase.agent;
 
 import "google/protobuf/timestamp.proto";
 import "patchbase/agent/common.proto";
+import "validate/validate.proto";
 
 option go_package = "go.patchbase.net/proto/agent";
 
@@ -22,4 +23,24 @@ message Host {
   VirtualizationRole virtualization_role = 12;
   repeated string environment_tags = 13;
   repeated string ip_addresses = 14;
+}
+
+message RegisterHostMetadata {
+  string ip_address = 1;
+  string os_name = 2;
+  string os_version = 3;
+  string architecture = 4;
+}
+
+message RegisterHostRequest {
+  string registration_token = 1 [(validate.rules).string = {min_len: 1, max_len: 255}];
+  string hostname = 2 [(validate.rules).string = {min_len: 1, max_len: 255}];
+  string machine_id = 3 [(validate.rules).string = {min_len: 1, max_len: 128}];
+  RegisterHostMetadata metadata = 4 [(validate.rules).message.required = true];
+}
+
+message RegisterHostResponse {
+  string host_id = 1;
+  string host_access_token = 2;
+  string approval_status = 3;
 }

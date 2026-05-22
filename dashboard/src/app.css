@@ -446,6 +446,12 @@ tbody td.mono {
 	margin-bottom: 8px;
 }
 
+.host-card-header-right {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
 .host-card-name {
 	font-size: 15px;
 	font-weight: 600;
@@ -481,6 +487,98 @@ tbody td.mono {
 	justify-content: space-between;
 	font-size: 12px;
 	color: var(--text-dim);
+}
+
+.host-actions-cell {
+	width: 1%;
+	white-space: nowrap;
+	text-align: right;
+}
+
+.host-actions {
+	position: relative;
+	display: inline-flex;
+}
+
+.host-actions-trigger {
+	width: 28px;
+	height: 28px;
+	border: 1px solid var(--border);
+	background: var(--bg-primary);
+	border-radius: 6px;
+	display: inline-flex;
+	flex-direction: column;
+	justify-content: center;
+	align-items: center;
+	gap: 3px;
+	cursor: pointer;
+}
+
+.host-actions-trigger:hover {
+	border-color: var(--border-light);
+	background: var(--bg-card-hover);
+}
+
+.host-actions-trigger:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
+.host-actions-trigger span {
+	display: block;
+	width: 12px;
+	height: 1px;
+	background: var(--text-secondary);
+}
+
+.host-actions-menu {
+	position: absolute;
+	top: calc(100% + 6px);
+	left: 0;
+	min-width: 132px;
+	background: var(--bg-card);
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 6px;
+	z-index: 20;
+	box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+.host-actions-menu-right {
+	right: 0;
+	left: auto;
+}
+
+.host-actions-item {
+	width: 100%;
+	text-align: left;
+	border: none;
+	background: transparent;
+	color: var(--text-secondary);
+	padding: 8px 10px;
+	border-radius: 6px;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.host-actions-item:hover {
+	background: var(--bg-card-hover);
+	color: var(--text-primary);
+}
+
+.host-actions-item:disabled {
+	opacity: 0.6;
+	cursor: default;
+}
+
+.host-actions-item-danger {
+	color: var(--red);
+}
+
+.host-actions-item-danger:hover {
+	background: var(--red-bg);
+	color: var(--red);
 }
 
 /* ---- ADVISORY CARDS ---- */
@@ -861,6 +959,48 @@ select.form-input {
 	margin-top: 6px;
 }
 
+.segmented-toggle {
+	display: inline-flex;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	overflow: hidden;
+	background: var(--surface-muted);
+}
+
+.segmented-toggle button {
+	background: transparent;
+	border: none;
+	color: var(--text-secondary);
+	padding: 6px 10px;
+	font-size: 12px;
+	font-weight: 600;
+	cursor: pointer;
+}
+
+.segmented-toggle button.active {
+	background: var(--bg-card);
+	color: var(--text-primary);
+}
+
+.token-create-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	margin-top: 12px;
+	max-width: 540px;
+}
+
+.token-create-row .form-input {
+	flex: 1 1 260px;
+	min-width: 180px;
+	max-width: 340px;
+}
+
+.token-create-button {
+	flex: 0 0 auto;
+	white-space: nowrap;
+}
+
 /* ---- RESPONSIVE ---- */
 @media (max-width: 1024px) {
 	.stats-row {
@@ -887,5 +1027,16 @@ select.form-input {
 
 	.host-grid {
 		grid-template-columns: 1fr;
+	}
+
+	.token-create-row {
+		flex-direction: column;
+		align-items: stretch;
+		max-width: none;
+	}
+
+	.token-create-row .form-input {
+		min-width: 0;
+		max-width: none;
 	}
 }

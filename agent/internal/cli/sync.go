@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
@@ -62,35 +63,31 @@ func runSync(cmd *cobra.Command, args []string) error {
 		fmt.Println(string(data))
 	}
 
-	httpClient, err := client.NewHTTPClient(fileConfig.CACert, fileConfig.AllowInsecureHTTP)
+	httpClient, err := client.NewHTTPClient(fileConfig.ServerURL, fileConfig.CACert, fileConfig.AllowInsecureHTTP)
 	if err != nil {
 		return fmt.Errorf("create http client: %w", err)
 	}
 
-	result, err := httpClient.PostSnapshot(cmd.Context(), fileConfig.ServerURL, fileConfig.HostToken, snapshot)
+	result, err := httpClient.PostSnapshot(cmd.Context(), fileConfig.HostToken, snapshot)
 	if err != nil {
 		return fmt.Errorf("sync: %w", err)
 	}
 
-	fmt.Printf("sync status=%d endpoint=%s\n", result.Status, result.Endpoint)
+	slog.Info("Sync completed", "status", result.Status, "endpoint", result.Endpoint)
 	if result.Status < 200 || result.Status >= 300 {
 		if result.RequestID != "" {
-			fmt.Printf("request_id=%s\n", result.RequestID)
+			slog.Error("Sync rejected", "request_id", result.RequestID, "message", string(result.Body))
 		}
 	}
 	if result.Response != nil {
-		fmt.Printf("accepted=%v\n", result.Response.Accepted)
-		if result.Response.HostID != "" {
-			fmt.Printf("host_id=%s\n", result.Response.HostID)
-		}
-		if result.Response.SnapshotID != "" {
-			fmt.Printf("snapshot_id=%s\n", result.Response.SnapshotID)
-		}
-		if result.Response.NextCheckInSeconds != 0 {
-			fmt.Printf("next_check_in_seconds=%d\n", result.Response.NextCheckInSeconds)
-		}
+		slog.Info("Sync response details",
+			"accepted", result.Response.Accepted,
+			"host_id", result.Response.HostId,
+			"snapshot_id", result.Response.SnapshotId,
+			"next_check_in_seconds", result.Response.NextCheckInSeconds,
+		)
 	} else if len(result.Body) != 0 {
-		fmt.Printf("response_body=%s\n", string(result.Body))
+		slog.Error("Sync error response", "body", string(result.Body))
 	}
 
 	if result.Status < 200 || result.Status >= 300 {

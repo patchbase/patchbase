@@ -33,7 +33,7 @@ func collectEnabledRPMRepos(fs afero.Fs) []*agent.Repo {
 		}
 
 		entries, err := dir.Readdirnames(-1)
-		_ = dir.Close()
+		dir.Close() // nolint:errcheck
 		if err != nil {
 			continue
 		}
@@ -69,7 +69,7 @@ func collectEnabledAPTRepos(fs afero.Fs) []*agent.Repo {
 	dir, err := fs.Open("/etc/apt/sources.list.d")
 	if err == nil {
 		entries, readErr := dir.Readdirnames(-1)
-		_ = dir.Close()
+		dir.Close() // nolint:errcheck
 		if readErr == nil {
 			sort.Strings(entries)
 			for _, name := range entries {

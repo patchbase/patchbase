@@ -69,10 +69,20 @@
 		let unmounted = false;
 		let pollTimer: ReturnType<typeof setInterval> | undefined;
 
+		const stopSetupStatusPolling = (): void => {
+			if (pollTimer) {
+				clearInterval(pollTimer);
+				pollTimer = undefined;
+			}
+		};
+
 		const runGuardCycle = async (): Promise<void> => {
 			await refreshSetupStatus();
 			if (unmounted) {
 				return;
+			}
+			if (setupCompleted) {
+				stopSetupStatusPolling();
 			}
 			if (loading) {
 				loading = false;
@@ -84,8 +94,15 @@
 			void runGuardCycle();
 		};
 
-		void runGuardCycle();
-		pollTimer = setInterval(run, setupStatusPollInterval);
+		void (async () => {
+			await runGuardCycle();
+			if (unmounted) {
+				return;
+			}
+			if (setupCompleted === false && !pollTimer) {
+				pollTimer = setInterval(run, setupStatusPollInterval);
+			}
+		})();
 
 		const onSessionChanged = (): void => {
 			void enforceRouteGuard();
@@ -99,9 +116,7 @@
 
 		return () => {
 			unmounted = true;
-			if (pollTimer) {
-				clearInterval(pollTimer);
-			}
+			stopSetupStatusPolling();
 			window.removeEventListener(sessionChangedEvent, onSessionChanged);
 			window.removeEventListener('popstate', onPopState);
 		};

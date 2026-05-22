@@ -7,14 +7,22 @@ import "patchbase/agent/host.proto";
 import "patchbase/agent/package.proto";
 import "patchbase/agent/repo.proto";
 import "patchbase/agent/runtime.proto";
+import "validate/validate.proto";
 
 option go_package = "go.patchbase.net/proto/agent";
 
 message AgentSnapshot {
-  string schema_version = 1;
-  google.protobuf.Timestamp sent_at = 2;
-  Host host = 3;
+  string schema_version = 1 [(validate.rules).string = {min_len: 1, max_len: 64}];
+  google.protobuf.Timestamp sent_at = 2 [(validate.rules).timestamp = {required: true}];
+  Host host = 3 [(validate.rules).message = {required: true}];
   repeated Repo repos = 4;
   repeated Package packages = 5;
-  Runtime runtime = 6;
+  Runtime runtime = 6 [(validate.rules).message = {required: true}];
+}
+
+message SyncResponse {
+  bool accepted = 1;
+  string host_id = 2;
+  string snapshot_id = 3;
+  int32 next_check_in_seconds = 4;
 }

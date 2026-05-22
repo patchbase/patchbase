@@ -24,3 +24,7 @@ enum VirtualizationRole {
   VIRTUALIZATION_ROLE_CONTAINER = 3;
   VIRTUALIZATION_ROLE_UNKNOWN = 4;
 }
+
+message APIError {
+  string error = 1;
+}

@@ -1,7 +1,7 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@protobuf//bazel:proto_library.bzl", "proto_library")
 load("@rules_go//go:def.bzl", "go_library")
-load("@rules_proto_grpc_go//:defs.bzl", "go_proto_compile")
+load("//proto:defs.bzl", "go_proto_compile")
 
 # gazelle:prefix go.patchbase.net/proto/agent
 # gazelle:proto disable
@@ -19,6 +19,7 @@ proto_library(
     visibility = ["//visibility:public"],
     deps = [
         "@protobuf//:timestamp_proto",
+        "@protoc-gen-validate//validate:validate_proto",
     ],
 )
 
@@ -37,17 +38,25 @@ go_library(
     name = "agent",
     srcs = [
         "common.pb.go",
+        "common.pb.validate.go",
         "host.pb.go",
+        "host.pb.validate.go",
         "package.pb.go",
+        "package.pb.validate.go",
         "repo.pb.go",
+        "repo.pb.validate.go",
         "runtime.pb.go",
+        "runtime.pb.validate.go",
         "snapshot.pb.go",
+        "snapshot.pb.validate.go",
     ],
     importpath = "go.patchbase.net/proto/agent",
     visibility = ["//visibility:public"],
     deps = [
         "@org_golang_google_protobuf//reflect/protoreflect",
         "@org_golang_google_protobuf//runtime/protoimpl",
+        "@org_golang_google_protobuf//types/known/anypb",
         "@org_golang_google_protobuf//types/known/timestamppb",
+        "@protoc-gen-validate//validate",
     ],
 )

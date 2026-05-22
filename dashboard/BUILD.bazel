@@ -1,5 +1,5 @@
-load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary")
+load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@rules_go//go:def.bzl", "go_library")
 load(":defs.bzl", "exec_filegroup")
@@ -18,32 +18,32 @@ npm_link_all_packages(
 
 js_binary(
     name = "dashboard_build_tool",
-    entry_point = "tools/bazel_build.mjs",
     data = [":node_modules"],
+    entry_point = "tools/bazel_build.mjs",
 )
 
 js_run_binary(
     name = "build_dashboard_assets",
-    tool = ":dashboard_build_tool",
-    chdir = package_name(),
     srcs = glob([
         "src/**",
         "static/**",
     ]) + [
-        ":node_modules",
+        ".npmrc",
         "package.json",
         "pnpm-lock.yaml",
-        ".npmrc",
         "svelte.config.js",
         "tools/bazel_build.mjs",
         "tsconfig.json",
         "vite.config.ts",
+        ":node_modules",
     ],
+    chdir = package_name(),
+    execution_requirements = {"no-sandbox": "1"},
     out_dirs = [
         "build",
         ".svelte-kit",
     ],
-    execution_requirements = {"no-sandbox": "1"},
+    tool = ":dashboard_build_tool",
 )
 
 exec_filegroup(

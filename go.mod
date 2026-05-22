@@ -17,12 +17,15 @@ require (
 	github.com/spf13/viper v1.21.0
 	github.com/stretchr/testify v1.11.1
 	go.patchbase.net/dashboard v0.0.0
+	go.patchbase.net/proto/agent v0.0.0-00010101000000-000000000000
 	golang.org/x/crypto v0.51.0
+	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
 	github.com/goccy/go-yaml v1.18.0 // indirect
@@ -58,3 +61,5 @@ require (
 )
 
 replace go.patchbase.net/dashboard => ./dashboard
+
+replace go.patchbase.net/proto/agent => ./proto/agent

@@ -8,12 +8,14 @@ go_library(
         "option.go",
         "password.go",
         "random.go",
+        "ssh.go",
     ],
     importpath = "go.patchbase.net/server/internal/utils",
     visibility = ["//:__subpackages__"],
     deps = [
         "@in_gopkg_yaml_v3//:yaml_v3",
         "@org_golang_x_crypto//bcrypt",
+        "@org_golang_x_crypto//ssh",
     ],
 )
 

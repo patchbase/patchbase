@@ -39,6 +39,16 @@ func (h dashboardHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// If the file wasn't found and it looks like a static asset, return 404.
+	// This prevents serving index.html (which is text/html) for missing JS chunks,
+	// which causes strict MIME type checking errors in browsers. When SvelteKit
+	// gets a 404 for a chunk, it automatically forces a full page reload to get
+	// the updated assets.
+	if strings.HasPrefix(requestedPath, "_app/") {
+		http.NotFound(w, r)
+		return
+	}
+
 	http.ServeFileFS(w, r, h.files, "index.html")
 }
 

@@ -5,9 +5,13 @@ go_library(
     srcs = [
         "db.go",
         "extra.go",
+        "host_access_tokens.sql.go",
+        "host_snapshots.sql.go",
+        "hosts.sql.go",
         "injector.go",
         "models.go",
         "querier.go",
+        "registration_tokens.sql.go",
         "settings.sql.go",
         "users.sql.go",
     ],

@@ -2,9 +2,16 @@ package cli
 
 import (
 	"fmt"
+	"log/slog"
+	"net"
+	"os"
+	"runtime"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"go.patchbase.net/agent/internal/client"
 	"go.patchbase.net/agent/internal/config"
+	agent "go.patchbase.net/proto/agent"
 )
 
 func newEnrollCmd() *cobra.Command {
@@ -40,16 +47,106 @@ func enroll(cmd *cobra.Command, args []string) error {
 
 	cfg := config.File{
 		ServerURL:         args[0],
-		HostToken:         args[1],
+		HostToken:         "",
 		CACert:            caCert,
 		AllowInsecureHTTP: allowInsecureHTTP,
 	}
+
+	httpClient, err := client.NewHTTPClient(args[0], caCert, allowInsecureHTTP)
+	if err != nil {
+		return fmt.Errorf("create http client: %w", err)
+	}
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return fmt.Errorf("read hostname: %w", err)
+	}
+
+	registerResult, err := httpClient.RegisterHost(
+		cmd.Context(),
+		&agent.RegisterHostRequest{
+			RegistrationToken: args[1],
+			Hostname:          hostname,
+			MachineId:         readMachineID(),
+			Metadata:          collectRegistrationMetadata(),
+		},
+	)
+	if err != nil {
+		return fmt.Errorf("register host: %w", err)
+	}
+	if registerResult.Response == nil || registerResult.Response.HostAccessToken == "" {
+		return fmt.Errorf("register host: invalid response")
+	}
+
+	cfg.HostToken = registerResult.Response.HostAccessToken
 
 	fs := config.DefaultFS()
 	if err := config.Save(fs, configPath, cfg); err != nil {
 		return fmt.Errorf("save config: %w", err)
 	}
 
-	fmt.Printf("wrote config to %s\nserver_url=%s\n", configPath, cfg.ServerURL)
+	slog.Info("Successfully enrolled host",
+		"config_path", configPath,
+		"server_url", cfg.ServerURL,
+		"host_id", registerResult.Response.HostId,
+		"approval_status", registerResult.Response.ApprovalStatus,
+	)
 	return nil
+}
+
+func readMachineID() string {
+	data, err := os.ReadFile("/etc/machine-id")
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(data))
+}
+
+func collectRegistrationMetadata() *agent.RegisterHostMetadata {
+	return &agent.RegisterHostMetadata{
+		IpAddress:    firstNonLoopbackIP(),
+		OsName:       runtime.GOOS,
+		OsVersion:    readOSVersion(),
+		Architecture: runtime.GOARCH,
+	}
+}
+
+func readOSVersion() string {
+	data, err := os.ReadFile("/etc/os-release")
+	if err != nil {
+		return "unknown"
+	}
+
+	for _, line := range strings.Split(string(data), "\n") {
+		if !strings.HasPrefix(line, "VERSION_ID=") {
+			continue
+		}
+		value := strings.TrimPrefix(line, "VERSION_ID=")
+		value = strings.TrimSpace(strings.Trim(value, `"`))
+		if value != "" {
+			return value
+		}
+	}
+
+	return "unknown"
+}
+
+func firstNonLoopbackIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return ""
+	}
+
+	for _, addr := range addrs {
+		ipNet, ok := addr.(*net.IPNet)
+		if !ok || ipNet.IP == nil || ipNet.IP.IsLoopback() {
+			continue
+		}
+		ip4 := ipNet.IP.To4()
+		if ip4 != nil {
+			return ip4.String()
+		}
+	}
+
+	return ""
 }

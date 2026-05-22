@@ -1,0 +1,170 @@
+-- name: InsertAgentHost :one
+INSERT INTO hosts (
+    id,
+    onboarding_mode,
+    approval_status,
+    display_name,
+    machine_id,
+    hostname,
+    ip_address,
+    os_name,
+    os_version,
+    architecture,
+    status
+)
+VALUES (
+    $1,
+    'agent',
+    'waiting_approval',
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    'active'
+)
+RETURNING *;
+
+-- name: InsertSSHHost :one
+INSERT INTO hosts (
+    id,
+    onboarding_mode,
+    approval_status,
+    approved_at,
+    display_name,
+    hostname,
+    ip_address,
+    status,
+    pull_ssh_user,
+    pull_frequency_minutes,
+    pull_public_key,
+    pull_private_key
+)
+VALUES (
+    $1,
+    'ssh',
+    'approved',
+    now(),
+    $2,
+    $3,
+    $4,
+    'active',
+    $5,
+    $6,
+    $7,
+    $8
+)
+RETURNING *;
+
+-- name: GetHostByID :one
+SELECT *
+FROM hosts
+WHERE id = $1;
+
+-- name: ListPendingHosts :many
+SELECT *
+FROM hosts
+WHERE approval_status = 'waiting_approval'
+ORDER BY created_at DESC, id DESC;
+
+-- name: ApproveHostByID :one
+UPDATE hosts
+SET
+    approval_status = 'approved',
+    approved_at = now()
+WHERE id = $1
+RETURNING *;
+
+-- name: ClearHostLastSnapshotByID :exec
+UPDATE hosts
+SET last_snapshot_id = NULL
+WHERE id = $1;
+
+-- name: DeleteHostByID :one
+DELETE FROM hosts
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateHostFromSnapshot :one
+UPDATE hosts
+SET
+    machine_id = $2,
+    hostname = $3,
+    ip_address = $4,
+    os_family = $5,
+    os_name = $6,
+    os_major = $7,
+    os_version = $8,
+    architecture = $9,
+    status = 'active',
+    last_seen_at = $10,
+    last_advisory_check_at = $10,
+    last_snapshot_id = $11
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateSSHPullRun :exec
+UPDATE hosts
+SET
+    pull_last_run_at = $2,
+    pull_last_run_status = $3,
+    pull_last_run_error = $4,
+    last_advisory_check_at = $2,
+    machine_id = COALESCE($5, machine_id),
+    hostname = COALESCE($6, hostname),
+    ip_address = COALESCE($7, ip_address),
+    os_family = COALESCE($8, os_family),
+    os_name = COALESCE($9, os_name),
+    os_major = COALESCE($10, os_major),
+    os_version = COALESCE($11, os_version),
+    architecture = COALESCE($12, architecture),
+    last_seen_at = COALESCE($2, last_seen_at)
+WHERE id = $1;
+
+-- name: ListHostsWithState :many
+SELECT
+    sqlc.embed(h),
+    COALESCE(hcs.overall_action, 'none') AS overall_action,
+    COALESCE(hcs.critical_count, 0) AS critical_count,
+    COALESCE(hcs.important_count, 0) AS important_count,
+    COALESCE(hcs.moderate_count, 0) AS moderate_count,
+    COALESCE(hcs.actionable_count, 0) AS actionable_count,
+    COALESCE(hcs.available_updates, 0) AS available_updates,
+    COALESCE(hcs.needs_reboot, 0) AS needs_reboot,
+    COALESCE(hcs.needs_restart, 0) AS needs_restart,
+    COALESCE(hcs.no_fix, 0) AS no_fix,
+    COALESCE(hcs.unknown, 0) AS unknown,
+    hcs.updated_at AS state_updated_at
+FROM hosts h
+LEFT JOIN host_current_state hcs ON hcs.host_id = h.id
+ORDER BY
+    CASE COALESCE(hcs.overall_action, 'none')
+        WHEN 'reboot_host' THEN 0
+        WHEN 'restart_service' THEN 1
+        WHEN 'update_package' THEN 2
+        WHEN 'investigate' THEN 3
+        ELSE 4
+    END,
+    h.last_seen_at DESC NULLS LAST,
+    h.hostname ASC,
+    h.id ASC;
+
+-- name: GetHostWithStateByID :one
+SELECT
+    sqlc.embed(h),
+    COALESCE(hcs.overall_action, 'none') AS overall_action,
+    COALESCE(hcs.critical_count, 0) AS critical_count,
+    COALESCE(hcs.important_count, 0) AS important_count,
+    COALESCE(hcs.moderate_count, 0) AS moderate_count,
+    COALESCE(hcs.actionable_count, 0) AS actionable_count,
+    COALESCE(hcs.available_updates, 0) AS available_updates,
+    COALESCE(hcs.needs_reboot, 0) AS needs_reboot,
+    COALESCE(hcs.needs_restart, 0) AS needs_restart,
+    COALESCE(hcs.no_fix, 0) AS no_fix,
+    COALESCE(hcs.unknown, 0) AS unknown,
+    hcs.updated_at AS state_updated_at
+FROM hosts h
+LEFT JOIN host_current_state hcs ON hcs.host_id = h.id
+WHERE h.id = $1;

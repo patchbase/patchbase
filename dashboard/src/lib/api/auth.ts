@@ -1,3 +1,5 @@
+import { request } from '$lib/api/request.js';
+
 export interface SetupStatusResponse {
 	completed: boolean;
 }
@@ -41,13 +43,4 @@ export async function completeSetup(
 		},
 		body: JSON.stringify(payload),
 	});
-}
-
-async function request(path: string, init?: RequestInit): Promise<any> {
-	const response = await fetch(path, init);
-	const data = await response.json().catch(() => null);
-	if (!response.ok) {
-		throw new Error(data?.error || 'Request failed');
-	}
-	return data;
 }

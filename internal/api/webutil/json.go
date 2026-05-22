@@ -2,9 +2,11 @@ package webutil
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 
+	agent "go.patchbase.net/proto/agent"
 	"go.patchbase.net/server/internal/utils"
 )
 
@@ -18,10 +20,17 @@ type APIError struct {
 func WriteJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
+	json.NewEncoder(w).Encode(payload) // nolint:errcheck
 }
 
 func WriteAPIError(w http.ResponseWriter, r *http.Request, status int, message string, details any) {
+	if r.Header.Get("Content-Type") == "application/x-protobuf" || r.Header.Get("Accept") == "application/x-protobuf" {
+		if details != nil {
+			message = fmt.Sprintf("%s: %v", message, details)
+		}
+		WriteProto(w, status, &agent.APIError{Error: message})
+		return
+	}
 	WriteJSON(w, status, APIError{
 		Error:   message,
 		Details: details,

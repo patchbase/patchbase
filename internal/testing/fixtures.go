@@ -30,7 +30,7 @@ func LoadYAMLFixtures(paths ...string) Fixture {
 		if err != nil {
 			return fmt.Errorf("open fixture database connection: %w", err)
 		}
-		defer db.Close()
+		defer db.Close() // nolint:errcheck
 
 		loader, err := testfixtures.New(
 			testfixtures.Database(db),

@@ -296,6 +296,109 @@ CREATE TABLE public.users (
     CONSTRAINT users_id_prefix_check CHECK ((id ~~ like_escape('u\_%'::text, '\'::text)))
 );
 
+--
+-- Name: hosts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.hosts (
+    id text NOT NULL,
+    onboarding_mode text NOT NULL,
+    approval_status text DEFAULT 'waiting_approval'::text NOT NULL,
+    approved_at timestamp with time zone,
+    display_name text,
+    machine_id text,
+    hostname text,
+    ip_address text,
+    os_family text DEFAULT 'unknown'::text NOT NULL,
+    os_name text DEFAULT 'Unknown'::text NOT NULL,
+    os_major integer DEFAULT 0 NOT NULL,
+    os_version text DEFAULT 'unknown'::text NOT NULL,
+    architecture text DEFAULT 'unknown'::text NOT NULL,
+    status text DEFAULT 'active'::text NOT NULL,
+    last_seen_at timestamp with time zone,
+    last_advisory_check_at timestamp with time zone,
+    first_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_snapshot_id text,
+    pull_ssh_user text,
+    pull_frequency_minutes integer,
+    pull_public_key text,
+    pull_private_key text,
+    pull_last_run_at timestamp with time zone,
+    pull_last_run_status text,
+    pull_last_run_error text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT hosts_approval_status_check CHECK ((approval_status = ANY (ARRAY['waiting_approval'::text, 'approved'::text, 'rejected'::text]))),
+    CONSTRAINT hosts_id_prefix_check CHECK ((id ~~ like_escape('h\_%'::text, '\'::text))),
+    CONSTRAINT hosts_onboarding_mode_check CHECK ((onboarding_mode = ANY (ARRAY['agent'::text, 'ssh'::text])))
+);
+
+--
+-- Name: host_access_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.host_access_tokens (
+    id text NOT NULL,
+    host_id text NOT NULL,
+    token_hash text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    revoked_at timestamp with time zone,
+    last_used_at timestamp with time zone,
+    CONSTRAINT host_access_tokens_id_prefix_check CHECK ((id ~~ like_escape('htok\_%'::text, '\'::text)))
+);
+
+--
+-- Name: host_snapshots; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.host_snapshots (
+    id text NOT NULL,
+    host_id text NOT NULL,
+    collected_at timestamp with time zone NOT NULL,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    payload bytea NOT NULL,
+    running_kernel_nevra text DEFAULT ''::text NOT NULL,
+    boot_time timestamp with time zone,
+    has_process_data boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT host_snapshots_id_prefix_check CHECK ((id ~~ like_escape('snap\_%'::text, '\'::text)))
+);
+
+--
+-- Name: host_current_state; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.host_current_state (
+    host_id text NOT NULL,
+    snapshot_id text NOT NULL,
+    overall_action text DEFAULT 'none'::text NOT NULL,
+    critical_count integer DEFAULT 0 NOT NULL,
+    important_count integer DEFAULT 0 NOT NULL,
+    moderate_count integer DEFAULT 0 NOT NULL,
+    actionable_count integer DEFAULT 0 NOT NULL,
+    available_updates integer DEFAULT 0 NOT NULL,
+    needs_reboot integer DEFAULT 0 NOT NULL,
+    needs_restart integer DEFAULT 0 NOT NULL,
+    no_fix integer DEFAULT 0 NOT NULL,
+    unknown integer DEFAULT 0 NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+--
+-- Name: registration_tokens; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.registration_tokens (
+    id text NOT NULL,
+    name text NOT NULL,
+    token_hash text NOT NULL,
+    created_by_user_id text NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    revoked_at timestamp with time zone,
+    last_used_at timestamp with time zone,
+    CONSTRAINT registration_tokens_id_prefix_check CHECK ((id ~~ like_escape('rtok\_%'::text, '\'::text)))
+);
+
 
 --
 -- Name: river_job id; Type: DEFAULT; Schema: public; Owner: -
@@ -383,6 +486,41 @@ ALTER TABLE ONLY public.settings
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
 
+--
+-- Name: hosts hosts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosts
+    ADD CONSTRAINT hosts_pkey PRIMARY KEY (id);
+
+--
+-- Name: host_access_tokens host_access_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_access_tokens
+    ADD CONSTRAINT host_access_tokens_pkey PRIMARY KEY (id);
+
+--
+-- Name: host_current_state host_current_state_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_current_state
+    ADD CONSTRAINT host_current_state_pkey PRIMARY KEY (host_id);
+
+--
+-- Name: host_snapshots host_snapshots_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_snapshots
+    ADD CONSTRAINT host_snapshots_pkey PRIMARY KEY (id);
+
+--
+-- Name: registration_tokens registration_tokens_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.registration_tokens
+    ADD CONSTRAINT registration_tokens_pkey PRIMARY KEY (id);
+
 
 --
 -- Name: river_job_args_index; Type: INDEX; Schema: public; Owner: -
@@ -446,6 +584,54 @@ CREATE UNIQUE INDEX runtimes_name_unique_idx ON public.runtimes USING btree (nam
 
 CREATE INDEX runtimes_status_active_idx ON public.runtimes USING btree (status) WHERE (archived_at IS NULL);
 
+--
+-- Name: hosts_approval_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX hosts_approval_status_idx ON public.hosts USING btree (approval_status);
+
+--
+-- Name: hosts_hostname_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX hosts_hostname_idx ON public.hosts USING btree (hostname);
+
+--
+-- Name: host_access_tokens_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX host_access_tokens_active_idx ON public.host_access_tokens USING btree (host_id, created_at DESC) WHERE (revoked_at IS NULL);
+
+--
+-- Name: host_access_tokens_host_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX host_access_tokens_host_idx ON public.host_access_tokens USING btree (host_id);
+
+--
+-- Name: host_access_tokens_token_hash_unique_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX host_access_tokens_token_hash_unique_idx ON public.host_access_tokens USING btree (token_hash);
+
+--
+-- Name: host_snapshots_host_collected_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX host_snapshots_host_collected_idx ON public.host_snapshots USING btree (host_id, collected_at DESC);
+
+--
+-- Name: registration_tokens_active_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX registration_tokens_active_idx ON public.registration_tokens USING btree (created_at DESC) WHERE (revoked_at IS NULL);
+
+--
+-- Name: registration_tokens_token_hash_unique_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX registration_tokens_token_hash_unique_idx ON public.registration_tokens USING btree (token_hash);
+
 
 --
 -- Name: users_email_active_unique_idx; Type: INDEX; Schema: public; Owner: -
@@ -467,6 +653,12 @@ CREATE TRIGGER runtimes_set_updated_at BEFORE UPDATE ON public.runtimes FOR EACH
 
 CREATE TRIGGER settings_set_updated_at BEFORE UPDATE ON public.settings FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
+--
+-- Name: hosts hosts_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER hosts_set_updated_at BEFORE UPDATE ON public.hosts FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
 
 --
 -- Name: users users_set_updated_at; Type: TRIGGER; Schema: public; Owner: -
@@ -482,9 +674,50 @@ CREATE TRIGGER users_set_updated_at BEFORE UPDATE ON public.users FOR EACH ROW E
 ALTER TABLE ONLY public.river_client_queue
     ADD CONSTRAINT river_client_queue_river_client_id_fkey FOREIGN KEY (river_client_id) REFERENCES public.river_client(id) ON DELETE CASCADE;
 
+--
+-- Name: hosts hosts_last_snapshot_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.hosts
+    ADD CONSTRAINT hosts_last_snapshot_fk FOREIGN KEY (last_snapshot_id) REFERENCES public.host_snapshots(id);
+
+--
+-- Name: host_access_tokens host_access_tokens_host_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_access_tokens
+    ADD CONSTRAINT host_access_tokens_host_fk FOREIGN KEY (host_id) REFERENCES public.hosts(id);
+
+--
+-- Name: host_current_state host_current_state_host_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_current_state
+    ADD CONSTRAINT host_current_state_host_fk FOREIGN KEY (host_id) REFERENCES public.hosts(id);
+
+--
+-- Name: host_current_state host_current_state_snapshot_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_current_state
+    ADD CONSTRAINT host_current_state_snapshot_fk FOREIGN KEY (snapshot_id) REFERENCES public.host_snapshots(id);
+
+--
+-- Name: host_snapshots host_snapshots_host_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.host_snapshots
+    ADD CONSTRAINT host_snapshots_host_fk FOREIGN KEY (host_id) REFERENCES public.hosts(id);
+
+--
+-- Name: registration_tokens registration_tokens_created_by_user_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.registration_tokens
+    ADD CONSTRAINT registration_tokens_created_by_user_fk FOREIGN KEY (created_by_user_id) REFERENCES public.users(id);
+
 
 --
 -- PostgreSQL database dump complete
 --
-
 

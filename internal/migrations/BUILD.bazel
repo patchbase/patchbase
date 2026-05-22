@@ -6,6 +6,7 @@ go_library(
     embedsrcs = [
         "files/001_add_settings.sql",
         "files/002_add_users.sql",
+        "files/003_add_hosts.sql",
     ],
     importpath = "go.patchbase.net/server/internal/migrations",
     visibility = ["//:__subpackages__"],

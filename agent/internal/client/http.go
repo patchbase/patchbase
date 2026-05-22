@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,26 +15,12 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-type SyncResult struct {
-	Endpoint  string
-	Status    int
-	RequestID string
-	Body      []byte
-	Response  *SyncResponse
-}
-
-type SyncResponse struct {
-	Accepted           bool   `json:"accepted"`
-	HostID             string `json:"host_id"`
-	SnapshotID         string `json:"snapshot_id"`
-	NextCheckInSeconds int32  `json:"next_check_in_seconds"`
-}
-
 type HTTPClient struct {
-	Client *http.Client
+	serverURL string
+	client    *http.Client
 }
 
-func NewHTTPClient(caCertPath string, allowInsecureHTTP bool) (*HTTPClient, error) {
+func NewHTTPClient(serverURL string, caCertPath string, allowInsecureHTTP bool) (Client, error) {
 	transport := &http.Transport{}
 
 	if caCertPath != "" {
@@ -60,66 +45,90 @@ func NewHTTPClient(caCertPath string, allowInsecureHTTP bool) (*HTTPClient, erro
 		}
 	}
 
-	return &HTTPClient{
-		Client: &http.Client{Transport: transport},
-	}, nil
-}
-
-func (c *HTTPClient) PostSnapshot(ctx context.Context, serverURL, hostToken string, snapshot *agent.AgentSnapshot) (*SyncResult, error) {
-	endpoint := snapshotEndpoint(serverURL)
-
-	body, err := proto.Marshal(snapshot)
-	if err != nil {
-		return nil, fmt.Errorf("marshal snapshot: %w", err)
-	}
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(body))
-	if err != nil {
-		return nil, fmt.Errorf("create request: %w", err)
-	}
-
-	req.Header.Set("Authorization", "Bearer "+hostToken)
-	req.Header.Set("Content-Type", "application/x-protobuf")
-
-	isHTTP := strings.HasPrefix(endpoint, "http://")
-
-	resp, err := c.Client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("post snapshot: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("read response: %w", err)
-	}
-
-	if isHTTP && !isLoopback(endpoint) {
+	if strings.HasPrefix(serverURL, "http://") && !isLoopback(serverURL) {
 		return nil, fmt.Errorf("http only allowed for loopback addresses")
 	}
 
-	result := &SyncResult{
+	return &HTTPClient{
+		serverURL: strings.TrimRight(serverURL, "/"),
+		client:    &http.Client{Transport: transport},
+	}, nil
+}
+
+func (c *HTTPClient) RegisterHost(ctx context.Context, r *agent.RegisterHostRequest) (*RegisterResult, error) {
+	return httpPost[agent.RegisterHostResponse](c, ctx, c.registerEndpoint(), r, "")
+}
+
+func (c *HTTPClient) PostSnapshot(ctx context.Context, hostToken string, snapshot *agent.AgentSnapshot) (*SyncResult, error) {
+	return httpPost[agent.SyncResponse](c, ctx, c.snapshotEndpoint(), snapshot, hostToken)
+}
+
+func (c *HTTPClient) snapshotEndpoint() string {
+	return c.serverURL + "/api/v1/agent/snapshots"
+}
+
+func (c *HTTPClient) registerEndpoint() string {
+	return c.serverURL + "/api/v1/agent/register"
+}
+
+func (c *HTTPClient) doRequest(ctx context.Context, method string, endpoint string, body []byte, authToken string) (*http.Response, []byte, error) {
+	var reqBody io.Reader
+	if len(body) > 0 {
+		reqBody = bytes.NewReader(body)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, reqBody)
+	if err != nil {
+		return nil, nil, fmt.Errorf("create request: %w", err)
+	}
+
+	if authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+authToken)
+	}
+	req.Header.Set("Content-Type", "application/x-protobuf")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return nil, nil, fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close() // nolint:errcheck
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, nil, fmt.Errorf("read response: %w", err)
+	}
+
+	return resp, respBody, nil
+}
+
+func httpPost[R any](c *HTTPClient, ctx context.Context, endpoint string, payload proto.Message, authToken string) (*Result[R], error) {
+	body, err := proto.Marshal(payload)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	resp, respBody, err := c.doRequest(ctx, http.MethodPost, endpoint, body, authToken)
+	if err != nil {
+		return nil, err
+	}
+
+	result := &Result[R]{
 		Endpoint:  endpoint,
 		Status:    resp.StatusCode,
 		RequestID: resp.Header.Get("X-Request-Id"),
 		Body:      respBody,
 	}
 
-	var syncResp SyncResponse
-	if err := json.Unmarshal(respBody, &syncResp); err == nil {
-		result.Response = &syncResp
+	var r R
+	pm, ok := any(&r).(proto.Message)
+	if !ok {
+		return nil, fmt.Errorf("internal error: type %T does not implement proto.Message", &r)
+	}
+	if err := proto.Unmarshal(respBody, pm); err == nil {
+		result.Response = &r
 	}
 
 	return result, nil
-}
-
-func snapshotEndpoint(serverURL string) string {
-	trimmed := strings.TrimRight(serverURL, "/")
-	suffix := "/api/v1/agent/snapshots"
-	if strings.HasSuffix(trimmed, suffix) {
-		return trimmed
-	}
-	return trimmed + suffix
 }
 
 func isLoopback(endpoint string) bool {

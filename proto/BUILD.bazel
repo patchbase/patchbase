@@ -1,5 +1,17 @@
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@rules_proto_grpc//:defs.bzl", "proto_plugin")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
+
+proto_plugin(
+    name = "validate_plugin",
+    options = [
+        "lang=go",
+        "paths=source_relative",
+    ],
+    outputs = ["{protopath}.pb.validate.go"],
+    tool = "@protoc-gen-validate//:protoc-gen-validate",
+    visibility = ["//visibility:public"],
+)
 
 write_file(
     name = "gen_update",
@@ -8,7 +20,7 @@ write_file(
         "#!/usr/bin/env bash",
         "set -euo pipefail",
         "cd \"$BUILD_WORKSPACE_DIRECTORY\"",
-        "cp -fv bazel-bin/proto/agent/agent_go/patchbase/agent/*pb.go proto/agent/",
+        "cp -fv bazel-bin/proto/agent/agent_go/patchbase/agent/*pb*.go proto/agent/",
     ],
 )
 

@@ -1,7 +1,10 @@
 export interface Host {
 	id: string;
+	onboarding_mode?: string;
+	approval_status?: string;
 	display_name: string | null;
 	hostname: string;
+	ip_address?: string;
 	os_family: string;
 	os_name: string;
 	os_major: number;
@@ -19,6 +22,12 @@ export interface Host {
 	needs_restart: number;
 	no_fix: number;
 	unknown: number;
+	last_advisory_check_at?: string | null;
+	state_updated_at?: string | null;
+	pull_last_run_at?: string | null;
+	pull_last_run_status?: string;
+	pull_last_run_error?: string;
+	created_at?: string;
 	updated_at: string;
 }
 

@@ -9,14 +9,39 @@ import (
 )
 
 type Querier interface {
+	ApproveHostByID(ctx context.Context, id string) (Host, error)
+	ClearHostLastSnapshotByID(ctx context.Context, id string) error
 	CompleteInitialSetupForUser(ctx context.Context, arg CompleteInitialSetupForUserParams) (User, error)
 	CreateAdminUser(ctx context.Context, arg CreateAdminUserParams) (User, error)
 	CreateSetting(ctx context.Context, arg CreateSettingParams) (Setting, error)
 	CreateSettingIfAbsent(ctx context.Context, arg CreateSettingIfAbsentParams) error
+	DeleteHostAccessTokensByHostID(ctx context.Context, hostID string) error
+	DeleteHostByID(ctx context.Context, id string) (Host, error)
+	DeleteHostCurrentStateByHostID(ctx context.Context, hostID string) error
+	DeleteHostSnapshotsByHostID(ctx context.Context, hostID string) error
+	GetActiveHostAccessTokenByHash(ctx context.Context, tokenHash string) (HostAccessToken, error)
+	GetActiveRegistrationTokenByHash(ctx context.Context, tokenHash string) (RegistrationToken, error)
 	GetAdminUser(ctx context.Context) (User, error)
+	GetHostByID(ctx context.Context, id string) (Host, error)
+	GetHostWithStateByID(ctx context.Context, id string) (GetHostWithStateByIDRow, error)
+	GetLatestHostSnapshotByHostID(ctx context.Context, hostID string) (HostSnapshot, error)
 	GetSetting(ctx context.Context, key string) (Setting, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
+	InsertAgentHost(ctx context.Context, arg InsertAgentHostParams) (Host, error)
+	InsertHostAccessToken(ctx context.Context, arg InsertHostAccessTokenParams) (HostAccessToken, error)
+	InsertHostSnapshot(ctx context.Context, arg InsertHostSnapshotParams) (HostSnapshot, error)
+	InsertRegistrationToken(ctx context.Context, arg InsertRegistrationTokenParams) (RegistrationToken, error)
+	InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (Host, error)
+	ListHostsWithState(ctx context.Context) ([]ListHostsWithStateRow, error)
+	ListPendingHosts(ctx context.Context) ([]Host, error)
+	ListRegistrationTokens(ctx context.Context) ([]RegistrationToken, error)
+	RevokeRegistrationToken(ctx context.Context, id string) (RegistrationToken, error)
+	TouchHostAccessTokenLastUsed(ctx context.Context, id string) error
+	TouchRegistrationTokenLastUsed(ctx context.Context, id string) error
+	UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFromSnapshotParams) (Host, error)
+	UpdateSSHPullRun(ctx context.Context, arg UpdateSSHPullRunParams) error
+	UpsertHostCurrentState(ctx context.Context, arg UpsertHostCurrentStateParams) error
 	UpsertSetting(ctx context.Context, arg UpsertSettingParams) (Setting, error)
 }
 

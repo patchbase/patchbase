@@ -2,7 +2,11 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 
 go_library(
     name = "client",
-    srcs = ["http.go"],
+    srcs = [
+        "http.go",
+        "interface.go",
+        "types.go",
+    ],
     importpath = "go.patchbase.net/agent/internal/client",
     visibility = ["//agent:__subpackages__"],
     deps = [
@@ -16,5 +20,10 @@ go_test(
     size = "small",
     srcs = ["http_test.go"],
     embed = [":client"],
-    deps = ["@com_github_stretchr_testify//assert"],
+    deps = [
+        "//proto/agent",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+    ],
 )

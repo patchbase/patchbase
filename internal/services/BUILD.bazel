@@ -4,7 +4,9 @@ go_library(
     name = "services",
     srcs = [
         "auth.go",
+        "hosts.go",
         "settings.go",
+        "ssh_pull.go",
     ],
     importpath = "go.patchbase.net/server/internal/services",
     visibility = ["//:__subpackages__"],
@@ -12,9 +14,12 @@ go_library(
         "//internal/sql",
         "//internal/sql/id",
         "//internal/utils",
+        "//proto/agent",
         "@com_github_golang_jwt_jwt_v5//:jwt",
         "@com_github_jackc_pgx_v5//:pgx",
+        "@com_github_jackc_pgx_v5//pgtype",
         "@com_github_jackc_pgx_v5//pgxpool",
         "@com_github_samber_do_v2//:do",
+        "@org_golang_google_protobuf//proto",
     ],
 )

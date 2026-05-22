@@ -111,6 +111,83 @@ type GooseDbVersion struct {
 	Tstamp    pgtype.Timestamp
 }
 
+type Host struct {
+	ID                   string
+	OnboardingMode       string
+	ApprovalStatus       string
+	ApprovedAt           pgtype.Timestamptz
+	DisplayName          utils.Option[string]
+	MachineID            utils.Option[string]
+	Hostname             utils.Option[string]
+	IpAddress            utils.Option[string]
+	OsFamily             string
+	OsName               string
+	OsMajor              int32
+	OsVersion            string
+	Architecture         string
+	Status               string
+	LastSeenAt           pgtype.Timestamptz
+	LastAdvisoryCheckAt  pgtype.Timestamptz
+	FirstSeenAt          pgtype.Timestamptz
+	LastSnapshotID       utils.Option[string]
+	PullSshUser          utils.Option[string]
+	PullFrequencyMinutes *int32
+	PullPublicKey        utils.Option[string]
+	PullPrivateKey       utils.Option[string]
+	PullLastRunAt        pgtype.Timestamptz
+	PullLastRunStatus    utils.Option[string]
+	PullLastRunError     utils.Option[string]
+	CreatedAt            pgtype.Timestamptz
+	UpdatedAt            pgtype.Timestamptz
+}
+
+type HostAccessToken struct {
+	ID         string
+	HostID     string
+	TokenHash  string
+	CreatedAt  pgtype.Timestamptz
+	RevokedAt  pgtype.Timestamptz
+	LastUsedAt pgtype.Timestamptz
+}
+
+type HostCurrentState struct {
+	HostID           string
+	SnapshotID       string
+	OverallAction    string
+	CriticalCount    int32
+	ImportantCount   int32
+	ModerateCount    int32
+	ActionableCount  int32
+	AvailableUpdates int32
+	NeedsReboot      int32
+	NeedsRestart     int32
+	NoFix            int32
+	Unknown          int32
+	UpdatedAt        pgtype.Timestamptz
+}
+
+type HostSnapshot struct {
+	ID                 string
+	HostID             string
+	CollectedAt        pgtype.Timestamptz
+	ReceivedAt         pgtype.Timestamptz
+	Payload            []byte
+	RunningKernelNevra string
+	BootTime           pgtype.Timestamptz
+	HasProcessData     bool
+	CreatedAt          pgtype.Timestamptz
+}
+
+type RegistrationToken struct {
+	ID              string
+	Name            string
+	TokenHash       string
+	CreatedByUserID string
+	CreatedAt       pgtype.Timestamptz
+	RevokedAt       pgtype.Timestamptz
+	LastUsedAt      pgtype.Timestamptz
+}
+
 type RiverClient struct {
 	ID        string
 	CreatedAt pgtype.Timestamptz

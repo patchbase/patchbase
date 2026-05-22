@@ -1,0 +1,39 @@
+load("//third_party/bazel:go_rules.bzl", "go_api_library", "integration_test")
+
+go_api_library(
+    name = "hosts",
+    srcs = [
+        "approve_host.go",
+        "create_ssh_host.go",
+        "create_token.go",
+        "delete_host.go",
+        "get_host.go",
+        "get_latest_snapshot.go",
+        "list_hosts.go",
+        "list_pending_hosts.go",
+        "list_tokens.go",
+        "revoke_token.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/api/v1/hosts",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/api/auth",
+        "//internal/api/v1/entities",
+        "//internal/api/webutil",
+        "//internal/services",
+        "@com_github_samber_do_v2//:do",
+    ],
+)
+
+integration_test(
+    name = "hosts_test",
+    srcs = ["hosts_test.go"],
+    deps = [
+        "//internal/testing",
+        "//proto/agent",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)

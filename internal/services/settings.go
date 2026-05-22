@@ -66,9 +66,7 @@ func (s *settings) TryInitialSetup(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("begin initial setup transaction: %w", err)
 	}
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
+	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
 	initialSetup := NewSettingManager[InitialSetupDone](InitialSetupDoneKey, queries)
@@ -137,9 +135,7 @@ func (s *settings) CompleteInitialSetup(ctx context.Context, userID string, inpu
 	if err != nil {
 		return sql.User{}, fmt.Errorf("begin initial setup completion transaction: %w", err)
 	}
-	defer func() {
-		_ = tx.Rollback(ctx)
-	}()
+	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
 	initialSetup := NewSettingManager[InitialSetupDone](InitialSetupDoneKey, queries)

@@ -1,6 +1,7 @@
 package testing
 
 import (
+	"bytes"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -27,6 +28,14 @@ func (b *Backend) HTTPGet(path string, opts ...HTTPRequestOption) *httptest.Resp
 
 func (b *Backend) HTTPPost(path string, body string, opts ...HTTPRequestOption) *httptest.ResponseRecorder {
 	return b.doHTTPRequest(http.MethodPost, path, strings.NewReader(body), opts...)
+}
+
+func (b *Backend) HTTPPostBytes(path string, body []byte, opts ...HTTPRequestOption) *httptest.ResponseRecorder {
+	return b.doHTTPRequest(http.MethodPost, path, bytes.NewReader(body), opts...)
+}
+
+func (b *Backend) HTTPDelete(path string, opts ...HTTPRequestOption) *httptest.ResponseRecorder {
+	return b.doHTTPRequest(http.MethodDelete, path, nil, opts...)
 }
 
 func (b *Backend) doHTTPRequest(method string, path string, body io.Reader, opts ...HTTPRequestOption) *httptest.ResponseRecorder {
