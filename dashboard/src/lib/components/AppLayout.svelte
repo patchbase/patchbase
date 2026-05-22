@@ -66,8 +66,10 @@
 
 <aside class="sidebar">
 	<div class="sidebar-brand">
-		<img src="/logo.png" alt="" width={28} height={28} />
-		<span>PatchBase</span>
+		<a href="/" class="logo-link">
+			<img src="/logo.png" alt="" class="logo-icon" width={28} height={28} />
+			<span class="logo-text">PATCH<span class="logo-accent">BASE</span></span>
+		</a>
 		<span class="version">{version}</span>
 	</div>
 	<nav class="sidebar-nav">

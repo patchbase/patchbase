@@ -87,10 +87,30 @@ a:hover {
 	border-bottom: 1px solid var(--border);
 }
 
-.sidebar-brand span {
+.logo-link {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	text-decoration: none;
+	color: var(--text-primary);
+}
+
+.logo-link:hover {
+	text-decoration: none;
+}
+
+.logo-icon {
+	border-radius: 6px;
+}
+
+.logo-text {
 	font-size: 18px;
-	font-weight: 700;
-	letter-spacing: -0.01em;
+	font-weight: 800;
+	letter-spacing: 0.02em;
+}
+
+.logo-accent {
+	color: var(--accent-light);
 }
 
 .sidebar-brand .version {
@@ -903,11 +923,7 @@ select.form-input {
 	border-bottom: 1px solid var(--border);
 }
 
-.auth-brand span {
-	font-size: 18px;
-	font-weight: 700;
-	letter-spacing: -0.01em;
-}
+
 
 .auth-brand .version {
 	font-size: 11px;

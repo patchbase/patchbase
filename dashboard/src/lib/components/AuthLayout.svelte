@@ -21,8 +21,10 @@
 <div class="auth-page">
 	<div class="auth-card">
 		<div class="auth-brand">
-			<img src="/logo.png" alt="" width={26} height={26} />
-			<span>PatchBase</span>
+			<a href="/" class="logo-link">
+				<img src="/logo.png" alt="" class="logo-icon" width={26} height={26} />
+				<span class="logo-text">PATCH<span class="logo-accent">BASE</span></span>
+			</a>
 			<span class="version">{version}</span>
 		</div>
 		<h1>{title}</h1>
