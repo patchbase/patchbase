@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/spf13/afero"
 	"go.patchbase.net/server/internal/config"
+	"go.patchbase.net/server/internal/services/matchers"
 	db "go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/utils"
 
@@ -325,6 +327,34 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 		return handleFailure(fmt.Errorf("failed to verify advisories table in SQLite: %w", err))
 	}
 
+	// 5.5 Ingest SQLite records into Postgres
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return handleFailure(fmt.Errorf("failed to start postgres ingestion transaction: %w", err))
+	}
+	defer tx.Rollback(ctx) // nolint:errcheck
+
+	mappings := s.config.AdvisorySync.ScopeMappings
+	if len(mappings) == 0 {
+		mappings = defaultScopeMappings
+	}
+	if err := ImportAdvisoryDB(ctx, tx, db.New(tx), sqliteDB, scopeKey, mappings); err != nil {
+		return handleFailure(fmt.Errorf("failed to import advisory database: %w", err))
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return handleFailure(fmt.Errorf("failed to commit postgres ingestion transaction: %w", err))
+	}
+
+	// 5.6 Match hosts under this scope key against updated advisory records
+	matcherSvc, err := do.Invoke[matchers.Matcher](s.injector)
+	if err != nil {
+		return handleFailure(fmt.Errorf("failed to resolve Matcher service: %w", err))
+	}
+	if err := matcherSvc.MatchHostsForScope(ctx, scopeKey); err != nil {
+		return handleFailure(fmt.Errorf("failed to match hosts for scope: %w", err))
+	}
+
 	// 6. Clean up previous file if hash changed and we have a new file
 	if hasPrevious && current.Sha256.UnwrapOr("") != detail.Sha256 && current.LocalPath.UnwrapOr("") != destPath {
 		_ = s.fs.Remove(current.LocalPath.UnwrapOr(""))
@@ -463,4 +493,300 @@ func optString(o utils.Option[string]) *string {
 		return &val
 	}
 	return nil
+}
+
+func getMajorVersionFromScopeKey(scopeKey string, mappings []config.ScopeMapping) int32 {
+	if len(mappings) == 0 {
+		mappings = defaultScopeMappings
+	}
+	for _, m := range mappings {
+		if m.Scope == scopeKey {
+			if m.Match.OSMajor != 0 {
+				return m.Match.OSMajor
+			}
+			if m.Match.OSVersion != "" {
+				parts := strings.Split(m.Match.OSVersion, ".")
+				if len(parts) > 0 {
+					if major, err := strconv.Atoi(parts[0]); err == nil {
+						return int32(major)
+					}
+				}
+			}
+		}
+	}
+	parts := strings.Split(scopeKey, ":")
+	if len(parts) == 2 {
+		if major, err := strconv.Atoi(parts[1]); err == nil {
+			return int32(major)
+		}
+	}
+	return 0
+}
+
+func ImportAdvisoryDB(ctx context.Context, tx pgx.Tx, q *db.Queries, sqliteDB *sql.DB, scopeKey string, mappings []config.ScopeMapping) error {
+	// 1. Fetch product streams from SQLite
+	psRows, err := sqliteDB.QueryContext(ctx, "SELECT id, vendor, distro_family, distro_name, major_version, minor_version, architecture, repo_family, repo_id_pattern, cpe, status FROM product_streams")
+	if err != nil {
+		return fmt.Errorf("query product streams: %w", err)
+	}
+	defer func() { _ = psRows.Close() }()
+
+	var streamIDs []string
+	var productStreams []db.UpsertProductStreamParams
+	for psRows.Next() {
+		var id, vendor, distroFamily, distroName, repoFamily, status string
+		var majorVersion int32
+		var minorVersion, architecture, repoIDPattern, cpe *string
+		if err := psRows.Scan(&id, &vendor, &distroFamily, &distroName, &majorVersion, &minorVersion, &architecture, &repoFamily, &repoIDPattern, &cpe, &status); err != nil {
+			return fmt.Errorf("scan product stream: %w", err)
+		}
+		streamIDs = append(streamIDs, id)
+		productStreams = append(productStreams, db.UpsertProductStreamParams{
+			ID:            id,
+			Vendor:        vendor,
+			DistroFamily:  distroFamily,
+			DistroName:    distroName,
+			MajorVersion:  majorVersion,
+			MinorVersion:  optFromPtr(minorVersion),
+			Architecture:  optFromPtr(architecture),
+			RepoFamily:    repoFamily,
+			RepoIDPattern: optFromPtr(repoIDPattern),
+			Cpe:           optFromPtr(cpe),
+			Status:        status,
+		})
+	}
+	if err := psRows.Err(); err != nil {
+		return fmt.Errorf("product streams rows: %w", err)
+	}
+
+	var cleanUpStreamIDs []string
+	parts := strings.Split(scopeKey, ":")
+	if len(parts) == 2 {
+		vendor := parts[0]
+		if vendor == "rhel" {
+			vendor = "redhat"
+		}
+		major := getMajorVersionFromScopeKey(scopeKey, mappings)
+
+		existingIDs, err := q.ListProductStreamIDsByVendorAndVersion(ctx, db.ListProductStreamIDsByVendorAndVersionParams{
+			Vendor:       vendor,
+			MajorVersion: major,
+		})
+		if err == nil {
+			cleanUpStreamIDs = append(cleanUpStreamIDs, existingIDs...)
+		}
+	}
+
+	seenIDs := make(map[string]bool)
+	for _, id := range cleanUpStreamIDs {
+		seenIDs[id] = true
+	}
+	for _, id := range streamIDs {
+		if !seenIDs[id] {
+			cleanUpStreamIDs = append(cleanUpStreamIDs, id)
+			seenIDs[id] = true
+		}
+	}
+
+	// 2. Clear matching stream data in Postgres
+	if len(cleanUpStreamIDs) > 0 {
+		if err := q.DeleteAdvisoryReferencesByStreamIDs(ctx, cleanUpStreamIDs); err != nil {
+			return fmt.Errorf("delete advisory references: %w", err)
+		}
+		if err := q.DeleteAdvisoryProductStreamsByStreamIDs(ctx, cleanUpStreamIDs); err != nil {
+			return fmt.Errorf("delete advisory product streams: %w", err)
+		}
+		if err := q.DeleteAffectedPackageRulesByStreamIDs(ctx, cleanUpStreamIDs); err != nil {
+			return fmt.Errorf("delete affected package rules: %w", err)
+		}
+		if err := q.DeleteFixedPackagesByStreamIDs(ctx, cleanUpStreamIDs); err != nil {
+			return fmt.Errorf("delete fixed packages: %w", err)
+		}
+		if err := q.DeleteProductStreamsByIDs(ctx, cleanUpStreamIDs); err != nil {
+			return fmt.Errorf("delete product streams: %w", err)
+		}
+		if err := q.DeleteAdvisoriesWithoutStreams(ctx); err != nil {
+			return fmt.Errorf("delete advisories without streams: %w", err)
+		}
+	}
+
+	// 3. Insert product streams
+	for _, ps := range productStreams {
+		if err := q.UpsertProductStream(ctx, ps); err != nil {
+			return fmt.Errorf("upsert product stream %s: %w", ps.ID, err)
+		}
+	}
+
+	// 4. Fetch and insert advisories from SQLite
+	advRows, err := sqliteDB.QueryContext(ctx, "SELECT id, source_system, raw_source_id, source_url, vendor, advisory_type, severity, summary, description, published_at, updated_at, evidence_tier, is_security FROM advisories")
+	if err != nil {
+		return fmt.Errorf("query advisories: %w", err)
+	}
+	defer func() { _ = advRows.Close() }()
+
+	for advRows.Next() {
+		var id, sourceSystem, rawSourceID, vendor, advisoryType, evidenceTier string
+		var sourceURL, severity, summary, description, publishedAt, updatedAt *string
+		var isSecurity bool
+		if err := advRows.Scan(&id, &sourceSystem, &rawSourceID, &sourceURL, &vendor, &advisoryType, &severity, &summary, &description, &publishedAt, &updatedAt, &evidenceTier, &isSecurity); err != nil {
+			return fmt.Errorf("scan advisory: %w", err)
+		}
+		err = q.UpsertAdvisory(ctx, db.UpsertAdvisoryParams{
+			ID:           id,
+			SourceSystem: sourceSystem,
+			RawSourceID:  rawSourceID,
+			SourceUrl:    optFromPtr(sourceURL),
+			Vendor:       vendor,
+			AdvisoryType: advisoryType,
+			Severity:     optFromPtr(severity),
+			Summary:      optFromPtr(summary),
+			Description:  optFromPtr(description),
+			PublishedAt:  optFromPtr(publishedAt),
+			UpdatedAt:    optFromPtr(updatedAt),
+			EvidenceTier: evidenceTier,
+			IsSecurity:   isSecurity,
+		})
+		if err != nil {
+			return fmt.Errorf("upsert advisory %s: %w", id, err)
+		}
+	}
+	if err := advRows.Err(); err != nil {
+		return fmt.Errorf("advisories rows: %w", err)
+	}
+
+	// 5. Fetch and insert advisory references
+	refRows, err := sqliteDB.QueryContext(ctx, "SELECT id, advisory_id, ref_type, ref_value, severity_vendor, severity_cvss, title, url FROM advisory_references")
+	if err != nil {
+		return fmt.Errorf("query advisory references: %w", err)
+	}
+	defer func() { _ = refRows.Close() }()
+
+	for refRows.Next() {
+		var id, advisoryID, refType, refValue string
+		var severityVendor, title, url *string
+		var severityCvss *float64
+		if err := refRows.Scan(&id, &advisoryID, &refType, &refValue, &severityVendor, &severityCvss, &title, &url); err != nil {
+			return fmt.Errorf("scan advisory reference: %w", err)
+		}
+		err = q.InsertAdvisoryReference(ctx, db.InsertAdvisoryReferenceParams{
+			ID:             id,
+			AdvisoryID:     advisoryID,
+			RefType:        refType,
+			RefValue:       refValue,
+			SeverityVendor: optFromPtr(severityVendor),
+			SeverityCvss:   severityCvss,
+			Title:          optFromPtr(title),
+			Url:            optFromPtr(url),
+		})
+		if err != nil {
+			return fmt.Errorf("insert advisory reference %s: %w", id, err)
+		}
+	}
+	if err := refRows.Err(); err != nil {
+		return fmt.Errorf("advisory references rows: %w", err)
+	}
+
+	// 6. Fetch and insert advisory product stream links
+	linkRows, err := sqliteDB.QueryContext(ctx, "SELECT advisory_id, product_stream_id FROM advisory_product_streams")
+	if err != nil {
+		return fmt.Errorf("query advisory product streams: %w", err)
+	}
+	defer func() { _ = linkRows.Close() }()
+
+	for linkRows.Next() {
+		var advisoryID, productStreamID string
+		if err := linkRows.Scan(&advisoryID, &productStreamID); err != nil {
+			return fmt.Errorf("scan advisory product stream link: %w", err)
+		}
+		err = q.InsertAdvisoryProductStream(ctx, db.InsertAdvisoryProductStreamParams{
+			AdvisoryID:      advisoryID,
+			ProductStreamID: productStreamID,
+		})
+		if err != nil {
+			return fmt.Errorf("insert advisory product stream %s -> %s: %w", advisoryID, productStreamID, err)
+		}
+	}
+	if err := linkRows.Err(); err != nil {
+		return fmt.Errorf("advisory product streams rows: %w", err)
+	}
+
+	// 7. Fetch and insert affected package rules
+	ruleRows, err := sqliteDB.QueryContext(ctx, "SELECT id, advisory_id, product_stream_id, package_name, source_rpm, arch, epoch_constraint, version_constraint, release_constraint, rpm_evr_rule, context, evidence_tier FROM affected_package_rules")
+	if err != nil {
+		return fmt.Errorf("query affected package rules: %w", err)
+	}
+	defer func() { _ = ruleRows.Close() }()
+
+	for ruleRows.Next() {
+		var id, advisoryID, productStreamID, packageName, contextStr, evidenceTier string
+		var sourceRPM, arch, epochConstraint, versionConstraint, releaseConstraint, rpmEvrRule *string
+		if err := ruleRows.Scan(&id, &advisoryID, &productStreamID, &packageName, &sourceRPM, &arch, &epochConstraint, &versionConstraint, &releaseConstraint, &rpmEvrRule, &contextStr, &evidenceTier); err != nil {
+			return fmt.Errorf("scan affected package rule: %w", err)
+		}
+		err = q.InsertAffectedPackageRule(ctx, db.InsertAffectedPackageRuleParams{
+			ID:                id,
+			AdvisoryID:        advisoryID,
+			ProductStreamID:   productStreamID,
+			PackageName:       packageName,
+			SourceRpm:         optFromPtr(sourceRPM),
+			Arch:              optFromPtr(arch),
+			EpochConstraint:   optFromPtr(epochConstraint),
+			VersionConstraint: optFromPtr(versionConstraint),
+			ReleaseConstraint: optFromPtr(releaseConstraint),
+			RpmEvrRule:        optFromPtr(rpmEvrRule),
+			Context:           contextStr,
+			EvidenceTier:      evidenceTier,
+		})
+		if err != nil {
+			return fmt.Errorf("insert affected package rule %s: %w", id, err)
+		}
+	}
+	if err := ruleRows.Err(); err != nil {
+		return fmt.Errorf("affected package rules rows: %w", err)
+	}
+
+	// 8. Fetch and insert fixed packages
+	fixRows, err := sqliteDB.QueryContext(ctx, "SELECT id, advisory_id, product_stream_id, package_name, epoch, version, release, arch, nevra, source_rpm, repo_family, evidence_tier FROM fixed_packages")
+	if err != nil {
+		return fmt.Errorf("query fixed packages: %w", err)
+	}
+	defer func() { _ = fixRows.Close() }()
+
+	for fixRows.Next() {
+		var id, advisoryID, productStreamID, packageName, version, release, nevra, evidenceTier string
+		var epoch int32
+		var arch, sourceRPM, repoFamily *string
+		if err := fixRows.Scan(&id, &advisoryID, &productStreamID, &packageName, &epoch, &version, &release, &arch, &nevra, &sourceRPM, &repoFamily, &evidenceTier); err != nil {
+			return fmt.Errorf("scan fixed package: %w", err)
+		}
+		err = q.InsertFixedPackage(ctx, db.InsertFixedPackageParams{
+			ID:              id,
+			AdvisoryID:      advisoryID,
+			ProductStreamID: productStreamID,
+			PackageName:     packageName,
+			Epoch:           epoch,
+			Version:         version,
+			Release:         release,
+			Arch:            optFromPtr(arch),
+			Nevra:           nevra,
+			SourceRpm:       optFromPtr(sourceRPM),
+			RepoFamily:      optFromPtr(repoFamily),
+			EvidenceTier:    evidenceTier,
+		})
+		if err != nil {
+			return fmt.Errorf("insert fixed package %s: %w", id, err)
+		}
+	}
+	if err := fixRows.Err(); err != nil {
+		return fmt.Errorf("fixed packages rows: %w", err)
+	}
+
+	return nil
+}
+
+func optFromPtr[T any](p *T) utils.Option[T] {
+	if p == nil {
+		return utils.None[T]()
+	}
+	return utils.Some(*p)
 }

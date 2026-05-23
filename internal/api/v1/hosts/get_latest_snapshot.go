@@ -24,7 +24,7 @@ func GetLatestSnapshot(i do.Injector) apiauth.AuthenticatedHandler {
 		snapshot, err := hostsService.GetLatestSnapshot(r.Context(), hostID)
 		if err != nil {
 			switch {
-			case errors.Is(err, services.ErrHostNotFound):
+			case errors.Is(err, services.ErrHostNotFound) || errors.Is(err, services.ErrSnapshotNotFound):
 				webutil.WriteAPIError(w, r, http.StatusNotFound, "snapshot not found", nil)
 			default:
 				webutil.LogError(r, "get latest host snapshot failed", err)

@@ -60,6 +60,38 @@ func (ns NullRiverJobState) Value() (driver.Value, error) {
 	return string(ns.RiverJobState), nil
 }
 
+type Advisory struct {
+	ID           string
+	SourceSystem string
+	RawSourceID  string
+	SourceUrl    utils.Option[string]
+	Vendor       string
+	AdvisoryType string
+	Severity     utils.Option[string]
+	Summary      utils.Option[string]
+	Description  utils.Option[string]
+	PublishedAt  utils.Option[string]
+	UpdatedAt    utils.Option[string]
+	EvidenceTier string
+	IsSecurity   bool
+}
+
+type AdvisoryProductStream struct {
+	AdvisoryID      string
+	ProductStreamID string
+}
+
+type AdvisoryReference struct {
+	ID             string
+	AdvisoryID     string
+	RefType        string
+	RefValue       string
+	SeverityVendor utils.Option[string]
+	SeverityCvss   *float64
+	Title          utils.Option[string]
+	Url            utils.Option[string]
+}
+
 type AdvisoryScope struct {
 	ScopeKey      string
 	Status        string
@@ -73,6 +105,55 @@ type AdvisoryScope struct {
 	NextRefreshAt pgtype.Timestamptz
 	CreatedAt     pgtype.Timestamptz
 	UpdatedAt     pgtype.Timestamptz
+}
+
+type AffectedPackageRule struct {
+	ID                string
+	AdvisoryID        string
+	ProductStreamID   string
+	PackageName       string
+	SourceRpm         utils.Option[string]
+	Arch              utils.Option[string]
+	EpochConstraint   utils.Option[string]
+	VersionConstraint utils.Option[string]
+	ReleaseConstraint utils.Option[string]
+	RpmEvrRule        utils.Option[string]
+	Context           string
+	EvidenceTier      string
+}
+
+type DecisionRecord struct {
+	ID                 string
+	HostID             string
+	SnapshotID         string
+	AdvisoryID         string
+	InstalledPackageID utils.Option[string]
+	ProductStreamID    utils.Option[string]
+	PackageName        string
+	InstalledNevra     utils.Option[string]
+	FixedNevra         utils.Option[string]
+	Status             string
+	Action             string
+	Severity           utils.Option[string]
+	EvidenceTier       string
+	ReasonCode         string
+	ReasonText         utils.Option[string]
+	ComputedAt         string
+}
+
+type FixedPackage struct {
+	ID              string
+	AdvisoryID      string
+	ProductStreamID string
+	PackageName     string
+	Epoch           int32
+	Version         string
+	Release         string
+	Arch            utils.Option[string]
+	Nevra           string
+	SourceRpm       utils.Option[string]
+	RepoFamily      utils.Option[string]
+	EvidenceTier    string
 }
 
 type GooseDbVersion struct {
@@ -162,6 +243,20 @@ type HostSshPullJob struct {
 	StartedAt   pgtype.Timestamptz
 	CompletedAt pgtype.Timestamptz
 	Error       utils.Option[string]
+}
+
+type ProductStream struct {
+	ID            string
+	Vendor        string
+	DistroFamily  string
+	DistroName    string
+	MajorVersion  int32
+	MinorVersion  utils.Option[string]
+	Architecture  utils.Option[string]
+	RepoFamily    string
+	RepoIDPattern utils.Option[string]
+	Cpe           utils.Option[string]
+	Status        string
 }
 
 type RegistrationToken struct {

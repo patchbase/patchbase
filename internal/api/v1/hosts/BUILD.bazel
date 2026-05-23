@@ -15,6 +15,8 @@ go_api_library(
         "list_tokens.go",
         "onboard_ssh_host.go",
         "revoke_token.go",
+        "upgradable.go",
+        "vulnerable.go",
     ],
     importpath = "go.patchbase.net/server/internal/api/v1/hosts",
     visibility = ["//:__subpackages__"],
@@ -23,7 +25,10 @@ go_api_library(
         "//internal/api/v1/entities",
         "//internal/api/webutil",
         "//internal/services",
+        "//internal/sql",
+        "//proto/agent",
         "@com_github_samber_do_v2//:do",
+        "@org_golang_google_protobuf//proto",
     ],
 )
 
@@ -31,7 +36,10 @@ integration_test(
     name = "hosts_test",
     srcs = ["hosts_test.go"],
     deps = [
+        "//internal/sql",
+        "//internal/sql/id",
         "//internal/testing",
+        "//internal/utils",
         "//proto/agent",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",

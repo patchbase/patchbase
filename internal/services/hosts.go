@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/do/v2"
 	agentpb "go.patchbase.net/proto/agent"
+	"go.patchbase.net/server/internal/services/matchers"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/sql/id"
 	"go.patchbase.net/server/internal/utils"
@@ -31,6 +32,7 @@ var (
 	ErrHostNotFound             = errors.New("host not found")
 	ErrTokenAlreadyRevoked      = errors.New("registration token already revoked")
 	ErrInvalidSnapshotPayload   = errors.New("invalid snapshot payload")
+	ErrSnapshotNotFound         = errors.New("snapshot not found")
 )
 
 type SSHPullArgs struct {
@@ -126,6 +128,7 @@ type HostSnapshotInfo struct {
 	RunningKernelNevra string     `json:"running_kernel_nevra"`
 	BootTime           *time.Time `json:"boot_time"`
 	HasProcessData     bool       `json:"has_process_data"`
+	Payload            []byte     `json:"payload"`
 }
 
 type HostSSHPullJobInfo struct {
@@ -176,11 +179,16 @@ func NewHosts(i do.Injector) (Hosts, error) {
 		return nil, fmt.Errorf("failed to get periodic job manager: %w", err)
 	}
 
+	sshRunner, err := do.Invoke[SSHPullRunner](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get ssh runner: %w", err)
+	}
+
 	return &hosts{
 		pool:               pool,
 		sql:                queries,
 		random:             random,
-		sshRunner:          defaultSSHPullRunner{},
+		sshRunner:          sshRunner,
 		crypto:             crypto,
 		injector:           i,
 		periodicJobManager: periodicJobManager,
@@ -232,10 +240,8 @@ func (s *hosts) ListRegistrationTokens(ctx context.Context) ([]RegistrationToken
 }
 
 func (s *hosts) RevokeRegistrationToken(ctx context.Context, tokenID string) error {
-	if _, err := s.sql.RevokeRegistrationToken(ctx, tokenID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrTokenAlreadyRevoked
-		}
+	_, err := sql.Required(s.sql.RevokeRegistrationToken(ctx, tokenID))(ErrTokenAlreadyRevoked)
+	if err != nil {
 		return fmt.Errorf("revoke registration token: %w", err)
 	}
 	return nil
@@ -254,11 +260,8 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
-	regToken, err := queries.GetActiveRegistrationTokenByHash(ctx, utils.SHA256(registrationToken))
+	regToken, err := sql.Required(queries.GetActiveRegistrationTokenByHash(ctx, utils.SHA256(registrationToken)))(ErrInvalidRegistrationToken)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrInvalidRegistrationToken
-		}
 		return nil, fmt.Errorf("get active registration token: %w", err)
 	}
 
@@ -334,19 +337,13 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
-	tokenRow, err := queries.GetActiveHostAccessTokenByHash(ctx, utils.SHA256(trimmedToken))
+	tokenRow, err := sql.Required(queries.GetActiveHostAccessTokenByHash(ctx, utils.SHA256(trimmedToken)))(ErrInvalidHostAccessToken)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrInvalidHostAccessToken
-		}
 		return nil, fmt.Errorf("get active host access token: %w", err)
 	}
 
-	host, err := queries.GetHostByID(ctx, tokenRow.HostID)
+	host, err := sql.Required(queries.GetHostByID(ctx, tokenRow.HostID))(ErrHostNotFound)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrHostNotFound
-		}
 		return nil, fmt.Errorf("get host by id: %w", err)
 	}
 	if host.ApprovalStatus != "approved" {
@@ -487,6 +484,16 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 		utils.GetLogger(ctx).Warn("invoke advisory sync service failed", "error", err)
 	}
 
+	// Run MatchSnapshot post-commit
+	matcher, err := do.Invoke[matchers.Matcher](s.injector)
+	if err == nil {
+		if _, err := matcher.MatchSnapshot(ctx, host.ID, snapshotRow.ID); err != nil {
+			utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", host.ID, "snapshot_id", snapshotRow.ID, "error", err)
+		}
+	} else {
+		utils.GetLogger(ctx).Warn("invoke matcher service failed", "error", err)
+	}
+
 	return &agentpb.SyncResponse{
 		Accepted:           true,
 		HostId:             host.ID,
@@ -508,11 +515,8 @@ func (s *hosts) ListPendingHosts(ctx context.Context) ([]HostInfo, error) {
 }
 
 func (s *hosts) ApproveHost(ctx context.Context, hostID string) (HostInfo, error) {
-	host, err := s.sql.ApproveHostByID(ctx, hostID)
+	host, err := sql.Required(s.sql.ApproveHostByID(ctx, hostID))(ErrHostNotFound)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return HostInfo{}, ErrHostNotFound
-		}
 		return HostInfo{}, fmt.Errorf("approve host: %w", err)
 	}
 	return mapHost(host, nil), nil
@@ -578,11 +582,8 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 }
 
 func (s *hosts) OnboardSSHHost(ctx context.Context, hostID string) error {
-	host, err := s.sql.GetHostByID(ctx, hostID)
+	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(ErrHostNotFound)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrHostNotFound
-		}
 		return fmt.Errorf("get host: %w", err)
 	}
 
@@ -627,22 +628,16 @@ func (s *hosts) ListHosts(ctx context.Context) ([]HostInfo, error) {
 }
 
 func (s *hosts) GetHost(ctx context.Context, hostID string) (HostInfo, error) {
-	row, err := s.sql.GetHostWithStateByID(ctx, hostID)
+	row, err := sql.Required(s.sql.GetHostWithStateByID(ctx, hostID))(ErrHostNotFound)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return HostInfo{}, ErrHostNotFound
-		}
 		return HostInfo{}, fmt.Errorf("get host: %w", err)
 	}
 	return mapHostWithStateByID(row), nil
 }
 
 func (s *hosts) GetLatestSnapshot(ctx context.Context, hostID string) (HostSnapshotInfo, error) {
-	row, err := s.sql.GetLatestHostSnapshotByHostID(ctx, hostID)
+	row, err := sql.Required(s.sql.GetLatestHostSnapshotByHostID(ctx, hostID))(ErrSnapshotNotFound)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return HostSnapshotInfo{}, ErrHostNotFound
-		}
 		return HostSnapshotInfo{}, fmt.Errorf("get latest snapshot: %w", err)
 	}
 	return HostSnapshotInfo{
@@ -653,6 +648,7 @@ func (s *hosts) GetLatestSnapshot(ctx context.Context, hostID string) (HostSnaps
 		RunningKernelNevra: row.RunningKernelNevra,
 		BootTime:           toTimePtr(row.BootTime),
 		HasProcessData:     row.HasProcessData,
+		Payload:            row.Payload,
 	}, nil
 }
 
@@ -669,11 +665,8 @@ func (s *hosts) DeleteHost(ctx context.Context, hostID string) error {
 	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
-	_, err = queries.GetHostByID(ctx, trimmedHostID)
+	_, err = sql.Required(queries.GetHostByID(ctx, trimmedHostID))(ErrHostNotFound)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrHostNotFound
-		}
 		return fmt.Errorf("get host by id: %w", err)
 	}
 
@@ -689,10 +682,8 @@ func (s *hosts) DeleteHost(ctx context.Context, hostID string) error {
 	if err := queries.DeleteHostSnapshotsByHostID(ctx, trimmedHostID); err != nil {
 		return fmt.Errorf("delete host snapshots: %w", err)
 	}
-	if _, err := queries.DeleteHostByID(ctx, trimmedHostID); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrHostNotFound
-		}
+	_, err = sql.Required(queries.DeleteHostByID(ctx, trimmedHostID))(ErrHostNotFound)
+	if err != nil {
 		return fmt.Errorf("delete host: %w", err)
 	}
 
@@ -903,11 +894,8 @@ func mapHostWithStateByID(row sql.GetHostWithStateByIDRow) HostInfo {
 }
 
 func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
-	host, err := s.sql.GetHostByID(ctx, hostID)
+	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(ErrHostNotFound)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return ErrHostNotFound
-		}
 		return fmt.Errorf("get host: %w", err)
 	}
 
@@ -936,6 +924,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 
 		queries := sql.New(tx)
 
+		var snapshotID string
 		var optErr utils.Option[string]
 		if errMsg != "" {
 			optErr = utils.Some(errMsg)
@@ -970,6 +959,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 			if err != nil {
 				return fmt.Errorf("insert host snapshot: %w", err)
 			}
+			snapshotID = snapshotRow.ID
 
 			err = queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
 				ID:                hostID,
@@ -1058,6 +1048,16 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 				}
 			} else {
 				utils.GetLogger(ctx).Warn("invoke advisory sync service failed", "error", err)
+			}
+
+			// Trigger MatchSnapshot
+			matcher, err := do.Invoke[matchers.Matcher](s.injector)
+			if err == nil {
+				if _, err := matcher.MatchSnapshot(ctx, hostID, snapshotID); err != nil {
+					utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", hostID, "snapshot_id", snapshotID, "error", err)
+				}
+			} else {
+				utils.GetLogger(ctx).Warn("invoke matcher service failed", "error", err)
 			}
 		}
 

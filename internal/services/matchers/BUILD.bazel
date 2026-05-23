@@ -1,0 +1,53 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "matchers",
+    srcs = [
+        "matcher.go",
+        "matcher_rpmver.go",
+        "matcher_streams.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/services/matchers",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/sql",
+        "//internal/sql/id",
+        "//internal/utils",
+        "//proto/agent",
+        "@com_github_jackc_pgx_v5//:pgx",
+        "@com_github_jackc_pgx_v5//pgxpool",
+        "@com_github_samber_do_v2//:do",
+        "@org_golang_google_protobuf//proto",
+    ],
+)
+
+go_test(
+    name = "matcher_test",
+    size = "small",
+    srcs = ["matcher_test.go"],
+    embed = [":matchers"],
+    deps = [
+        "//internal/sql",
+        "//internal/utils",
+        "//proto/agent",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+go_test(
+    name = "matcher_integration_test",
+    size = "small",
+    srcs = ["matcher_integration_test.go"],
+    deps = [
+        ":matchers",
+        "//internal/testing",
+        "//proto/agent",
+        "@com_github_jackc_pgx_v5//pgtype",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)

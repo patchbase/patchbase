@@ -11,6 +11,7 @@ import (
 	"go.patchbase.net/server/internal/config"
 	"go.patchbase.net/server/internal/queue"
 	"go.patchbase.net/server/internal/services"
+	"go.patchbase.net/server/internal/services/matchers"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/utils"
 )
@@ -32,13 +33,14 @@ func New(ctx context.Context, cfg config.Config) do.Injector {
 	do.Provide(injector, queue.NewPeriodicJobManager)
 
 	// services
+	do.Provide[services.SSHPullRunner](injector, services.NewSSHPullRunner)
 	do.Provide[services.Auth](injector, services.NewAuth)
 	do.Provide[services.Hosts](injector, services.NewHosts)
 	do.Provide[services.Settings](injector, services.NewSettings)
 	do.Provide[services.AdvisorySyncService](injector, services.NewAdvisorySync)
+	do.Provide[matchers.Matcher](injector, matchers.NewMatcher)
 
 	// api
 	do.Provide[auth.Auth](injector, auth.New)
-
 	return injector
 }

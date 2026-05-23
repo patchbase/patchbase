@@ -1,6 +1,6 @@
 import { request } from "$lib/api/request.js";
 import { getSession } from "$lib/auth/session.js";
-import type { Host, HostSnapshot, HostPullJob } from "$lib/types";
+import type { Host, HostSnapshot, HostPullJob, MatcherDecisionGroup } from "$lib/types";
 
 export interface RegistrationTokenInfo {
   id: string;
@@ -119,4 +119,12 @@ export async function onboardSSHHost(id: string): Promise<void> {
   await authenticatedRequest(`/api/v1/hosts/${id}/onboard-ssh`, {
     method: "POST",
   });
+}
+
+export async function getHostVulnerablePackages(id: string): Promise<MatcherDecisionGroup[]> {
+  return authenticatedRequest(`/api/v1/hosts/${id}/packages/vulnerable`);
+}
+
+export async function getHostUpgradablePackages(id: string): Promise<MatcherDecisionGroup[]> {
+  return authenticatedRequest(`/api/v1/hosts/${id}/packages/upgradable`);
 }

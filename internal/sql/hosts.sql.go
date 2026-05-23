@@ -472,6 +472,53 @@ func (q *Queries) ListApprovedSSHHosts(ctx context.Context) ([]ListApprovedSSHHo
 	return items, nil
 }
 
+const listHostsByAdvisoryScopeKey = `-- name: ListHostsByAdvisoryScopeKey :many
+SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key FROM hosts
+WHERE advisory_scope_key = $1
+`
+
+func (q *Queries) ListHostsByAdvisoryScopeKey(ctx context.Context, advisoryScopeKey utils.Option[string]) ([]Host, error) {
+	rows, err := q.db.Query(ctx, listHostsByAdvisoryScopeKey, advisoryScopeKey)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Host
+	for rows.Next() {
+		var i Host
+		if err := rows.Scan(
+			&i.ID,
+			&i.OnboardingMode,
+			&i.ApprovalStatus,
+			&i.ApprovedAt,
+			&i.DisplayName,
+			&i.MachineID,
+			&i.Hostname,
+			&i.IpAddress,
+			&i.OsFamily,
+			&i.OsName,
+			&i.OsMajor,
+			&i.OsVersion,
+			&i.Architecture,
+			&i.Status,
+			&i.LastSeenAt,
+			&i.LastAdvisoryCheckAt,
+			&i.FirstSeenAt,
+			&i.LastSnapshotID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.AdvisoryScopeKey,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listHostsWithState = `-- name: ListHostsWithState :many
 SELECT
     h.id, h.onboarding_mode, h.approval_status, h.approved_at, h.display_name, h.machine_id, h.hostname, h.ip_address, h.os_family, h.os_name, h.os_major, h.os_version, h.architecture, h.status, h.last_seen_at, h.last_advisory_check_at, h.first_seen_at, h.last_snapshot_id, h.created_at, h.updated_at, h.advisory_scope_key,

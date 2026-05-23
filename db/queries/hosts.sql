@@ -222,6 +222,10 @@ FROM hosts h
 JOIN host_ssh_pull hp ON hp.host_id = h.id
 WHERE h.onboarding_mode = 'ssh' AND h.approval_status = 'approved' AND hp.onboarded = true;
 
+-- name: ListHostsByAdvisoryScopeKey :many
+SELECT * FROM hosts
+WHERE advisory_scope_key = $1;
+
 -- name: SetSSHPullOnboarded :exec
 UPDATE host_ssh_pull
 SET onboarded = $2

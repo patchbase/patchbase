@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "backend.go",
         "database.go",
+        "export_test_helpers.go",
         "fixtures.go",
         "http.go",
     ],
@@ -14,6 +15,7 @@ go_library(
         "//internal/config",
         "//internal/di",
         "//internal/services",
+        "//internal/sql",
         "//internal/utils",
         "@com_github_go_testfixtures_testfixtures_v3//:testfixtures",
         "@com_github_jackc_pgx_v5//:pgx",

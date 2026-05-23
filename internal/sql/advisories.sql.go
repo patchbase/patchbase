@@ -8,147 +8,50 @@ package sql
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5/pgtype"
 	"go.patchbase.net/server/internal/utils"
 )
 
-const getAdvisoryScope = `-- name: GetAdvisoryScope :one
-SELECT scope_key, status, last_sync_at, last_success_at, last_error, advisory_count, sha256, size_bytes, local_path, next_refresh_at, created_at, updated_at FROM advisory_scopes
-WHERE scope_key = $1
-`
-
-func (q *Queries) GetAdvisoryScope(ctx context.Context, scopeKey string) (AdvisoryScope, error) {
-	row := q.db.QueryRow(ctx, getAdvisoryScope, scopeKey)
-	var i AdvisoryScope
-	err := row.Scan(
-		&i.ScopeKey,
-		&i.Status,
-		&i.LastSyncAt,
-		&i.LastSuccessAt,
-		&i.LastError,
-		&i.AdvisoryCount,
-		&i.Sha256,
-		&i.SizeBytes,
-		&i.LocalPath,
-		&i.NextRefreshAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const insertAdvisoryScopeIfNotExists = `-- name: InsertAdvisoryScopeIfNotExists :exec
-INSERT INTO advisory_scopes (
-    scope_key,
-    status
-) VALUES (
-    $1, $2
+const deleteAdvisoriesWithoutStreams = `-- name: DeleteAdvisoriesWithoutStreams :exec
+DELETE FROM advisories
+WHERE id NOT IN (
+    SELECT DISTINCT advisory_id FROM advisory_product_streams
 )
-ON CONFLICT (scope_key) DO NOTHING
 `
 
-type InsertAdvisoryScopeIfNotExistsParams struct {
-	ScopeKey string
-	Status   string
-}
-
-func (q *Queries) InsertAdvisoryScopeIfNotExists(ctx context.Context, arg InsertAdvisoryScopeIfNotExistsParams) error {
-	_, err := q.db.Exec(ctx, insertAdvisoryScopeIfNotExists, arg.ScopeKey, arg.Status)
+func (q *Queries) DeleteAdvisoriesWithoutStreams(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, deleteAdvisoriesWithoutStreams)
 	return err
 }
 
-const listAdvisoryScopeStats = `-- name: ListAdvisoryScopeStats :many
-SELECT
-    as_scopes.scope_key,
-    as_scopes.status,
-    as_scopes.last_sync_at,
-    as_scopes.last_success_at,
-    as_scopes.last_error,
-    as_scopes.advisory_count,
-    as_scopes.sha256,
-    as_scopes.size_bytes,
-    as_scopes.local_path,
-    as_scopes.next_refresh_at,
-    COUNT(h.id)::int AS host_count
-FROM advisory_scopes as_scopes
-LEFT JOIN hosts h ON h.advisory_scope_key = as_scopes.scope_key
-GROUP BY as_scopes.scope_key
-ORDER BY as_scopes.scope_key ASC
+const listAdvisoriesByStreamIDs = `-- name: ListAdvisoriesByStreamIDs :many
+SELECT DISTINCT a.id, a.source_system, a.raw_source_id, a.source_url, a.vendor, a.advisory_type, a.severity, a.summary, a.description, a.published_at, a.updated_at, a.evidence_tier, a.is_security FROM advisories a
+JOIN advisory_product_streams aps ON aps.advisory_id = a.id
+WHERE aps.product_stream_id = ANY($1::text[])
 `
 
-type ListAdvisoryScopeStatsRow struct {
-	ScopeKey      string
-	Status        string
-	LastSyncAt    pgtype.Timestamptz
-	LastSuccessAt pgtype.Timestamptz
-	LastError     utils.Option[string]
-	AdvisoryCount int32
-	Sha256        utils.Option[string]
-	SizeBytes     int64
-	LocalPath     utils.Option[string]
-	NextRefreshAt pgtype.Timestamptz
-	HostCount     int32
-}
-
-func (q *Queries) ListAdvisoryScopeStats(ctx context.Context) ([]ListAdvisoryScopeStatsRow, error) {
-	rows, err := q.db.Query(ctx, listAdvisoryScopeStats)
+func (q *Queries) ListAdvisoriesByStreamIDs(ctx context.Context, dollar_1 []string) ([]Advisory, error) {
+	rows, err := q.db.Query(ctx, listAdvisoriesByStreamIDs, dollar_1)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []ListAdvisoryScopeStatsRow
+	var items []Advisory
 	for rows.Next() {
-		var i ListAdvisoryScopeStatsRow
+		var i Advisory
 		if err := rows.Scan(
-			&i.ScopeKey,
-			&i.Status,
-			&i.LastSyncAt,
-			&i.LastSuccessAt,
-			&i.LastError,
-			&i.AdvisoryCount,
-			&i.Sha256,
-			&i.SizeBytes,
-			&i.LocalPath,
-			&i.NextRefreshAt,
-			&i.HostCount,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, i)
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const listAdvisoryScopes = `-- name: ListAdvisoryScopes :many
-SELECT scope_key, status, last_sync_at, last_success_at, last_error, advisory_count, sha256, size_bytes, local_path, next_refresh_at, created_at, updated_at FROM advisory_scopes
-ORDER BY scope_key ASC
-`
-
-func (q *Queries) ListAdvisoryScopes(ctx context.Context) ([]AdvisoryScope, error) {
-	rows, err := q.db.Query(ctx, listAdvisoryScopes)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []AdvisoryScope
-	for rows.Next() {
-		var i AdvisoryScope
-		if err := rows.Scan(
-			&i.ScopeKey,
-			&i.Status,
-			&i.LastSyncAt,
-			&i.LastSuccessAt,
-			&i.LastError,
-			&i.AdvisoryCount,
-			&i.Sha256,
-			&i.SizeBytes,
-			&i.LocalPath,
-			&i.NextRefreshAt,
-			&i.CreatedAt,
+			&i.ID,
+			&i.SourceSystem,
+			&i.RawSourceID,
+			&i.SourceUrl,
+			&i.Vendor,
+			&i.AdvisoryType,
+			&i.Severity,
+			&i.Summary,
+			&i.Description,
+			&i.PublishedAt,
 			&i.UpdatedAt,
+			&i.EvidenceTier,
+			&i.IsSecurity,
 		); err != nil {
 			return nil, err
 		}
@@ -160,152 +63,58 @@ func (q *Queries) ListAdvisoryScopes(ctx context.Context) ([]AdvisoryScope, erro
 	return items, nil
 }
 
-const updateAdvisoryScopeStatus = `-- name: UpdateAdvisoryScopeStatus :one
-UPDATE advisory_scopes
-SET
-    status = $2,
-    last_error = $3,
-    updated_at = now()
-WHERE scope_key = $1
-RETURNING scope_key, status, last_sync_at, last_success_at, last_error, advisory_count, sha256, size_bytes, local_path, next_refresh_at, created_at, updated_at
-`
-
-type UpdateAdvisoryScopeStatusParams struct {
-	ScopeKey  string
-	Status    string
-	LastError utils.Option[string]
-}
-
-func (q *Queries) UpdateAdvisoryScopeStatus(ctx context.Context, arg UpdateAdvisoryScopeStatusParams) (AdvisoryScope, error) {
-	row := q.db.QueryRow(ctx, updateAdvisoryScopeStatus, arg.ScopeKey, arg.Status, arg.LastError)
-	var i AdvisoryScope
-	err := row.Scan(
-		&i.ScopeKey,
-		&i.Status,
-		&i.LastSyncAt,
-		&i.LastSuccessAt,
-		&i.LastError,
-		&i.AdvisoryCount,
-		&i.Sha256,
-		&i.SizeBytes,
-		&i.LocalPath,
-		&i.NextRefreshAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const upsertAdvisoryScope = `-- name: UpsertAdvisoryScope :one
-INSERT INTO advisory_scopes (
-    scope_key,
-    status,
-    last_sync_at,
-    last_success_at,
-    last_error,
-    advisory_count,
-    sha256,
-    size_bytes,
-    local_path,
-    next_refresh_at
+const upsertAdvisory = `-- name: UpsertAdvisory :exec
+INSERT INTO advisories (
+    id, source_system, raw_source_id, source_url, vendor, advisory_type, severity, summary, description, published_at, updated_at, evidence_tier, is_security
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
 )
-ON CONFLICT (scope_key) DO UPDATE SET
-    status = EXCLUDED.status,
-    last_sync_at = COALESCE(EXCLUDED.last_sync_at, advisory_scopes.last_sync_at),
-    last_success_at = COALESCE(EXCLUDED.last_success_at, advisory_scopes.last_success_at),
-    last_error = EXCLUDED.last_error,
-    advisory_count = EXCLUDED.advisory_count,
-    sha256 = COALESCE(EXCLUDED.sha256, advisory_scopes.sha256),
-    size_bytes = EXCLUDED.size_bytes,
-    local_path = COALESCE(EXCLUDED.local_path, advisory_scopes.local_path),
-    next_refresh_at = COALESCE(EXCLUDED.next_refresh_at, advisory_scopes.next_refresh_at),
-    updated_at = now()
-RETURNING scope_key, status, last_sync_at, last_success_at, last_error, advisory_count, sha256, size_bytes, local_path, next_refresh_at, created_at, updated_at
+ON CONFLICT (id) DO UPDATE SET
+    source_system = EXCLUDED.source_system,
+    raw_source_id = EXCLUDED.raw_source_id,
+    source_url = EXCLUDED.source_url,
+    vendor = EXCLUDED.vendor,
+    advisory_type = EXCLUDED.advisory_type,
+    severity = EXCLUDED.severity,
+    summary = EXCLUDED.summary,
+    description = EXCLUDED.description,
+    published_at = EXCLUDED.published_at,
+    updated_at = EXCLUDED.updated_at,
+    evidence_tier = EXCLUDED.evidence_tier,
+    is_security = EXCLUDED.is_security
 `
 
-type UpsertAdvisoryScopeParams struct {
-	ScopeKey      string
-	Status        string
-	LastSyncAt    pgtype.Timestamptz
-	LastSuccessAt pgtype.Timestamptz
-	LastError     utils.Option[string]
-	AdvisoryCount int32
-	Sha256        utils.Option[string]
-	SizeBytes     int64
-	LocalPath     utils.Option[string]
-	NextRefreshAt pgtype.Timestamptz
+type UpsertAdvisoryParams struct {
+	ID           string
+	SourceSystem string
+	RawSourceID  string
+	SourceUrl    utils.Option[string]
+	Vendor       string
+	AdvisoryType string
+	Severity     utils.Option[string]
+	Summary      utils.Option[string]
+	Description  utils.Option[string]
+	PublishedAt  utils.Option[string]
+	UpdatedAt    utils.Option[string]
+	EvidenceTier string
+	IsSecurity   bool
 }
 
-func (q *Queries) UpsertAdvisoryScope(ctx context.Context, arg UpsertAdvisoryScopeParams) (AdvisoryScope, error) {
-	row := q.db.QueryRow(ctx, upsertAdvisoryScope,
-		arg.ScopeKey,
-		arg.Status,
-		arg.LastSyncAt,
-		arg.LastSuccessAt,
-		arg.LastError,
-		arg.AdvisoryCount,
-		arg.Sha256,
-		arg.SizeBytes,
-		arg.LocalPath,
-		arg.NextRefreshAt,
+func (q *Queries) UpsertAdvisory(ctx context.Context, arg UpsertAdvisoryParams) error {
+	_, err := q.db.Exec(ctx, upsertAdvisory,
+		arg.ID,
+		arg.SourceSystem,
+		arg.RawSourceID,
+		arg.SourceUrl,
+		arg.Vendor,
+		arg.AdvisoryType,
+		arg.Severity,
+		arg.Summary,
+		arg.Description,
+		arg.PublishedAt,
+		arg.UpdatedAt,
+		arg.EvidenceTier,
+		arg.IsSecurity,
 	)
-	var i AdvisoryScope
-	err := row.Scan(
-		&i.ScopeKey,
-		&i.Status,
-		&i.LastSyncAt,
-		&i.LastSuccessAt,
-		&i.LastError,
-		&i.AdvisoryCount,
-		&i.Sha256,
-		&i.SizeBytes,
-		&i.LocalPath,
-		&i.NextRefreshAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
-}
-
-const upsertAdvisoryScopeStatus = `-- name: UpsertAdvisoryScopeStatus :one
-INSERT INTO advisory_scopes (
-    scope_key,
-    status,
-    last_error
-) VALUES (
-    $1, $2, $3
-)
-ON CONFLICT (scope_key) DO UPDATE SET
-    status = EXCLUDED.status,
-    last_error = EXCLUDED.last_error,
-    updated_at = now()
-RETURNING scope_key, status, last_sync_at, last_success_at, last_error, advisory_count, sha256, size_bytes, local_path, next_refresh_at, created_at, updated_at
-`
-
-type UpsertAdvisoryScopeStatusParams struct {
-	ScopeKey  string
-	Status    string
-	LastError utils.Option[string]
-}
-
-func (q *Queries) UpsertAdvisoryScopeStatus(ctx context.Context, arg UpsertAdvisoryScopeStatusParams) (AdvisoryScope, error) {
-	row := q.db.QueryRow(ctx, upsertAdvisoryScopeStatus, arg.ScopeKey, arg.Status, arg.LastError)
-	var i AdvisoryScope
-	err := row.Scan(
-		&i.ScopeKey,
-		&i.Status,
-		&i.LastSyncAt,
-		&i.LastSuccessAt,
-		&i.LastError,
-		&i.AdvisoryCount,
-		&i.Sha256,
-		&i.SizeBytes,
-		&i.LocalPath,
-		&i.NextRefreshAt,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-	)
-	return i, err
+	return err
 }

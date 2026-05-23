@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jackc/pgx/v5"
 	"github.com/samber/do/v2"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/utils"
@@ -47,11 +46,8 @@ func NewAuth(i do.Injector) (Auth, error) {
 }
 
 func (a *auth) Login(ctx context.Context, email string, password string) (LoginResult, error) {
-	user, err := a.sql.GetUserByEmail(ctx, normalizeEmail(email))
+	user, err := sql.Required(a.sql.GetUserByEmail(ctx, normalizeEmail(email)))(ErrInvalidCredentials)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return LoginResult{}, ErrInvalidCredentials
-		}
 		return LoginResult{}, fmt.Errorf("get user by email: %w", err)
 	}
 

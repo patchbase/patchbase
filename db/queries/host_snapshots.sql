@@ -78,3 +78,8 @@ ON CONFLICT (host_id) DO UPDATE SET
     no_fix = EXCLUDED.no_fix,
     unknown = EXCLUDED.unknown,
     updated_at = now();
+
+-- name: GetHostSnapshot :one
+SELECT * FROM host_snapshots
+WHERE id = $1
+LIMIT 1;

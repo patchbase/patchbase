@@ -84,6 +84,53 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
+-- Name: advisories; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.advisories (
+    id text NOT NULL,
+    source_system text NOT NULL,
+    raw_source_id text NOT NULL,
+    source_url text,
+    vendor text NOT NULL,
+    advisory_type text NOT NULL,
+    severity text,
+    summary text,
+    description text,
+    published_at text,
+    updated_at text,
+    evidence_tier text NOT NULL,
+    is_security boolean DEFAULT true NOT NULL
+);
+
+
+--
+-- Name: advisory_product_streams; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.advisory_product_streams (
+    advisory_id text NOT NULL,
+    product_stream_id text NOT NULL
+);
+
+
+--
+-- Name: advisory_references; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.advisory_references (
+    id text NOT NULL,
+    advisory_id text NOT NULL,
+    ref_type text NOT NULL,
+    ref_value text NOT NULL,
+    severity_vendor text,
+    severity_cvss double precision,
+    title text,
+    url text
+);
+
+
+--
 -- Name: advisory_scopes; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -100,6 +147,70 @@ CREATE TABLE public.advisory_scopes (
     next_refresh_at timestamp with time zone,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: affected_package_rules; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.affected_package_rules (
+    id text NOT NULL,
+    advisory_id text NOT NULL,
+    product_stream_id text NOT NULL,
+    package_name text NOT NULL,
+    source_rpm text,
+    arch text,
+    epoch_constraint text,
+    version_constraint text,
+    release_constraint text,
+    rpm_evr_rule text,
+    context text DEFAULT 'installed_package'::text NOT NULL,
+    evidence_tier text NOT NULL
+);
+
+
+--
+-- Name: decision_records; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.decision_records (
+    id text NOT NULL,
+    host_id text NOT NULL,
+    snapshot_id text NOT NULL,
+    advisory_id text NOT NULL,
+    installed_package_id text,
+    product_stream_id text,
+    package_name text NOT NULL,
+    installed_nevra text,
+    fixed_nevra text,
+    status text NOT NULL,
+    action text NOT NULL,
+    severity text,
+    evidence_tier text NOT NULL,
+    reason_code text NOT NULL,
+    reason_text text,
+    computed_at text NOT NULL
+);
+
+
+--
+-- Name: fixed_packages; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.fixed_packages (
+    id text NOT NULL,
+    advisory_id text NOT NULL,
+    product_stream_id text NOT NULL,
+    package_name text NOT NULL,
+    epoch integer DEFAULT 0 NOT NULL,
+    version text NOT NULL,
+    release text NOT NULL,
+    arch text,
+    nevra text NOT NULL,
+    source_rpm text,
+    repo_family text,
+    evidence_tier text NOT NULL
 );
 
 
@@ -243,6 +354,25 @@ CREATE TABLE public.hosts (
     CONSTRAINT hosts_approval_status_check CHECK ((approval_status = ANY (ARRAY['waiting_approval'::text, 'approved'::text, 'rejected'::text]))),
     CONSTRAINT hosts_id_prefix_check CHECK ((id ~~ like_escape('h\_%'::text, '\'::text))),
     CONSTRAINT hosts_onboarding_mode_check CHECK ((onboarding_mode = ANY (ARRAY['agent'::text, 'ssh'::text])))
+);
+
+
+--
+-- Name: product_streams; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_streams (
+    id text NOT NULL,
+    vendor text NOT NULL,
+    distro_family text NOT NULL,
+    distro_name text NOT NULL,
+    major_version integer NOT NULL,
+    minor_version text,
+    architecture text,
+    repo_family text NOT NULL,
+    repo_id_pattern text,
+    cpe text,
+    status text DEFAULT 'active'::text NOT NULL
 );
 
 
@@ -424,11 +554,59 @@ ALTER TABLE ONLY public.river_job ALTER COLUMN id SET DEFAULT nextval('public.ri
 
 
 --
+-- Name: advisories advisories_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.advisories
+    ADD CONSTRAINT advisories_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: advisory_product_streams advisory_product_streams_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.advisory_product_streams
+    ADD CONSTRAINT advisory_product_streams_pkey PRIMARY KEY (advisory_id, product_stream_id);
+
+
+--
+-- Name: advisory_references advisory_references_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.advisory_references
+    ADD CONSTRAINT advisory_references_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: advisory_scopes advisory_scopes_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.advisory_scopes
     ADD CONSTRAINT advisory_scopes_pkey PRIMARY KEY (scope_key);
+
+
+--
+-- Name: affected_package_rules affected_package_rules_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affected_package_rules
+    ADD CONSTRAINT affected_package_rules_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: decision_records decision_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.decision_records
+    ADD CONSTRAINT decision_records_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: fixed_packages fixed_packages_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fixed_packages
+    ADD CONSTRAINT fixed_packages_pkey PRIMARY KEY (id);
 
 
 --
@@ -485,6 +663,14 @@ ALTER TABLE ONLY public.host_ssh_pull
 
 ALTER TABLE ONLY public.hosts
     ADD CONSTRAINT hosts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: product_streams product_streams_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_streams
+    ADD CONSTRAINT product_streams_pkey PRIMARY KEY (id);
 
 
 --
@@ -557,6 +743,27 @@ ALTER TABLE ONLY public.settings
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: decision_records_advisory_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX decision_records_advisory_id_idx ON public.decision_records USING btree (advisory_id);
+
+
+--
+-- Name: decision_records_host_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX decision_records_host_id_idx ON public.decision_records USING btree (host_id);
+
+
+--
+-- Name: decision_records_snapshot_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX decision_records_snapshot_id_idx ON public.decision_records USING btree (snapshot_id);
 
 
 --
@@ -697,6 +904,94 @@ CREATE TRIGGER settings_set_updated_at BEFORE UPDATE ON public.settings FOR EACH
 --
 
 CREATE TRIGGER users_set_updated_at BEFORE UPDATE ON public.users FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+
+--
+-- Name: advisory_product_streams advisory_product_streams_advisory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.advisory_product_streams
+    ADD CONSTRAINT advisory_product_streams_advisory_id_fkey FOREIGN KEY (advisory_id) REFERENCES public.advisories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: advisory_product_streams advisory_product_streams_product_stream_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.advisory_product_streams
+    ADD CONSTRAINT advisory_product_streams_product_stream_id_fkey FOREIGN KEY (product_stream_id) REFERENCES public.product_streams(id) ON DELETE CASCADE;
+
+
+--
+-- Name: advisory_references advisory_references_advisory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.advisory_references
+    ADD CONSTRAINT advisory_references_advisory_id_fkey FOREIGN KEY (advisory_id) REFERENCES public.advisories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: affected_package_rules affected_package_rules_advisory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affected_package_rules
+    ADD CONSTRAINT affected_package_rules_advisory_id_fkey FOREIGN KEY (advisory_id) REFERENCES public.advisories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: affected_package_rules affected_package_rules_product_stream_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.affected_package_rules
+    ADD CONSTRAINT affected_package_rules_product_stream_id_fkey FOREIGN KEY (product_stream_id) REFERENCES public.product_streams(id) ON DELETE CASCADE;
+
+
+--
+-- Name: decision_records decision_records_advisory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.decision_records
+    ADD CONSTRAINT decision_records_advisory_id_fkey FOREIGN KEY (advisory_id) REFERENCES public.advisories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: decision_records decision_records_host_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.decision_records
+    ADD CONSTRAINT decision_records_host_id_fkey FOREIGN KEY (host_id) REFERENCES public.hosts(id) ON DELETE CASCADE;
+
+
+--
+-- Name: decision_records decision_records_product_stream_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.decision_records
+    ADD CONSTRAINT decision_records_product_stream_id_fkey FOREIGN KEY (product_stream_id) REFERENCES public.product_streams(id) ON DELETE SET NULL;
+
+
+--
+-- Name: decision_records decision_records_snapshot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.decision_records
+    ADD CONSTRAINT decision_records_snapshot_id_fkey FOREIGN KEY (snapshot_id) REFERENCES public.host_snapshots(id) ON DELETE CASCADE;
+
+
+--
+-- Name: fixed_packages fixed_packages_advisory_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fixed_packages
+    ADD CONSTRAINT fixed_packages_advisory_id_fkey FOREIGN KEY (advisory_id) REFERENCES public.advisories(id) ON DELETE CASCADE;
+
+
+--
+-- Name: fixed_packages fixed_packages_product_stream_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fixed_packages
+    ADD CONSTRAINT fixed_packages_product_stream_id_fkey FOREIGN KEY (product_stream_id) REFERENCES public.product_streams(id) ON DELETE CASCADE;
 
 
 --

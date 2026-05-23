@@ -135,6 +135,10 @@ func (b *Backend) Config() config.Config {
 	return b.config
 }
 
+func (b *Backend) DB() *pgxpool.Pool {
+	return do.MustInvoke[*pgxpool.Pool](b.injector)
+}
+
 func (b *Backend) IssueAccessToken(ctx context.Context, userID string) (string, error) {
 	authService := do.MustInvoke[services.Auth](b.injector)
 	token, err := authService.IssueAccessToken(ctx, userID)

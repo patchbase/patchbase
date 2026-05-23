@@ -113,3 +113,54 @@ export interface HostPullJob {
   completed_at: string | null;
   error: string | null;
 }
+
+export interface DecisionItem {
+  advisory_id: string;
+  title: string;
+  family_label: string;
+  package_name: string;
+  installed_nevra: string;
+  fixed_nevra: string;
+  package_state_label: string;
+  package_state_tone: string;
+  package_state_icon: string;
+  severity_label: string;
+  severity_tone: string;
+  status_label: string;
+  action_label: string;
+  action_tone: string;
+  evidence_tier: string;
+  reason_text: string;
+  computed_at: string;
+  advisory_source_system: string;
+  advisory_url: string;
+  advisory_updated_at: string;
+}
+
+export interface DecisionAdvisoryGroup {
+  advisory_id: string;
+  title: string;
+  severity_label: string;
+  severity_tone: string;
+  action_label: string;
+  action_tone: string;
+  evidence_tier: string;
+  computed_at: string;
+  advisory_source_system: string;
+  advisory_url: string;
+  advisory_updated_at: string;
+  package_count: number;
+  items: DecisionItem[];
+}
+
+export interface MatcherDecisionGroup {
+  family_label: string;
+  severity_label: string;
+  severity_tone: string;
+  action_label: string;
+  action_tone: string;
+  latest_updated_at: string;
+  advisory_count: number;
+  package_count: number;
+  advisories: DecisionAdvisoryGroup[];
+}

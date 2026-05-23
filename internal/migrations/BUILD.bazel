@@ -11,6 +11,7 @@ go_library(
         "files/005_add_host_ssh_pull_jobs.sql",
         "files/006_advisory_scopes.sql",
         "files/007_add_onboarded_to_host_ssh_pull.sql",
+        "files/008_add_matcher_tables.sql",
     ],
     importpath = "go.patchbase.net/server/internal/migrations",
     visibility = ["//:__subpackages__"],

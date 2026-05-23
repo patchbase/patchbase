@@ -4,6 +4,8 @@ go_api_library(
     name = "entities",
     srcs = [
         "hosts.go",
+        "matcher.go",
+        "packages_helper.go",
         "timestamp.go",
         "tokens.go",
     ],
@@ -11,6 +13,7 @@ go_api_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/services",
+        "//internal/sql",
         "//internal/utils",
         "@com_github_jackc_pgx_v5//pgtype",
     ],

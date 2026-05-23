@@ -48,8 +48,9 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}", auth.Required(hostsv1.GetHost(i)))
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}/snapshot", auth.Required(hostsv1.GetLatestSnapshot(i)))
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}/pull-jobs", auth.Required(hostsv1.ListPullJobs(i)))
+	mux.HandleFunc("GET /api/v1/hosts/{hostID}/packages/vulnerable", auth.Required(hostsv1.GetVulnerablePackages(i)))
+	mux.HandleFunc("GET /api/v1/hosts/{hostID}/packages/upgradable", auth.Required(hostsv1.GetUpgradablePackages(i)))
 	mux.HandleFunc("/api/", http.NotFound)
 	mux.Handle("/", dashboardHandler)
-
 	return mux, nil
 }

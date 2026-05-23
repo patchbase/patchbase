@@ -23,6 +23,7 @@ genrule(
     ],
     outs = [
         "gen/advisories.sql.go",
+        "gen/advisory_scopes.sql.go",
         "gen/db.go",
         "gen/host_access_tokens.sql.go",
         "gen/host_snapshots.sql.go",
@@ -33,6 +34,12 @@ genrule(
         "gen/registration_tokens.sql.go",
         "gen/settings.sql.go",
         "gen/users.sql.go",
+        "gen/product_streams.sql.go",
+        "gen/advisory_references.sql.go",
+        "gen/advisory_product_streams.sql.go",
+        "gen/affected_package_rules.sql.go",
+        "gen/fixed_packages.sql.go",
+        "gen/decision_records.sql.go",
     ],
     cmd = """
     mkdir -p db/gen

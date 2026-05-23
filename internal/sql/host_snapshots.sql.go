@@ -31,6 +31,29 @@ func (q *Queries) DeleteHostSnapshotsByHostID(ctx context.Context, hostID string
 	return err
 }
 
+const getHostSnapshot = `-- name: GetHostSnapshot :one
+SELECT id, host_id, collected_at, received_at, payload, running_kernel_nevra, boot_time, has_process_data, created_at FROM host_snapshots
+WHERE id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetHostSnapshot(ctx context.Context, id string) (HostSnapshot, error) {
+	row := q.db.QueryRow(ctx, getHostSnapshot, id)
+	var i HostSnapshot
+	err := row.Scan(
+		&i.ID,
+		&i.HostID,
+		&i.CollectedAt,
+		&i.ReceivedAt,
+		&i.Payload,
+		&i.RunningKernelNevra,
+		&i.BootTime,
+		&i.HasProcessData,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const getLatestHostSnapshotByHostID = `-- name: GetLatestHostSnapshotByHostID :one
 SELECT id, host_id, collected_at, received_at, payload, running_kernel_nevra, boot_time, has_process_data, created_at
 FROM host_snapshots

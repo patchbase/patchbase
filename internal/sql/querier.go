@@ -6,6 +6,8 @@ package sql
 
 import (
 	"context"
+
+	"go.patchbase.net/server/internal/utils"
 )
 
 type Querier interface {
@@ -15,34 +17,55 @@ type Querier interface {
 	CreateAdminUser(ctx context.Context, arg CreateAdminUserParams) (User, error)
 	CreateSetting(ctx context.Context, arg CreateSettingParams) (Setting, error)
 	CreateSettingIfAbsent(ctx context.Context, arg CreateSettingIfAbsentParams) error
+	DeleteAdvisoriesWithoutStreams(ctx context.Context) error
+	DeleteAdvisoryProductStreamsByStreamIDs(ctx context.Context, dollar_1 []string) error
+	DeleteAdvisoryReferencesByStreamIDs(ctx context.Context, dollar_1 []string) error
+	DeleteAffectedPackageRulesByStreamIDs(ctx context.Context, dollar_1 []string) error
+	DeleteDecisionRecordsBySnapshot(ctx context.Context, snapshotID string) error
+	DeleteFixedPackagesByStreamIDs(ctx context.Context, dollar_1 []string) error
 	DeleteHostAccessTokensByHostID(ctx context.Context, hostID string) error
 	DeleteHostByID(ctx context.Context, id string) (Host, error)
 	DeleteHostCurrentStateByHostID(ctx context.Context, hostID string) error
 	DeleteHostSnapshotsByHostID(ctx context.Context, hostID string) error
+	DeleteProductStreamsByIDs(ctx context.Context, dollar_1 []string) error
 	GetActiveHostAccessTokenByHash(ctx context.Context, tokenHash string) (HostAccessToken, error)
 	GetActiveRegistrationTokenByHash(ctx context.Context, tokenHash string) (RegistrationToken, error)
 	GetAdminUser(ctx context.Context) (User, error)
 	GetAdvisoryScope(ctx context.Context, scopeKey string) (AdvisoryScope, error)
 	GetHostByID(ctx context.Context, id string) (Host, error)
+	GetHostSnapshot(ctx context.Context, id string) (HostSnapshot, error)
 	GetHostWithStateByID(ctx context.Context, id string) (GetHostWithStateByIDRow, error)
 	GetLatestHostSnapshotByHostID(ctx context.Context, hostID string) (HostSnapshot, error)
 	GetSSHPullConfigByHostID(ctx context.Context, hostID string) (HostSshPull, error)
 	GetSetting(ctx context.Context, key string) (Setting, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByID(ctx context.Context, id string) (User, error)
+	InsertAdvisoryProductStream(ctx context.Context, arg InsertAdvisoryProductStreamParams) error
+	InsertAdvisoryReference(ctx context.Context, arg InsertAdvisoryReferenceParams) error
 	InsertAdvisoryScopeIfNotExists(ctx context.Context, arg InsertAdvisoryScopeIfNotExistsParams) error
+	InsertAffectedPackageRule(ctx context.Context, arg InsertAffectedPackageRuleParams) error
 	InsertAgentHost(ctx context.Context, arg InsertAgentHostParams) (Host, error)
+	InsertDecisionRecord(ctx context.Context, arg InsertDecisionRecordParams) error
+	InsertFixedPackage(ctx context.Context, arg InsertFixedPackageParams) error
 	InsertHostAccessToken(ctx context.Context, arg InsertHostAccessTokenParams) (HostAccessToken, error)
 	InsertHostSSHPullJob(ctx context.Context, arg InsertHostSSHPullJobParams) (HostSshPullJob, error)
 	InsertHostSnapshot(ctx context.Context, arg InsertHostSnapshotParams) (HostSnapshot, error)
 	InsertRegistrationToken(ctx context.Context, arg InsertRegistrationTokenParams) (RegistrationToken, error)
 	InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (InsertSSHHostRow, error)
+	ListAdvisoriesByStreamIDs(ctx context.Context, dollar_1 []string) ([]Advisory, error)
+	ListAdvisoryProductStreamsByStreamIDs(ctx context.Context, dollar_1 []string) ([]AdvisoryProductStream, error)
 	ListAdvisoryScopeStats(ctx context.Context) ([]ListAdvisoryScopeStatsRow, error)
 	ListAdvisoryScopes(ctx context.Context) ([]AdvisoryScope, error)
+	ListAffectedPackageRulesByStreamIDs(ctx context.Context, dollar_1 []string) ([]AffectedPackageRule, error)
 	ListApprovedSSHHosts(ctx context.Context) ([]ListApprovedSSHHostsRow, error)
+	ListDecisionPageRowsBySnapshot(ctx context.Context, snapshotID string) ([]ListDecisionPageRowsBySnapshotRow, error)
+	ListFixedPackagesByStreamIDs(ctx context.Context, dollar_1 []string) ([]FixedPackage, error)
 	ListHostSSHPullJobsByHostID(ctx context.Context, arg ListHostSSHPullJobsByHostIDParams) ([]HostSshPullJob, error)
+	ListHostsByAdvisoryScopeKey(ctx context.Context, advisoryScopeKey utils.Option[string]) ([]Host, error)
 	ListHostsWithState(ctx context.Context) ([]ListHostsWithStateRow, error)
 	ListPendingHosts(ctx context.Context) ([]Host, error)
+	ListProductStreamIDsByVendorAndVersion(ctx context.Context, arg ListProductStreamIDsByVendorAndVersionParams) ([]string, error)
+	ListProductStreams(ctx context.Context) ([]ProductStream, error)
 	ListRegistrationTokens(ctx context.Context) ([]RegistrationToken, error)
 	RevokeRegistrationToken(ctx context.Context, id string) (RegistrationToken, error)
 	SetSSHPullOnboarded(ctx context.Context, arg SetSSHPullOnboardedParams) error
@@ -53,9 +76,11 @@ type Querier interface {
 	UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFromSnapshotParams) (Host, error)
 	UpdateHostSSHPullJob(ctx context.Context, arg UpdateHostSSHPullJobParams) (HostSshPullJob, error)
 	UpdateSSHPullRun(ctx context.Context, arg UpdateSSHPullRunParams) error
+	UpsertAdvisory(ctx context.Context, arg UpsertAdvisoryParams) error
 	UpsertAdvisoryScope(ctx context.Context, arg UpsertAdvisoryScopeParams) (AdvisoryScope, error)
 	UpsertAdvisoryScopeStatus(ctx context.Context, arg UpsertAdvisoryScopeStatusParams) (AdvisoryScope, error)
 	UpsertHostCurrentState(ctx context.Context, arg UpsertHostCurrentStateParams) error
+	UpsertProductStream(ctx context.Context, arg UpsertProductStreamParams) error
 	UpsertSetting(ctx context.Context, arg UpsertSettingParams) (Setting, error)
 }
 
