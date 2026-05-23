@@ -437,6 +437,11 @@ func TestHosts_RunSSHPull_ProducesMatcherDecisions(t *testing.T) {
 	snapshot, err := queries.GetLatestHostSnapshotByHostID(ctx, hostID)
 	require.NoError(t, err)
 
+	updatedHost, err := queries.GetHostByID(ctx, hostID)
+	require.NoError(t, err)
+	require.True(t, updatedHost.LastSnapshotID.IsPresent())
+	assert.Equal(t, snapshot.ID, updatedHost.LastSnapshotID.UnwrapOr(""))
+
 	decisions, err := queries.ListDecisionPageRowsBySnapshot(ctx, snapshot.ID)
 	require.NoError(t, err)
 	assert.Len(t, decisions, 1)

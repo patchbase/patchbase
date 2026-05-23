@@ -174,6 +174,16 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 
 	for _, dec := range decisions {
 		if err := queries.InsertDecisionRecord(ctx, dec.record); err != nil {
+			if sql.IsForeignKeyViolation(err, "decision_records_advisory_id_fkey") {
+				m.logger.WarnContext(
+					ctx,
+					"skipping decision record insertion due to concurrently deleted advisory",
+					"host_id", hostID,
+					"snapshot_id", snapshotID,
+					"advisory_id", dec.record.AdvisoryID,
+				)
+				continue
+			}
 			return MatchResult{}, fmt.Errorf("insert decision record: %w", err)
 		}
 	}

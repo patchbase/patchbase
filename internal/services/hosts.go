@@ -964,6 +964,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 			err = queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
 				ID:                hostID,
 				PullLastRunAt:     pgTime(res.CollectedAt),
+				LastSnapshotID:    utils.Some(snapshotID),
 				PullLastRunStatus: statusOpt,
 				PullLastRunError:  errOpt,
 				MachineID:         optionString(res.MachineID),
@@ -1001,6 +1002,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 			err = queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
 				ID:                hostID,
 				PullLastRunAt:     pgTime(time.Now()),
+				LastSnapshotID:    utils.None[string](),
 				PullLastRunStatus: statusOpt,
 				PullLastRunError:  errOpt,
 				MachineID:         utils.None[string](),

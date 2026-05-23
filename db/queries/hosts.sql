@@ -139,6 +139,7 @@ WITH updated_pull AS (
 UPDATE hosts
 SET
     last_advisory_check_at = @pull_last_run_at,
+    last_snapshot_id = COALESCE(@last_snapshot_id, last_snapshot_id),
     machine_id = COALESCE(@machine_id, machine_id),
     hostname = COALESCE(@hostname, hostname),
     ip_address = COALESCE(@ip_address, ip_address),

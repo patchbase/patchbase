@@ -202,3 +202,70 @@ func TestResolveProductStreams(t *testing.T) {
 	require.Len(t, resolved, 1)
 	assert.Equal(t, "rocky:9-baseos", resolved[0].ID)
 }
+
+func TestParseRunningKernelEVR(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected evr
+		wantErr  bool
+	}{
+		{
+			name:  "standard with package name and arch",
+			input: "kernel-6.12.0-124.55.3.el10_1.x86_64",
+			expected: evr{
+				epoch:   0,
+				version: "6.12.0",
+				release: "124.55.3.el10_1",
+			},
+			wantErr: false,
+		},
+		{
+			name:  "without package name but with arch",
+			input: "6.12.0-124.55.3.el10_1.x86_64",
+			expected: evr{
+				epoch:   0,
+				version: "6.12.0",
+				release: "124.55.3.el10_1",
+			},
+			wantErr: false,
+		},
+		{
+			name:  "different release version without package name",
+			input: "6.12.0-124.56.1.el10_1.x86_64",
+			expected: evr{
+				epoch:   0,
+				version: "6.12.0",
+				release: "124.56.1.el10_1",
+			},
+			wantErr: false,
+		},
+		{
+			name:    "no release separator",
+			input:   "6.12.0",
+			wantErr: true,
+		},
+		{
+			name:    "no dot at all",
+			input:   "6-12",
+			wantErr: true,
+		},
+		{
+			name:    "completely malformed",
+			input:   "invalid",
+			wantErr: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseRunningKernelEVR(tc.input)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tc.expected, got)
+			}
+		})
+	}
+}

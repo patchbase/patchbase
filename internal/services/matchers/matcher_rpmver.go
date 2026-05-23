@@ -146,6 +146,10 @@ func parseRunningKernelEVR(value string) (evr, error) {
 		return parsed, nil
 	}
 
+	if parsed, err := parseEVR(body); err == nil {
+		return parsed, nil
+	}
+
 	return evr{}, fmt.Errorf("invalid running kernel evr %s", value)
 }
 
