@@ -174,6 +174,40 @@ func TestCollectAvailablePackageUpdateCountIgnoresErrors(t *testing.T) {
 	assert.Equal(t, int32(0), count)
 }
 
+func TestCollectUpgradablePackagesAPT(t *testing.T) {
+	runner := staticRunner{
+		resultByCommand: map[string][]byte{
+			"apt|list|--upgradable": []byte("Listing... Done\nbash/noble-updates 5.2.21-2ubuntu4 amd64 [upgradable from: 5.2.21-2ubuntu3]\n"),
+		},
+	}
+
+	pkgs, err := CollectUpgradablePackages(context.Background(), runner, agent.OsFamily_OS_FAMILY_APT)
+	require.NoError(t, err)
+	require.Len(t, pkgs, 1)
+	assert.Equal(t, "bash", pkgs[0].Name)
+	assert.Equal(t, "noble-updates", pkgs[0].RepoOrigin)
+	assert.Equal(t, "bash-0:5.2.21-2ubuntu4.amd64", pkgs[0].Nevra)
+}
+
+func TestCollectUpgradablePackagesRPM(t *testing.T) {
+	runner := staticRunner{
+		resultByCommand: map[string][]byte{
+			"dnf|-q|--cacheonly|check-update": []byte("curl.x86_64 7.61.1-22.el8 updates\nopenssl-libs.x86_64 1:1.1.1k-14.el8_6 baseos\n"),
+		},
+	}
+
+	pkgs, err := CollectUpgradablePackages(context.Background(), runner, agent.OsFamily_OS_FAMILY_RPM)
+	require.NoError(t, err)
+	require.Len(t, pkgs, 2)
+	assert.Equal(t, "curl", pkgs[0].Name)
+	assert.Equal(t, int32(0), pkgs[0].Epoch)
+	assert.Equal(t, "7.61.1", pkgs[0].Version)
+	assert.Equal(t, "22.el8", pkgs[0].Release)
+	assert.Equal(t, "updates", pkgs[0].RepoOrigin)
+	assert.Equal(t, "openssl-libs", pkgs[1].Name)
+	assert.Equal(t, int32(1), pkgs[1].Epoch)
+}
+
 type staticRunner struct {
 	resultByCommand map[string][]byte
 	errByCommand    map[string]error

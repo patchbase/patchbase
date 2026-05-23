@@ -295,7 +295,14 @@
 			{:else}
 				{#if upgradableGroups.length === 0}
 					<div class="empty-state-card">
-						<p>No package updates available.</p>
+						{#if host.available_updates > 0}
+							<p>
+								The host reports {host.available_updates} package update{host.available_updates === 1 ? '' : 's'},
+								but this snapshot did not include per-package update details.
+							</p>
+						{:else}
+							<p>No package updates available.</p>
+						{/if}
 					</div>
 				{:else}
 					<div class="groups-list">

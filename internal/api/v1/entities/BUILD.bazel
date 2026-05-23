@@ -8,6 +8,7 @@ go_api_library(
         "packages_helper.go",
         "timestamp.go",
         "tokens.go",
+        "upgradable.go",
     ],
     importpath = "go.patchbase.net/server/internal/api/v1/entities",
     visibility = ["//:__subpackages__"],
@@ -15,6 +16,7 @@ go_api_library(
         "//internal/services",
         "//internal/sql",
         "//internal/utils",
+        "//proto/agent",
         "@com_github_jackc_pgx_v5//pgtype",
     ],
 )

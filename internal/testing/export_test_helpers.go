@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/jackc/pgx/v5"
+	agentpb "go.patchbase.net/proto/agent"
 	"go.patchbase.net/server/internal/services"
 	db "go.patchbase.net/server/internal/sql"
 )
@@ -27,4 +28,9 @@ func TestCountAptPackageUpdates(output string) int32 {
 // TestCountRpmPackageUpdates wraps CountRpmPackageUpdates for external testing.
 func TestCountRpmPackageUpdates(output string) int32 {
 	return services.CountRpmPackageUpdates(output)
+}
+
+// TestParseUpgradablePackages wraps ParseUpgradablePackages for external testing.
+func TestParseUpgradablePackages(osFamily string, output string) []*agentpb.Package {
+	return services.ParseUpgradablePackages(osFamily, output)
 }

@@ -17,6 +17,7 @@ go_library(
         "//internal/services",
         "//internal/sql",
         "//internal/utils",
+        "//proto/agent",
         "@com_github_go_testfixtures_testfixtures_v3//:testfixtures",
         "@com_github_jackc_pgx_v5//:pgx",
         "@com_github_jackc_pgx_v5//pgxpool",

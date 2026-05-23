@@ -18,6 +18,7 @@ message AgentSnapshot {
   repeated Repo repos = 4;
   repeated Package packages = 5;
   Runtime runtime = 6 [(validate.rules).message = {required: true}];
+  repeated Package upgradable_packages = 7;
 }
 
 message SyncResponse {

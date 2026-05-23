@@ -1,5 +1,5 @@
-load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 
 # gazelle:prefix go.patchbase.net/advisories

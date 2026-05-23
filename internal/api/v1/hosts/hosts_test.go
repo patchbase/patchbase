@@ -304,6 +304,17 @@ func TestHostVulnerableAndUpgradablePackages(t *testing.T) {
 				Nevra:     "curl-0:7.76.1-14.el9.x86_64",
 			},
 		},
+		UpgradablePackages: []*agentpb.Package{
+			{
+				Name:       "curl",
+				Epoch:      0,
+				Version:    "7.76.1",
+				Release:    "15.el9",
+				Arch:       "x86_64",
+				RepoOrigin: "baseos",
+				Nevra:      "curl-0:7.76.1-15.el9.x86_64",
+			},
+		},
 		Runtime: &agentpb.Runtime{KernelRunning: "kernel-5.14.0"},
 	}
 	payloadBytes, err := proto.Marshal(snapshot)
@@ -317,18 +328,25 @@ func TestHostVulnerableAndUpgradablePackages(t *testing.T) {
 	)
 	require.Equal(t, http.StatusAccepted, ingestRecorder.Code)
 
-	// Query vulnerable and upgradable endpoints (should return empty list since no advisories exist in DB)
+	// Query vulnerable and upgradable endpoints.
+	// Vulnerable stays empty (no advisories), while upgradable should return host-observed updates.
 	vulnRecorder := backend.HTTPGet(
 		fmt.Sprintf("/api/v1/hosts/%s/packages/vulnerable", hostID),
 		apitesting.WithBearerToken(adminToken),
 	)
 	require.Equal(t, http.StatusOK, vulnRecorder.Code)
+	var vulnGroups []map[string]any
+	require.NoError(t, json.Unmarshal(vulnRecorder.Body.Bytes(), &vulnGroups))
+	assert.Empty(t, vulnGroups)
 
 	upgRecorder := backend.HTTPGet(
 		fmt.Sprintf("/api/v1/hosts/%s/packages/upgradable", hostID),
 		apitesting.WithBearerToken(adminToken),
 	)
 	require.Equal(t, http.StatusOK, upgRecorder.Code)
+	var upgGroups []map[string]any
+	require.NoError(t, json.Unmarshal(upgRecorder.Body.Bytes(), &upgGroups))
+	assert.NotEmpty(t, upgGroups)
 }
 
 func TestHostVulnerableAndUpgradablePackages_NonEmptyAndValidation(t *testing.T) {
@@ -444,6 +462,17 @@ func TestHostVulnerableAndUpgradablePackages_NonEmptyAndValidation(t *testing.T)
 	require.NoError(t, json.Unmarshal(vulnRecorder.Body.Bytes(), &vulnGroups))
 	assert.NotEmpty(t, vulnGroups)
 	assert.Equal(t, "openssl", vulnGroups[0]["family_label"])
+
+	// Verify empty response for upgradable packages (security advisories stay under vulnerable tab).
+	upgRecorder := backend.HTTPGet(
+		fmt.Sprintf("/api/v1/hosts/%s/packages/upgradable", hostID),
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusOK, upgRecorder.Code)
+
+	var upgGroups []map[string]any
+	require.NoError(t, json.Unmarshal(upgRecorder.Body.Bytes(), &upgGroups))
+	assert.Empty(t, upgGroups)
 
 	// Verify error-path (non-existent host ID returns 404)
 	errRecorder := backend.HTTPGet(

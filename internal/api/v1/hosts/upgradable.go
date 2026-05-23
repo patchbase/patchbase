@@ -65,11 +65,22 @@ func GetUpgradablePackages(i do.Injector) apiauth.AuthenticatedHandler {
 		}
 
 		decisions := make([]entities.DecisionItem, 0)
+		advisoryBackedPackages := make(map[string]struct{})
 		for _, row := range rows {
 			if !row.AdvisoryIsSecurity && row.Action != "none" {
 				decisions = append(decisions, entities.MapDecisionRow(row, sourceRPMs))
+				advisoryBackedPackages[row.PackageName] = struct{}{}
 			}
 		}
+		decisions = append(
+			decisions,
+			entities.MapObservedUpgradablePackages(
+				agentSnap.GetUpgradablePackages(),
+				agentSnap.GetPackages(),
+				advisoryBackedPackages,
+				snapshot.CollectedAt,
+			)...,
+		)
 
 		groups := entities.GroupDecisionsByRemediation(decisions)
 		webutil.WriteJSON(w, http.StatusOK, groups)

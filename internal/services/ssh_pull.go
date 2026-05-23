@@ -247,6 +247,7 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 			availableUpdates = CountRpmPackageUpdates(updatesSection)
 		}
 	}
+	upgradablePackages := ParseUpgradablePackages(osFamily, updatesSection)
 
 	var pbArch agentpb.Architecture
 	switch arch {
@@ -284,8 +285,9 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 			Architecture:                pbArch,
 			AvailablePackageUpdateCount: availableUpdates,
 		},
-		Packages: packages,
-		Repos:    repos,
+		Packages:           packages,
+		Repos:              repos,
+		UpgradablePackages: upgradablePackages,
 		Runtime: &agentpb.Runtime{
 			KernelRunning: fallback(fields["KERNEL"], "unknown"),
 		},
@@ -393,6 +395,122 @@ func CountRpmPackageUpdates(output string) int32 {
 		count++
 	}
 	return count
+}
+
+func ParseUpgradablePackages(osFamily string, output string) []*agentpb.Package {
+	items := make([]*agentpb.Package, 0)
+
+	scanner := bufio.NewScanner(strings.NewReader(output))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		var pkg *agentpb.Package
+		switch osFamily {
+		case "apt":
+			pkg = parseAptUpgradableLine(line)
+		case "rpm":
+			pkg = parseRpmUpgradableLine(line)
+		}
+		if pkg != nil {
+			items = append(items, pkg)
+		}
+	}
+
+	return items
+}
+
+func parseAptUpgradableLine(line string) *agentpb.Package {
+	if strings.HasPrefix(line, "Listing...") || strings.HasPrefix(line, "WARNING:") || strings.HasPrefix(line, "N:") {
+		return nil
+	}
+	if !strings.Contains(line, "[upgradable from:") {
+		return nil
+	}
+
+	fields := strings.Fields(line)
+	if len(fields) < 3 {
+		return nil
+	}
+
+	nameField := fields[0]
+	name, repoOrigin, ok := strings.Cut(nameField, "/")
+	if !ok || strings.TrimSpace(name) == "" {
+		return nil
+	}
+
+	version := strings.TrimSpace(fields[1])
+	arch := strings.TrimSpace(fields[2])
+	nevra := fmt.Sprintf("%s-%s", name, version)
+	if arch != "" {
+		nevra = fmt.Sprintf("%s.%s", nevra, arch)
+	}
+
+	return &agentpb.Package{
+		Name:       name,
+		Version:    version,
+		Arch:       arch,
+		RepoOrigin: repoOrigin,
+		Nevra:      nevra,
+	}
+}
+
+func parseRpmUpgradableLine(line string) *agentpb.Package {
+	if strings.HasPrefix(line, "Last metadata expiration check:") {
+		return nil
+	}
+	if line == "Obsoleting Packages" || line == "Obsoleted Packages" {
+		return nil
+	}
+
+	fields := strings.Fields(line)
+	if len(fields) < 3 {
+		return nil
+	}
+
+	nameArch := fields[0]
+	targetVersion := fields[1]
+	repoOrigin := fields[2]
+
+	name, arch, ok := strings.Cut(nameArch, ".")
+	if !ok || strings.TrimSpace(name) == "" {
+		return nil
+	}
+
+	epoch, versionRelease := int32(0), targetVersion
+	if epochPart, rest, cut := strings.Cut(targetVersion, ":"); cut {
+		if parsed, err := strconv.ParseInt(epochPart, 10, 32); err == nil {
+			epoch = int32(parsed)
+			versionRelease = rest
+		}
+	}
+
+	version := versionRelease
+	release := ""
+	if idx := strings.LastIndex(versionRelease, "-"); idx > 0 && idx+1 < len(versionRelease) {
+		version = versionRelease[:idx]
+		release = versionRelease[idx+1:]
+	}
+
+	nevra := fmt.Sprintf("%s-%d:%s", name, epoch, version)
+	if release != "" {
+		nevra = fmt.Sprintf("%s-%s", nevra, release)
+	}
+	if arch != "" {
+		nevra = fmt.Sprintf("%s.%s", nevra, arch)
+	}
+
+	return &agentpb.Package{
+		Name:       name,
+		Epoch:      epoch,
+		Version:    version,
+		Release:    release,
+		Arch:       arch,
+		RepoOrigin: repoOrigin,
+		Nevra:      nevra,
+	}
 }
 
 func fallback(value string, defaultValue string) string {

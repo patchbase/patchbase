@@ -60,9 +60,14 @@ func CollectSnapshot(ctx context.Context, fs afero.Fs, runner ExecRunner, versio
 	bootTimePb := timestamppb.New(bootTime)
 
 	var availableUpdateCount int32
-	count, err := CollectAvailablePackageUpdateCount(ctx, runner, osFamily)
+	upgradablePkgs, err := CollectUpgradablePackages(ctx, runner, osFamily)
 	if err == nil {
-		availableUpdateCount = count
+		availableUpdateCount = int32(len(upgradablePkgs))
+	} else {
+		count, countErr := CollectAvailablePackageUpdateCount(ctx, runner, osFamily)
+		if countErr == nil {
+			availableUpdateCount = count
+		}
 	}
 
 	hostnameStr := hostname
@@ -101,12 +106,13 @@ func CollectSnapshot(ctx context.Context, fs afero.Fs, runner ExecRunner, versio
 	}
 
 	return &agent.AgentSnapshot{
-		SchemaVersion: "v0",
-		SentAt:        sentAt,
-		Host:          host,
-		Repos:         repos,
-		Packages:      pkgs,
-		Runtime:       runtime,
+		SchemaVersion:      "v0",
+		SentAt:             sentAt,
+		Host:               host,
+		Repos:              repos,
+		Packages:           pkgs,
+		UpgradablePackages: upgradablePkgs,
+		Runtime:            runtime,
 	}, nil
 }
 

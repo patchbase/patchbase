@@ -24,15 +24,16 @@ const (
 )
 
 type AgentSnapshot struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SchemaVersion string                 `protobuf:"bytes,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
-	SentAt        *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
-	Host          *Host                  `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
-	Repos         []*Repo                `protobuf:"bytes,4,rep,name=repos,proto3" json:"repos,omitempty"`
-	Packages      []*Package             `protobuf:"bytes,5,rep,name=packages,proto3" json:"packages,omitempty"`
-	Runtime       *Runtime               `protobuf:"bytes,6,opt,name=runtime,proto3" json:"runtime,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	SchemaVersion      string                 `protobuf:"bytes,1,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	SentAt             *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`
+	Host               *Host                  `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
+	Repos              []*Repo                `protobuf:"bytes,4,rep,name=repos,proto3" json:"repos,omitempty"`
+	Packages           []*Package             `protobuf:"bytes,5,rep,name=packages,proto3" json:"packages,omitempty"`
+	Runtime            *Runtime               `protobuf:"bytes,6,opt,name=runtime,proto3" json:"runtime,omitempty"`
+	UpgradablePackages []*Package             `protobuf:"bytes,7,rep,name=upgradable_packages,json=upgradablePackages,proto3" json:"upgradable_packages,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *AgentSnapshot) Reset() {
@@ -103,6 +104,13 @@ func (x *AgentSnapshot) GetPackages() []*Package {
 func (x *AgentSnapshot) GetRuntime() *Runtime {
 	if x != nil {
 		return x.Runtime
+	}
+	return nil
+}
+
+func (x *AgentSnapshot) GetUpgradablePackages() []*Package {
+	if x != nil {
+		return x.UpgradablePackages
 	}
 	return nil
 }
@@ -179,14 +187,15 @@ var File_patchbase_agent_snapshot_proto protoreflect.FileDescriptor
 
 const file_patchbase_agent_snapshot_proto_rawDesc = "" +
 	"\n" +
-	"\x1epatchbase/agent/snapshot.proto\x12\x0fpatchbase.agent\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apatchbase/agent/host.proto\x1a\x1dpatchbase/agent/package.proto\x1a\x1apatchbase/agent/repo.proto\x1a\x1dpatchbase/agent/runtime.proto\x1a\x17validate/validate.proto\"\xd6\x02\n" +
+	"\x1epatchbase/agent/snapshot.proto\x12\x0fpatchbase.agent\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1apatchbase/agent/host.proto\x1a\x1dpatchbase/agent/package.proto\x1a\x1apatchbase/agent/repo.proto\x1a\x1dpatchbase/agent/runtime.proto\x1a\x17validate/validate.proto\"\xa1\x03\n" +
 	"\rAgentSnapshot\x120\n" +
 	"\x0eschema_version\x18\x01 \x01(\tB\t\xfaB\x06r\x04\x10\x01\x18@R\rschemaVersion\x12=\n" +
 	"\asent_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampB\b\xfaB\x05\xb2\x01\x02\b\x01R\x06sentAt\x123\n" +
 	"\x04host\x18\x03 \x01(\v2\x15.patchbase.agent.HostB\b\xfaB\x05\x8a\x01\x02\x10\x01R\x04host\x12+\n" +
 	"\x05repos\x18\x04 \x03(\v2\x15.patchbase.agent.RepoR\x05repos\x124\n" +
 	"\bpackages\x18\x05 \x03(\v2\x18.patchbase.agent.PackageR\bpackages\x12<\n" +
-	"\aruntime\x18\x06 \x01(\v2\x18.patchbase.agent.RuntimeB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aruntime\"\x97\x01\n" +
+	"\aruntime\x18\x06 \x01(\v2\x18.patchbase.agent.RuntimeB\b\xfaB\x05\x8a\x01\x02\x10\x01R\aruntime\x12I\n" +
+	"\x13upgradable_packages\x18\a \x03(\v2\x18.patchbase.agent.PackageR\x12upgradablePackages\"\x97\x01\n" +
 	"\fSyncResponse\x12\x1a\n" +
 	"\baccepted\x18\x01 \x01(\bR\baccepted\x12\x17\n" +
 	"\ahost_id\x18\x02 \x01(\tR\x06hostId\x12\x1f\n" +
@@ -222,11 +231,12 @@ var file_patchbase_agent_snapshot_proto_depIdxs = []int32{
 	4, // 2: patchbase.agent.AgentSnapshot.repos:type_name -> patchbase.agent.Repo
 	5, // 3: patchbase.agent.AgentSnapshot.packages:type_name -> patchbase.agent.Package
 	6, // 4: patchbase.agent.AgentSnapshot.runtime:type_name -> patchbase.agent.Runtime
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	5, // 5: patchbase.agent.AgentSnapshot.upgradable_packages:type_name -> patchbase.agent.Package
+	6, // [6:6] is the sub-list for method output_type
+	6, // [6:6] is the sub-list for method input_type
+	6, // [6:6] is the sub-list for extension type_name
+	6, // [6:6] is the sub-list for extension extendee
+	0, // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_patchbase_agent_snapshot_proto_init() }

@@ -226,6 +226,61 @@ func CollectAvailablePackageUpdateCount(ctx context.Context, runner ExecRunner, 
 	}
 }
 
+func CollectUpgradablePackages(ctx context.Context, runner ExecRunner, osFamily agent.OsFamily) ([]*agent.Package, error) {
+	switch osFamily {
+	case agent.OsFamily_OS_FAMILY_RPM:
+		return collectUpgradableRPMPackages(ctx, runner)
+	case agent.OsFamily_OS_FAMILY_APT:
+		return collectUpgradableAPTPackages(ctx, runner)
+	default:
+		return nil, fmt.Errorf("unsupported os family: %s", osFamily.String())
+	}
+}
+
+func collectUpgradableRPMPackages(ctx context.Context, runner ExecRunner) ([]*agent.Package, error) {
+	output, err := runner.Run(ctx, "dnf", "-q", "--cacheonly", "check-update")
+	if err != nil {
+		return nil, nil
+	}
+
+	items := make([]*agent.Package, 0)
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		pkg := parseRpmUpgradableLine(line)
+		if pkg != nil {
+			items = append(items, pkg)
+		}
+	}
+
+	return items, nil
+}
+
+func collectUpgradableAPTPackages(ctx context.Context, runner ExecRunner) ([]*agent.Package, error) {
+	output, err := runner.Run(ctx, "apt", "list", "--upgradable")
+	if err != nil {
+		return nil, nil
+	}
+
+	items := make([]*agent.Package, 0)
+	scanner := bufio.NewScanner(strings.NewReader(string(output)))
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+		pkg := parseAptUpgradableLine(line)
+		if pkg != nil {
+			items = append(items, pkg)
+		}
+	}
+
+	return items, nil
+}
+
 func collectAvailableRPMPackageUpdateCount(ctx context.Context, runner ExecRunner) (int32, error) {
 	output, err := runner.Run(ctx, "dnf", "-q", "--cacheonly", "check-update")
 	if err != nil {
@@ -298,6 +353,96 @@ func countAptPackageUpdates(output string) int32 {
 		count++
 	}
 	return count
+}
+
+func parseAptUpgradableLine(line string) *agent.Package {
+	if strings.HasPrefix(line, "Listing...") || strings.HasPrefix(line, "WARNING:") || strings.HasPrefix(line, "N:") {
+		return nil
+	}
+	if !strings.Contains(line, "[upgradable from:") {
+		return nil
+	}
+
+	fields := strings.Fields(line)
+	if len(fields) < 3 {
+		return nil
+	}
+
+	nameField := fields[0]
+	name, repoOrigin, ok := strings.Cut(nameField, "/")
+	if !ok || strings.TrimSpace(name) == "" {
+		return nil
+	}
+
+	epoch, version, release, err := parseDebianVersion(strings.TrimSpace(fields[1]))
+	if err != nil {
+		return nil
+	}
+
+	arch := strings.TrimSpace(fields[2])
+	return &agent.Package{
+		Name:       name,
+		Epoch:      epoch,
+		Version:    version,
+		Release:    release,
+		Arch:       arch,
+		RepoOrigin: repoOrigin,
+		Nevra:      formatPackageIdentifier(name, epoch, version, release, arch),
+	}
+}
+
+func parseRpmUpgradableLine(line string) *agent.Package {
+	if strings.HasPrefix(line, "Last metadata expiration check:") {
+		return nil
+	}
+	if line == "Obsoleting Packages" || line == "Obsoleted Packages" {
+		return nil
+	}
+
+	fields := strings.Fields(line)
+	if len(fields) < 3 {
+		return nil
+	}
+
+	nameArch := fields[0]
+	targetVersion := fields[1]
+	repoOrigin := fields[2]
+
+	dot := strings.LastIndex(nameArch, ".")
+	if dot <= 0 || dot+1 >= len(nameArch) {
+		return nil
+	}
+
+	name := nameArch[:dot]
+	arch := nameArch[dot+1:]
+
+	epoch := int32(0)
+	versionRelease := targetVersion
+	if epochPart, rest, cut := strings.Cut(targetVersion, ":"); cut {
+		parsedEpoch, err := parseEpoch(epochPart)
+		if err != nil {
+			return nil
+		}
+		epoch = parsedEpoch
+		versionRelease = rest
+	}
+
+	version := versionRelease
+	release := ""
+	if dash := strings.LastIndex(versionRelease, "-"); dash > 0 && dash+1 < len(versionRelease) {
+		version = versionRelease[:dash]
+		release = versionRelease[dash+1:]
+	}
+
+	return &agent.Package{
+		Name:       name,
+		Epoch:      epoch,
+		Version:    version,
+		Release:    release,
+		Arch:       arch,
+		RepoOrigin: repoOrigin,
+		Nevra:      formatPackageIdentifier(name, epoch, version, release, arch),
+	}
 }
 
 func parseEpoch(value string) (int32, error) {
