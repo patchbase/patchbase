@@ -39,7 +39,7 @@ func TestEVR_ParseAndCompare(t *testing.T) {
 		},
 		{
 			name:     "missing release separator",
-			evrStr:  "0:1.1.1",
+			evrStr:   "0:1.1.1",
 			expected: evr{},
 			wantErr:  true,
 		},
@@ -207,19 +207,20 @@ func TestResolveProductStreams(t *testing.T) {
 			},
 			repos: []*agentpb.Repo{
 				{
-					RepoId:  "ubuntu-noble-main",
-					Enabled: true,
+					RepoId:    "ssh_pull:1",
+					RepoLabel: "noble main",
+					Enabled:   true,
 				},
 			},
 			streams: []sql.ProductStream{
 				{
 					ID:           "ubuntu:24-main",
 					Vendor:       "ubuntu",
-					DistroFamily: "apt",
+					DistroFamily: "ubuntu",
 					DistroName:   "Ubuntu",
 					MajorVersion: 24,
-					Architecture: utils.Some("x86_64"),
-					RepoFamily:   "main",
+					Architecture: utils.Some("source"),
+					RepoFamily:   "noble",
 				},
 			},
 			expected: []string{"ubuntu:24-main"},
@@ -234,19 +235,20 @@ func TestResolveProductStreams(t *testing.T) {
 			},
 			repos: []*agentpb.Repo{
 				{
-					RepoId:  "debian-bookworm-main",
-					Enabled: true,
+					RepoId:    "ssh_pull:2",
+					RepoLabel: "bookworm main",
+					Enabled:   true,
 				},
 			},
 			streams: []sql.ProductStream{
 				{
 					ID:           "debian:12-main",
 					Vendor:       "debian",
-					DistroFamily: "apt",
+					DistroFamily: "debian",
 					DistroName:   "Debian GNU/Linux",
 					MajorVersion: 12,
-					Architecture: utils.Some("x86_64"),
-					RepoFamily:   "main",
+					Architecture: utils.Some("source"),
+					RepoFamily:   "bookworm",
 				},
 			},
 			expected: []string{"debian:12-main"},
@@ -261,6 +263,58 @@ func TestResolveProductStreams(t *testing.T) {
 				got = append(got, r.ID)
 			}
 			assert.Equal(t, tc.expected, got)
+		})
+	}
+}
+
+func TestMatchesPackageArch(t *testing.T) {
+	tests := []struct {
+		name      string
+		pkgArch   string
+		ruleArch  string
+		osFamily  string
+		shouldHit bool
+	}{
+		{
+			name:      "apt binary wildcard",
+			pkgArch:   "amd64",
+			ruleArch:  "binary",
+			osFamily:  "apt",
+			shouldHit: true,
+		},
+		{
+			name:      "apt source wildcard",
+			pkgArch:   "amd64",
+			ruleArch:  "source",
+			osFamily:  "apt",
+			shouldHit: true,
+		},
+		{
+			name:      "apt exact arch",
+			pkgArch:   "amd64",
+			ruleArch:  "amd64",
+			osFamily:  "apt",
+			shouldHit: true,
+		},
+		{
+			name:      "apt mismatched concrete arch",
+			pkgArch:   "amd64",
+			ruleArch:  "arm64",
+			osFamily:  "apt",
+			shouldHit: false,
+		},
+		{
+			name:      "rpm exact arch only",
+			pkgArch:   "x86_64",
+			ruleArch:  "source",
+			osFamily:  "rpm",
+			shouldHit: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.shouldHit, matchesPackageArch(tc.pkgArch, tc.ruleArch, tc.osFamily))
 		})
 	}
 }

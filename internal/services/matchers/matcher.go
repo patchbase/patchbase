@@ -329,8 +329,8 @@ func buildDecisions(
 		filteredRulesByPackage := filterRulesByPackage(rulesByAdvisory[advisory.ID], resolvedStreamIDs)
 		filteredFixesByPackage := filterFixesByPackage(fixesByAdvisory[advisory.ID], resolvedStreamIDs)
 		for _, pkg := range candidatePackages(packagesByName, filteredRulesByPackage, filteredFixesByPackage) {
-			relevantFixes := matchingFixedPackagesForPackage(pkg, filteredFixesByPackage[pkg.GetName()])
-			relevantRules := matchingRulesForPackage(pkg, filteredRulesByPackage[pkg.GetName()])
+			relevantFixes := matchingFixedPackagesForPackage(pkg, filteredFixesByPackage[pkg.GetName()], osFamily)
+			relevantRules := matchingRulesForPackage(pkg, filteredRulesByPackage[pkg.GetName()], osFamily)
 			if len(relevantRules) == 0 {
 				if len(relevantFixes) == 0 {
 					continue
@@ -389,7 +389,7 @@ func buildDecisions(
 			}
 
 			rule := matchedRules[0]
-			fixedPackages := matchingFixedPackagesForStream(pkg, rule.ProductStreamID, filteredFixesByPackage[pkg.GetName()])
+			fixedPackages := matchingFixedPackagesForStream(pkg, rule.ProductStreamID, filteredFixesByPackage[pkg.GetName()], osFamily)
 			if len(fixedPackages) == 0 {
 				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), "affected_no_fix", "investigate", rule.EvidenceTier, "vendor_fix_not_available", "vendor advisory marks package affected but no fixed package is available", computedAt)
 				decisions = append(decisions, decision{record: record, severity: advisorySeverity(advisory)})
@@ -581,10 +581,10 @@ func appliesToResolvedStream(advisoryID string, resolvedStreamIDs map[string]str
 	return false
 }
 
-func matchingRulesForPackage(pkg *agentpb.Package, rules []sql.AffectedPackageRule) []sql.AffectedPackageRule {
+func matchingRulesForPackage(pkg *agentpb.Package, rules []sql.AffectedPackageRule, osFamily string) []sql.AffectedPackageRule {
 	matched := make([]sql.AffectedPackageRule, 0)
 	for _, rule := range rules {
-		if rule.Arch.IsPresent() && rule.Arch.UnwrapOr("") != "" && rule.Arch.UnwrapOr("") != pkg.GetArch() {
+		if !matchesPackageArch(pkg.GetArch(), rule.Arch.UnwrapOr(""), osFamily) {
 			continue
 		}
 
@@ -611,13 +611,13 @@ func matchesRule(pkg *agentpb.Package, rule sql.AffectedPackageRule, osFamily st
 	return true, nil
 }
 
-func matchingFixedPackagesForStream(pkg *agentpb.Package, productStreamID string, fixes []sql.FixedPackage) []sql.FixedPackage {
+func matchingFixedPackagesForStream(pkg *agentpb.Package, productStreamID string, fixes []sql.FixedPackage, osFamily string) []sql.FixedPackage {
 	matched := make([]sql.FixedPackage, 0)
 	for _, fix := range fixes {
 		if fix.ProductStreamID != productStreamID {
 			continue
 		}
-		if fix.Arch.IsPresent() && fix.Arch.UnwrapOr("") != "" && fix.Arch.UnwrapOr("") != pkg.GetArch() {
+		if !matchesPackageArch(pkg.GetArch(), fix.Arch.UnwrapOr(""), osFamily) {
 			continue
 		}
 
@@ -627,10 +627,10 @@ func matchingFixedPackagesForStream(pkg *agentpb.Package, productStreamID string
 	return matched
 }
 
-func matchingFixedPackagesForPackage(pkg *agentpb.Package, fixes []sql.FixedPackage) []sql.FixedPackage {
+func matchingFixedPackagesForPackage(pkg *agentpb.Package, fixes []sql.FixedPackage, osFamily string) []sql.FixedPackage {
 	matched := make([]sql.FixedPackage, 0)
 	for _, fix := range fixes {
-		if fix.Arch.IsPresent() && fix.Arch.UnwrapOr("") != "" && fix.Arch.UnwrapOr("") != pkg.GetArch() {
+		if !matchesPackageArch(pkg.GetArch(), fix.Arch.UnwrapOr(""), osFamily) {
 			continue
 		}
 
@@ -916,6 +916,22 @@ func severityPriority(severity string) int {
 	default:
 		return 0
 	}
+}
+
+func matchesPackageArch(pkgArch string, ruleArch string, osFamily string) bool {
+	normalizedRuleArch := strings.ToLower(strings.TrimSpace(ruleArch))
+	if normalizedRuleArch == "" {
+		return true
+	}
+
+	if strings.EqualFold(osFamily, "apt") {
+		switch normalizedRuleArch {
+		case "binary", "source", "all", "any":
+			return true
+		}
+	}
+
+	return normalizedRuleArch == strings.ToLower(strings.TrimSpace(pkgArch))
 }
 
 func parseDecisionFixedEVR(record sql.InsertDecisionRecordParams, osFamily string) (evr, bool) {

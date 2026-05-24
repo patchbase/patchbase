@@ -449,6 +449,60 @@ func TestHosts_RunSSHPull_ProducesMatcherDecisions(t *testing.T) {
 	assert.Equal(t, "openssl", decisions[0].PackageName)
 }
 
+func TestHosts_RunSSHPull_CollectErrorPreserved(t *testing.T) {
+	mockRunner := &mockSSHPullRunner{err: fmt.Errorf("ssh failed: permission denied")}
+
+	backend := apitesting.NewBackend(t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+		apitesting.WithInjectorOverride(func(i do.Injector) {
+			do.Override[services.SSHPullRunner](i, func(_ do.Injector) (services.SSHPullRunner, error) {
+				return mockRunner, nil
+			})
+		}),
+	)
+
+	queries := do.MustInvoke[db.Querier](backend.Injector())
+	ctx := context.Background()
+
+	hostID := id.New("h")
+	_, err := queries.InsertAgentHost(ctx, db.InsertAgentHostParams{
+		ID:          hostID,
+		DisplayName: utils.Some("ssh-host-typed-nil"),
+		Hostname:    utils.Some("ssh-host-typed-nil"),
+	})
+	require.NoError(t, err)
+
+	_, err = backend.DB().Exec(ctx, `
+		UPDATE hosts
+		SET onboarding_mode = 'ssh', approval_status = 'approved'
+		WHERE id = $1
+	`, hostID)
+	require.NoError(t, err)
+
+	crypto := do.MustInvoke[utils.Crypto](backend.Injector())
+	encryptedKey, err := crypto.Encrypt("mock-private-key")
+	require.NoError(t, err)
+
+	_, err = backend.DB().Exec(ctx, `
+		INSERT INTO host_ssh_pull (host_id, pull_ssh_user, pull_frequency_minutes, pull_private_key, onboarded)
+		VALUES ($1, 'root', 60, $2, true)
+	`, hostID, encryptedKey)
+	require.NoError(t, err)
+
+	hostsService := do.MustInvoke[services.Hosts](backend.Injector())
+	err = hostsService.RunSSHPull(ctx, string(hostID))
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "collect snapshot: ssh failed: permission denied")
+	assert.NotContains(t, err.Error(), "%!w(<nil>)")
+
+	jobs, err := hostsService.ListSSHPullJobs(ctx, string(hostID))
+	require.NoError(t, err)
+	require.Len(t, jobs, 1)
+	assert.Equal(t, "failed", jobs[0].Status)
+	require.NotNil(t, jobs[0].Error)
+	assert.Contains(t, *jobs[0].Error, "ssh failed: permission denied")
+}
+
 func mockProtobufPayload(t *testing.T) []byte {
 	snap := &agentpb.AgentSnapshot{
 		SchemaVersion: "1.0",

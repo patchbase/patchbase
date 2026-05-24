@@ -929,14 +929,13 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 		if errMsg != "" {
 			optErr = utils.Some(errMsg)
 		}
-		_, err = queries.UpdateHostSSHPullJob(ctx, sql.UpdateHostSSHPullJobParams{
+		if _, updateJobErr := queries.UpdateHostSSHPullJob(ctx, sql.UpdateHostSSHPullJobParams{
 			ID:          jobID,
 			Status:      status,
 			CompletedAt: pgTime(time.Now()),
 			Error:       optErr,
-		})
-		if err != nil {
-			return fmt.Errorf("update host ssh pull job: %w", err)
+		}); updateJobErr != nil {
+			return fmt.Errorf("update host ssh pull job: %w", updateJobErr)
 		}
 
 		statusOpt := utils.Some(status)
@@ -947,7 +946,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 			if res.BootTime != nil {
 				bootTime = pgTime(*res.BootTime)
 			}
-			snapshotRow, err := queries.InsertHostSnapshot(ctx, sql.InsertHostSnapshotParams{
+			snapshotRow, insertSnapshotErr := queries.InsertHostSnapshot(ctx, sql.InsertHostSnapshotParams{
 				ID:                 id.New("snap"),
 				HostID:             hostID,
 				CollectedAt:        pgTime(res.CollectedAt),
@@ -956,12 +955,12 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 				BootTime:           bootTime,
 				HasProcessData:     res.HasProcessData,
 			})
-			if err != nil {
-				return fmt.Errorf("insert host snapshot: %w", err)
+			if insertSnapshotErr != nil {
+				return fmt.Errorf("insert host snapshot: %w", insertSnapshotErr)
 			}
 			snapshotID = snapshotRow.ID
 
-			err = queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
+			if updateRunErr := queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
 				ID:                hostID,
 				PullLastRunAt:     pgTime(res.CollectedAt),
 				LastSnapshotID:    utils.Some(snapshotID),
@@ -975,12 +974,11 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 				OsMajor:           res.OSMajor,
 				OsVersion:         res.OSVersion,
 				Architecture:      res.Architecture,
-			})
-			if err != nil {
-				return fmt.Errorf("update ssh pull run success: %w", err)
+			}); updateRunErr != nil {
+				return fmt.Errorf("update ssh pull run success: %w", updateRunErr)
 			}
 
-			err = queries.UpsertHostCurrentState(ctx, sql.UpsertHostCurrentStateParams{
+			if upsertStateErr := queries.UpsertHostCurrentState(ctx, sql.UpsertHostCurrentStateParams{
 				HostID:           hostID,
 				SnapshotID:       snapshotRow.ID,
 				OverallAction:    res.OverallAction,
@@ -993,13 +991,12 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 				NeedsRestart:     res.NeedsRestart,
 				NoFix:            res.NoFix,
 				Unknown:          res.Unknown,
-			})
-			if err != nil {
-				return fmt.Errorf("upsert host current state: %w", err)
+			}); upsertStateErr != nil {
+				return fmt.Errorf("upsert host current state: %w", upsertStateErr)
 			}
 
 		} else {
-			err = queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
+			if updateRunErr := queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
 				ID:                hostID,
 				PullLastRunAt:     pgTime(time.Now()),
 				LastSnapshotID:    utils.None[string](),
@@ -1013,9 +1010,8 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 				OsMajor:           host.OsMajor,
 				OsVersion:         host.OsVersion,
 				Architecture:      host.Architecture,
-			})
-			if err != nil {
-				return fmt.Errorf("update ssh pull run failure: %w", err)
+			}); updateRunErr != nil {
+				return fmt.Errorf("update ssh pull run failure: %w", updateRunErr)
 			}
 		}
 

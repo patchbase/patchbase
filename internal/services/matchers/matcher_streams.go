@@ -9,7 +9,7 @@ import (
 
 func resolveProductStreams(host sql.Host, repos []*agentpb.Repo, streams []sql.ProductStream) []sql.ProductStream {
 	resolved := make([]sql.ProductStream, 0)
-	enabledRepoIDs := enabledRepoIDs(repos)
+	repoMatchFields := enabledRepoMatchFields(repos)
 	seen := map[string]struct{}{}
 
 	for _, stream := range streams {
@@ -17,11 +17,11 @@ func resolveProductStreams(host sql.Host, repos []*agentpb.Repo, streams []sql.P
 			continue
 		}
 
-		if stream.Architecture.IsPresent() && stream.Architecture.UnwrapOr("") != "" && stream.Architecture.UnwrapOr("") != host.Architecture {
+		if !matchesStreamArchitecture(host.OsFamily, host.Architecture, stream.Architecture.UnwrapOr("")) {
 			continue
 		}
 
-		if stream.RepoFamily != "" && stream.RepoFamily != "all" && !matchesRepoFamily(enabledRepoIDs, stream.RepoFamily) {
+		if stream.RepoFamily != "" && stream.RepoFamily != "all" && !matchesRepoFamily(repoMatchFields, stream.RepoFamily) {
 			continue
 		}
 
@@ -36,15 +36,23 @@ func resolveProductStreams(host sql.Host, repos []*agentpb.Repo, streams []sql.P
 	return resolved
 }
 
-func enabledRepoIDs(repos []*agentpb.Repo) []string {
-	enabled := make([]string, 0, len(repos))
+func enabledRepoMatchFields(repos []*agentpb.Repo) []string {
+	fields := make([]string, 0, len(repos)*3)
 	for _, repo := range repos {
 		if repo.Enabled {
-			enabled = append(enabled, strings.ToLower(repo.RepoId))
+			if repo.RepoId != "" {
+				fields = append(fields, strings.ToLower(repo.RepoId))
+			}
+			if repo.RepoLabel != "" {
+				fields = append(fields, strings.ToLower(repo.RepoLabel))
+			}
+			if repo.Baseurl != "" {
+				fields = append(fields, strings.ToLower(repo.Baseurl))
+			}
 		}
 	}
 
-	return enabled
+	return fields
 }
 
 func matchesHostDistro(host sql.Host, stream sql.ProductStream) bool {
@@ -79,13 +87,27 @@ func matchesHostDistro(host sql.Host, stream sql.ProductStream) bool {
 	}
 }
 
-func matchesRepoFamily(enabledRepoIDs []string, repoFamily string) bool {
+func matchesRepoFamily(matchFields []string, repoFamily string) bool {
 	repoFamily = strings.ToLower(strings.TrimSpace(repoFamily))
-	for _, repoID := range enabledRepoIDs {
-		if strings.Contains(repoID, repoFamily) {
+	for _, field := range matchFields {
+		if strings.Contains(field, repoFamily) {
 			return true
 		}
 	}
 
 	return false
+}
+
+func matchesStreamArchitecture(osFamily string, hostArch string, streamArch string) bool {
+	streamArch = strings.ToLower(strings.TrimSpace(streamArch))
+	if streamArch == "" {
+		return true
+	}
+
+	// Advisory DB apt streams can represent source-level applicability.
+	if strings.EqualFold(osFamily, "apt") && (streamArch == "source" || streamArch == "binary") {
+		return true
+	}
+
+	return streamArch == strings.ToLower(strings.TrimSpace(hostArch))
 }
