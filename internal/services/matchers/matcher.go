@@ -167,7 +167,7 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 	rulesByAdvisory := indexRulesByAdvisory(data.rules)
 	fixesByAdvisory := indexFixesByAdvisory(data.fixes)
 
-	decisions, err := buildDecisions(hostID, snapshot, packages, resolvedStreams, data.advisories, advisoryStreams, rulesByAdvisory, fixesByAdvisory, computedAt)
+	decisions, err := buildDecisions(host.ID, host.OsFamily, snapshot, packages, resolvedStreams, data.advisories, advisoryStreams, rulesByAdvisory, fixesByAdvisory, computedAt)
 	if err != nil {
 		return MatchResult{}, fmt.Errorf("build decisions: %w", err)
 	}
@@ -307,6 +307,7 @@ type decisionKey struct {
 
 func buildDecisions(
 	hostID string,
+	osFamily string,
 	snapshot sql.HostSnapshot,
 	packages []*agentpb.Package,
 	streams []sql.ProductStream,
@@ -335,12 +336,12 @@ func buildDecisions(
 					continue
 				}
 
-				bestFix, err := selectBestFix(relevantFixes)
+				bestFix, err := selectBestFix(relevantFixes, osFamily)
 				if err != nil {
 					return nil, fmt.Errorf("select best fix for package %s: %w", pkg.GetNevra(), err)
 				}
 
-				record, shouldEmit, err := decisionFromFixedPackageOnly(hostID, snapshot, advisory, pkg, bestFix, computedAt)
+				record, shouldEmit, err := decisionFromFixedPackageOnly(hostID, osFamily, snapshot, packages, advisory, pkg, bestFix, computedAt)
 				if err != nil {
 					return nil, err
 				}
@@ -352,7 +353,7 @@ func buildDecisions(
 
 			matchedRules := make([]sql.AffectedPackageRule, 0, len(relevantRules))
 			for _, rule := range relevantRules {
-				matched, err := matchesRule(pkg, rule)
+				matched, err := matchesRule(pkg, rule, osFamily)
 				if err != nil {
 					return nil, fmt.Errorf("evaluate rule %s for package %s: %w", rule.ID, pkg.GetNevra(), err)
 				}
@@ -366,12 +367,12 @@ func buildDecisions(
 					continue
 				}
 
-				bestFix, err := selectBestFix(relevantFixes)
+				bestFix, err := selectBestFix(relevantFixes, osFamily)
 				if err != nil {
 					return nil, fmt.Errorf("select best fix for package %s: %w", pkg.GetNevra(), err)
 				}
 
-				record, shouldEmit, err := decisionFromFixedPackageOnly(hostID, snapshot, advisory, pkg, bestFix, computedAt)
+				record, shouldEmit, err := decisionFromFixedPackageOnly(hostID, osFamily, snapshot, packages, advisory, pkg, bestFix, computedAt)
 				if err != nil {
 					return nil, err
 				}
@@ -395,7 +396,7 @@ func buildDecisions(
 				continue
 			}
 
-			bestFix, err := selectBestFix(fixedPackages)
+			bestFix, err := selectBestFix(fixedPackages, osFamily)
 			if err != nil {
 				return nil, fmt.Errorf("select best fix for package %s: %w", pkg.GetNevra(), err)
 			}
@@ -404,11 +405,17 @@ func buildDecisions(
 			fixed := evr{epoch: int64(bestFix.Epoch), version: bestFix.Version, release: bestFix.Release}
 			evidenceTier := decisionEvidenceTier(advisory.EvidenceTier, rule.EvidenceTier, bestFix.EvidenceTier)
 
-			if kernelRunningSatisfiesFixedBuild(snapshot, pkg.GetName(), fixed) {
+			if kernelRunningSatisfiesFixedBuild(snapshot, packages, pkg.GetName(), fixed, osFamily) {
 				continue
 			}
 
-			if compareEVR(installed, fixed) < 0 {
+			var compared int
+			if osFamily == "apt" {
+				compared = compareDebianEVR(installed, fixed)
+			} else {
+				compared = compareEVR(installed, fixed)
+			}
+			if compared < 0 {
 				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), "affected_fix_available", "update_package", evidenceTier, "vendor_fix_available_not_installed", "a vendor fixed package is available but not installed", computedAt)
 				record.FixedNevra = utils.Some(bestFix.Nevra)
 				decisions = append(decisions, decision{record: record, severity: advisorySeverity(advisory)})
@@ -420,13 +427,8 @@ func buildDecisions(
 			reasonCode := "installed_package_at_or_above_fixed_build"
 			reasonText := "installed package is at or above the vendor fixed build"
 
-			if isKernelPackage(pkg.GetName()) {
-				runningKernel, err := parseRunningKernelEVR(snapshot.RunningKernelNevra)
-				if err != nil {
-					return nil, fmt.Errorf("parse running kernel evr for snapshot %s: %w", snapshot.ID, err)
-				}
-
-				if compareEVR(runningKernel, fixed) < 0 {
+			if isKernelPackage(pkg.GetName(), osFamily) {
+				if !kernelRunningSatisfiesFixedBuild(snapshot, packages, pkg.GetName(), fixed, osFamily) {
 					status = "fixed_package_installed_pending_activation"
 					action = "reboot_host"
 					reasonCode = "fixed_package_installed_kernel_not_running"
@@ -440,12 +442,14 @@ func buildDecisions(
 		}
 	}
 
-	return collapseSupersededDecisions(decisions), nil
+	return collapseSupersededDecisions(decisions, osFamily), nil
 }
 
 func decisionFromFixedPackageOnly(
 	hostID string,
+	osFamily string,
 	snapshot sql.HostSnapshot,
+	packages []*agentpb.Package,
 	advisory sql.Advisory,
 	pkg *agentpb.Package,
 	bestFix sql.FixedPackage,
@@ -455,11 +459,17 @@ func decisionFromFixedPackageOnly(
 	fixed := evr{epoch: int64(bestFix.Epoch), version: bestFix.Version, release: bestFix.Release}
 	evidenceTier := decisionEvidenceTier(advisory.EvidenceTier, bestFix.EvidenceTier)
 
-	if kernelRunningSatisfiesFixedBuild(snapshot, pkg.GetName(), fixed) {
+	if kernelRunningSatisfiesFixedBuild(snapshot, packages, pkg.GetName(), fixed, osFamily) {
 		return sql.InsertDecisionRecordParams{}, false, nil
 	}
 
-	if compareEVR(installed, fixed) < 0 {
+	var compared int
+	if osFamily == "apt" {
+		compared = compareDebianEVR(installed, fixed)
+	} else {
+		compared = compareEVR(installed, fixed)
+	}
+	if compared < 0 {
 		record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(bestFix.ProductStreamID), "affected_fix_available", "update_package", evidenceTier, "vendor_fix_available_not_installed", "a vendor fixed package is available but not installed", computedAt)
 		record.FixedNevra = utils.Some(bestFix.Nevra)
 		return record, true, nil
@@ -470,13 +480,8 @@ func decisionFromFixedPackageOnly(
 	reasonCode := "installed_package_at_or_above_fixed_build"
 	reasonText := "installed package is at or above the vendor fixed build"
 
-	if isKernelPackage(pkg.GetName()) {
-		runningKernel, err := parseRunningKernelEVR(snapshot.RunningKernelNevra)
-		if err != nil {
-			return sql.InsertDecisionRecordParams{}, false, fmt.Errorf("parse running kernel evr for snapshot %s: %w", snapshot.ID, err)
-		}
-
-		if compareEVR(runningKernel, fixed) < 0 {
+	if isKernelPackage(pkg.GetName(), osFamily) {
+		if !kernelRunningSatisfiesFixedBuild(snapshot, packages, pkg.GetName(), fixed, osFamily) {
 			status = "fixed_package_installed_pending_activation"
 			action = "reboot_host"
 			reasonCode = "fixed_package_installed_kernel_not_running"
@@ -522,16 +527,47 @@ func newDecisionRecord(
 	}
 }
 
-func kernelRunningSatisfiesFixedBuild(snapshot sql.HostSnapshot, packageName string, fixed evr) bool {
-	if !isKernelPackage(packageName) {
+func kernelRunningSatisfiesFixedBuild(snapshot sql.HostSnapshot, packages []*agentpb.Package, packageName string, fixed evr, osFamily string) bool {
+	if !isKernelPackage(packageName, osFamily) {
 		return false
+	}
+
+	if osFamily == "apt" {
+		runningAbi := strings.TrimSpace(snapshot.RunningKernelNevra)
+		fixedAbi := strings.TrimPrefix(packageName, "linux-image-")
+
+		if len(fixedAbi) > 0 && isDigit(fixedAbi[0]) && len(runningAbi) > 0 && isDigit(runningAbi[0]) {
+			runningAbiEVR, err1 := parseRunningKernelDebianEVR(runningAbi)
+			fixedAbiEVR, err2 := parseRunningKernelDebianEVR(fixedAbi)
+			if err1 == nil && err2 == nil {
+				abiCompared := compareDebianEVR(runningAbiEVR, fixedAbiEVR)
+				if abiCompared != 0 {
+					return abiCompared > 0
+				}
+				runningKernel, found := getRunningKernelPackageEVR(packages, runningAbi)
+				if found {
+					return compareDebianEVR(runningKernel, fixed) >= 0
+				}
+				return false
+			}
+		}
+
+		runningKernel, found := getRunningKernelPackageEVR(packages, runningAbi)
+		if found {
+			return compareDebianEVR(runningKernel, fixed) >= 0
+		}
+
+		runningKernel, err := parseRunningKernelDebianEVR(runningAbi)
+		if err != nil {
+			return false
+		}
+		return compareDebianEVR(runningKernel, fixed) >= 0
 	}
 
 	runningKernel, err := parseRunningKernelEVR(snapshot.RunningKernelNevra)
 	if err != nil {
 		return false
 	}
-
 	return compareEVR(runningKernel, fixed) >= 0
 }
 
@@ -558,8 +594,14 @@ func matchingRulesForPackage(pkg *agentpb.Package, rules []sql.AffectedPackageRu
 	return matched
 }
 
-func matchesRule(pkg *agentpb.Package, rule sql.AffectedPackageRule) (bool, error) {
+func matchesRule(pkg *agentpb.Package, rule sql.AffectedPackageRule, osFamily string) (bool, error) {
 	if rule.RpmEvrRule.IsPresent() && rule.RpmEvrRule.UnwrapOr("") != "" {
+		if osFamily == "apt" {
+			return evaluateDebianEVRRule(
+				evr{epoch: int64(pkg.GetEpoch()), version: pkg.GetVersion(), release: pkg.GetRelease()},
+				rule.RpmEvrRule.UnwrapOr(""),
+			)
+		}
 		return evaluateEVRRule(
 			evr{epoch: int64(pkg.GetEpoch()), version: pkg.GetVersion(), release: pkg.GetRelease()},
 			rule.RpmEvrRule.UnwrapOr(""),
@@ -598,7 +640,7 @@ func matchingFixedPackagesForPackage(pkg *agentpb.Package, fixes []sql.FixedPack
 	return matched
 }
 
-func selectBestFix(fixes []sql.FixedPackage) (sql.FixedPackage, error) {
+func selectBestFix(fixes []sql.FixedPackage, osFamily string) (sql.FixedPackage, error) {
 	if len(fixes) == 0 {
 		return sql.FixedPackage{}, fmt.Errorf("at least one fixed package is required")
 	}
@@ -607,7 +649,13 @@ func selectBestFix(fixes []sql.FixedPackage) (sql.FixedPackage, error) {
 	bestEVR := evr{epoch: int64(best.Epoch), version: best.Version, release: best.Release}
 	for _, candidate := range fixes[1:] {
 		candidateEVR := evr{epoch: int64(candidate.Epoch), version: candidate.Version, release: candidate.Release}
-		if compareEVR(candidateEVR, bestEVR) > 0 {
+		var compared int
+		if osFamily == "apt" {
+			compared = compareDebianEVR(candidateEVR, bestEVR)
+		} else {
+			compared = compareEVR(candidateEVR, bestEVR)
+		}
+		if compared > 0 {
 			best = candidate
 			bestEVR = candidateEVR
 		}
@@ -712,7 +760,10 @@ func candidatePackages(
 	return candidates
 }
 
-func isKernelPackage(name string) bool {
+func isKernelPackage(name string, osFamily string) bool {
+	if osFamily == "apt" {
+		return strings.HasPrefix(name, "linux-image-")
+	}
 	return name == "kernel" || strings.HasPrefix(name, "kernel-")
 }
 
@@ -762,7 +813,7 @@ func indexFixesByAdvisory(fixes []sql.FixedPackage) map[string][]sql.FixedPackag
 	return grouped
 }
 
-func collapseSupersededDecisions(decisions []decision) []decision {
+func collapseSupersededDecisions(decisions []decision, osFamily string) []decision {
 	if len(decisions) <= 1 {
 		return decisions
 	}
@@ -779,7 +830,7 @@ func collapseSupersededDecisions(decisions []decision) []decision {
 			continue
 		}
 
-		if preferDecision(candidate, current) {
+		if preferDecision(candidate, current, osFamily) {
 			selected[key] = candidate
 		}
 	}
@@ -800,18 +851,24 @@ func newDecisionKey(record sql.InsertDecisionRecordParams) decisionKey {
 	}
 }
 
-func preferDecision(candidate decision, current decision) bool {
+func preferDecision(candidate decision, current decision, osFamily string) bool {
 	candidatePriority := decisionPriority(candidate.record)
 	currentPriority := decisionPriority(current.record)
 	if candidatePriority != currentPriority {
 		return candidatePriority > currentPriority
 	}
 
-	candidateFixed, candidateHasFixed := parseDecisionFixedEVR(candidate.record)
-	currentFixed, currentHasFixed := parseDecisionFixedEVR(current.record)
+	candidateFixed, candidateHasFixed := parseDecisionFixedEVR(candidate.record, osFamily)
+	currentFixed, currentHasFixed := parseDecisionFixedEVR(current.record, osFamily)
 	switch {
 	case candidateHasFixed && currentHasFixed:
-		if compared := compareEVR(candidateFixed, currentFixed); compared != 0 {
+		var compared int
+		if osFamily == "apt" {
+			compared = compareDebianEVR(candidateFixed, currentFixed)
+		} else {
+			compared = compareEVR(candidateFixed, currentFixed)
+		}
+		if compared != 0 {
 			return compared > 0
 		}
 	case candidateHasFixed:
@@ -861,12 +918,20 @@ func severityPriority(severity string) int {
 	}
 }
 
-func parseDecisionFixedEVR(record sql.InsertDecisionRecordParams) (evr, bool) {
+func parseDecisionFixedEVR(record sql.InsertDecisionRecordParams, osFamily string) (evr, bool) {
 	if !record.FixedNevra.IsPresent() || strings.TrimSpace(record.FixedNevra.UnwrapOr("")) == "" {
 		return evr{epoch: 0, version: "", release: ""}, false
 	}
 
 	value := strings.TrimSpace(record.FixedNevra.UnwrapOr(""))
+	if osFamily == "apt" {
+		parsed, err := parseDebianEVRFromNEVR(value)
+		if err != nil {
+			return evr{epoch: 0, version: "", release: ""}, false
+		}
+		return parsed, true
+	}
+
 	lastDot := strings.LastIndex(value, ".")
 	if lastDot == -1 {
 		return evr{epoch: 0, version: "", release: ""}, false

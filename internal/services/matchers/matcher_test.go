@@ -154,53 +154,115 @@ func TestEVR_EvaluateRules(t *testing.T) {
 }
 
 func TestResolveProductStreams(t *testing.T) {
-	host := sql.Host{
-		OsFamily:     "rpm",
-		OsName:       "Rocky Linux",
-		OsMajor:      9,
-		Architecture: "x86_64",
-	}
-
-	repos := []*agentpb.Repo{
+	tests := []struct {
+		name     string
+		host     sql.Host
+		repos    []*agentpb.Repo
+		streams  []sql.ProductStream
+		expected []string
+	}{
 		{
-			RepoId:  "rocky-9-baseos",
-			Enabled: true,
+			name: "Rocky Linux matching baseos",
+			host: sql.Host{
+				OsFamily:     "rpm",
+				OsName:       "Rocky Linux",
+				OsMajor:      9,
+				Architecture: "x86_64",
+			},
+			repos: []*agentpb.Repo{
+				{
+					RepoId:  "rocky-9-baseos",
+					Enabled: true,
+				},
+			},
+			streams: []sql.ProductStream{
+				{
+					ID:           "rocky:9-baseos",
+					Vendor:       "rocky",
+					DistroFamily: "rpm",
+					DistroName:   "Rocky Linux",
+					MajorVersion: 9,
+					Architecture: utils.Some("x86_64"),
+					RepoFamily:   "baseos",
+				},
+				{
+					ID:           "rocky:9-appstream",
+					Vendor:       "rocky",
+					DistroFamily: "rpm",
+					DistroName:   "Rocky Linux",
+					MajorVersion: 9,
+					Architecture: utils.Some("x86_64"),
+					RepoFamily:   "appstream",
+				},
+			},
+			expected: []string{"rocky:9-baseos"},
+		},
+		{
+			name: "Ubuntu noble matching stream",
+			host: sql.Host{
+				OsFamily:     "apt",
+				OsName:       "Ubuntu",
+				OsMajor:      24,
+				Architecture: "x86_64",
+			},
+			repos: []*agentpb.Repo{
+				{
+					RepoId:  "ubuntu-noble-main",
+					Enabled: true,
+				},
+			},
+			streams: []sql.ProductStream{
+				{
+					ID:           "ubuntu:24-main",
+					Vendor:       "ubuntu",
+					DistroFamily: "apt",
+					DistroName:   "Ubuntu",
+					MajorVersion: 24,
+					Architecture: utils.Some("x86_64"),
+					RepoFamily:   "main",
+				},
+			},
+			expected: []string{"ubuntu:24-main"},
+		},
+		{
+			name: "Debian bookworm matching stream",
+			host: sql.Host{
+				OsFamily:     "apt",
+				OsName:       "Debian GNU/Linux",
+				OsMajor:      12,
+				Architecture: "x86_64",
+			},
+			repos: []*agentpb.Repo{
+				{
+					RepoId:  "debian-bookworm-main",
+					Enabled: true,
+				},
+			},
+			streams: []sql.ProductStream{
+				{
+					ID:           "debian:12-main",
+					Vendor:       "debian",
+					DistroFamily: "apt",
+					DistroName:   "Debian GNU/Linux",
+					MajorVersion: 12,
+					Architecture: utils.Some("x86_64"),
+					RepoFamily:   "main",
+				},
+			},
+			expected: []string{"debian:12-main"},
 		},
 	}
 
-	streams := []sql.ProductStream{
-		{
-			ID:           "rocky:9-baseos",
-			Vendor:       "rocky",
-			DistroFamily: "rpm",
-			DistroName:   "Rocky Linux",
-			MajorVersion: 9,
-			Architecture: utils.Some("x86_64"),
-			RepoFamily:   "baseos",
-		},
-		{
-			ID:           "rocky:9-appstream",
-			Vendor:       "rocky",
-			DistroFamily: "rpm",
-			DistroName:   "Rocky Linux",
-			MajorVersion: 9,
-			Architecture: utils.Some("x86_64"),
-			RepoFamily:   "appstream",
-		},
-		{
-			ID:           "alma:9",
-			Vendor:       "alma",
-			DistroFamily: "rpm",
-			DistroName:   "AlmaLinux",
-			MajorVersion: 9,
-			Architecture: utils.Some("x86_64"),
-			RepoFamily:   "all",
-		},
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			resolved := resolveProductStreams(tc.host, tc.repos, tc.streams)
+			got := make([]string, 0, len(resolved))
+			for _, r := range resolved {
+				got = append(got, r.ID)
+			}
+			assert.Equal(t, tc.expected, got)
+		})
 	}
-
-	resolved := resolveProductStreams(host, repos, streams)
-	require.Len(t, resolved, 1)
-	assert.Equal(t, "rocky:9-baseos", resolved[0].ID)
 }
 
 func TestParseRunningKernelEVR(t *testing.T) {
@@ -268,4 +330,233 @@ func TestParseRunningKernelEVR(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDebianEVR_ParseAndCompare(t *testing.T) {
+	tests := []struct {
+		name     string
+		left     string
+		right    string
+		expected int // -1 left < right, 0 equal, 1 left > right
+	}{
+		{
+			name:     "equal simple",
+			left:     "1.0-1",
+			right:    "1.0-1",
+			expected: 0,
+		},
+		{
+			name:     "epoch higher",
+			left:     "1:1.0-1",
+			right:    "2.0-1",
+			expected: 1,
+		},
+		{
+			name:     "version higher",
+			left:     "2.0-1",
+			right:    "1.9-1",
+			expected: 1,
+		},
+		{
+			name:     "release higher",
+			left:     "1.0-2",
+			right:    "1.0-1",
+			expected: 1,
+		},
+		{
+			name:     "tilde sorts before empty",
+			left:     "1.0~beta1-1",
+			right:    "1.0-1",
+			expected: -1,
+		},
+		{
+			name:     "plus sorts after empty",
+			left:     "1.0+b1-1",
+			right:    "1.0-1",
+			expected: 1,
+		},
+		{
+			name:     "letters sort before non-letters",
+			left:     "1.0a-1",
+			right:    "1.0+-1",
+			expected: -1,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			l, err := parseDebianEVR(tc.left)
+			require.NoError(t, err)
+			r, err := parseDebianEVR(tc.right)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.expected, compareDebianEVR(l, r))
+		})
+	}
+}
+
+func TestDebianEVR_ParseFromNEVR(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected evr
+	}{
+		{
+			name:  "standard with epoch, release, arch",
+			input: "openssl-0:3.0.7-2.amd64",
+			expected: evr{
+				epoch:   0,
+				version: "3.0.7",
+				release: "2",
+			},
+		},
+		{
+			name:  "no epoch, with arch",
+			input: "openssl-3.0.7-2.amd64",
+			expected: evr{
+				epoch:   0,
+				version: "3.0.7",
+				release: "2",
+			},
+		},
+		{
+			name:  "no release, with arch",
+			input: "openssl-3.0.7.amd64",
+			expected: evr{
+				epoch:   0,
+				version: "3.0.7",
+				release: "",
+			},
+		},
+		{
+			name:  "no arch, with release",
+			input: "linux-image-generic-6.8.0-31",
+			expected: evr{
+				epoch:   0,
+				version: "6.8.0",
+				release: "31",
+			},
+		},
+		{
+			name:  "no arch, release contains dot and letter suffix",
+			input: "openssl-1.0-1.deb12u1",
+			expected: evr{
+				epoch:   0,
+				version: "1.0",
+				release: "1.deb12u1",
+			},
+		},
+		{
+			name:  "no arch, release contains dot and digit suffix",
+			input: "openssl-3.0.2-0ubuntu1.1",
+			expected: evr{
+				epoch:   0,
+				version: "3.0.2",
+				release: "0ubuntu1.1",
+			},
+		},
+		{
+			name:  "no arch, release contains multiple dot-separated suffixes",
+			input: "openssl-3.0.2-0ubuntu1.1.20230101",
+			expected: evr{
+				epoch:   0,
+				version: "3.0.2",
+				release: "0ubuntu1.1.20230101",
+			},
+		},
+		{
+			name:  "loong64 architecture suffix",
+			input: "openssl-3.0.7-2.loong64",
+			expected: evr{
+				epoch:   0,
+				version: "3.0.7",
+				release: "2",
+			},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseDebianEVRFromNEVR(tc.input)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, got)
+		})
+	}
+}
+
+func TestDebianEVR_EvaluateRules(t *testing.T) {
+	tests := []struct {
+		name      string
+		installed string
+		rule      string
+		expected  bool
+	}{
+		{
+			name:      "less than match",
+			installed: "1.0-1",
+			rule:      "< 2.0-1",
+			expected:  true,
+		},
+		{
+			name:      "less than no match",
+			installed: "2.0-1",
+			rule:      "< 1.0-1",
+			expected:  false,
+		},
+		{
+			name:      "equal match",
+			installed: "1.0-1",
+			rule:      "= 1.0-1",
+			expected:  true,
+		},
+		{
+			name:      "greater than or equal match",
+			installed: "2.0-1",
+			rule:      ">= 2.0-1",
+			expected:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			inst, err := parseDebianEVR(tc.installed)
+			require.NoError(t, err)
+			ok, err := evaluateDebianEVRRule(inst, tc.rule)
+			assert.NoError(t, err)
+			assert.Equal(t, tc.expected, ok)
+		})
+	}
+}
+
+func TestCollapseSupersededDecisions_APT(t *testing.T) {
+	dec1 := decision{
+		record: sql.InsertDecisionRecordParams{
+			HostID:             "host1",
+			SnapshotID:         "snap1",
+			AdvisoryID:         "adv1",
+			InstalledPackageID: utils.None[string](),
+			PackageName:        "openssl",
+			InstalledNevra:     utils.Some("openssl-1.0-1"),
+			FixedNevra:         utils.Some("openssl-1.0-1.deb12u1"),
+			Action:             "update_package",
+		},
+		severity: "critical",
+	}
+	dec2 := decision{
+		record: sql.InsertDecisionRecordParams{
+			HostID:             "host1",
+			SnapshotID:         "snap1",
+			AdvisoryID:         "adv2",
+			InstalledPackageID: utils.None[string](),
+			PackageName:        "openssl",
+			InstalledNevra:     utils.Some("openssl-1.0-1"),
+			FixedNevra:         utils.Some("openssl-1.0-1.deb12u2"), // newer!
+			Action:             "update_package",
+		},
+		severity: "critical",
+	}
+
+	collapsed := collapseSupersededDecisions([]decision{dec1, dec2}, "apt")
+	require.Len(t, collapsed, 1)
+	assert.Equal(t, "openssl-1.0-1.deb12u2", collapsed[0].record.FixedNevra.UnwrapOr(""))
 }

@@ -4,6 +4,7 @@ go_library(
     name = "matchers",
     srcs = [
         "matcher.go",
+        "matcher_debianver.go",
         "matcher_rpmver.go",
         "matcher_streams.go",
     ],

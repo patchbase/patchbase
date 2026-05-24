@@ -70,6 +70,10 @@ func matchesHostDistro(host sql.Host, stream sql.ProductStream) bool {
 		}
 
 		return hostName == "" && strings.Contains(hostFamily, "rhel")
+	case "ubuntu":
+		return strings.Contains(hostName, "ubuntu") || strings.Contains(hostFamily, "ubuntu")
+	case "debian":
+		return strings.Contains(hostName, "debian") || strings.Contains(hostFamily, "debian")
 	default:
 		return false
 	}
