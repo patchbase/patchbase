@@ -9,6 +9,7 @@ import (
 	advisoriesv1 "go.patchbase.net/server/internal/api/v1/advisories"
 	agentv1 "go.patchbase.net/server/internal/api/v1/agent"
 	authv1 "go.patchbase.net/server/internal/api/v1/auth"
+	dashboardv1 "go.patchbase.net/server/internal/api/v1/dashboard"
 	"go.patchbase.net/server/internal/api/v1/health"
 	hostsv1 "go.patchbase.net/server/internal/api/v1/hosts"
 	setupv1 "go.patchbase.net/server/internal/api/v1/setup"
@@ -35,6 +36,7 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 	mux.HandleFunc("GET /api/v1/advisories/scopes", auth.Required(advisoriesv1.GetScopeStatuses(i)))
 	mux.HandleFunc("POST /api/v1/advisories/scopes/{scopeKey}/sync", auth.Required(advisoriesv1.TriggerSync(i)))
 	mux.HandleFunc("GET /api/v1/advisories/overview", auth.Required(advisoriesv1.GetOverview(i)))
+	mux.HandleFunc("GET /api/v1/dashboard/overview", auth.Required(dashboardv1.GetOverview(i)))
 
 	mux.HandleFunc("GET /api/v1/hosts", auth.Required(hostsv1.ListHosts(i)))
 	mux.HandleFunc("GET /api/v1/hosts/pending", auth.Required(hostsv1.ListPending(i)))

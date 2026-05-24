@@ -1,0 +1,24 @@
+load("//third_party/bazel:go_rules.bzl", "go_api_library", "integration_test")
+
+go_api_library(
+    name = "dashboard",
+    srcs = ["overview.go"],
+    importpath = "go.patchbase.net/server/internal/api/v1/dashboard",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/api/auth",
+        "//internal/api/webutil",
+        "//internal/services",
+        "@com_github_samber_do_v2//:do",
+    ],
+)
+
+integration_test(
+    name = "overview_test",
+    srcs = ["overview_test.go"],
+    deps = [
+        "//internal/testing",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

@@ -2,14 +2,14 @@
 	import AppLayout from '$lib/components/AppLayout.svelte';
 	import StatsRow from '$lib/components/StatsRow.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
-	import { api } from '$lib/mocks/api.js';
+	import { listHosts } from '$lib/api/hosts.js';
 	import { formatTime } from '$lib/format';
 	import type { Host } from '$lib/types';
 
 	let hosts = $state<Host[]>([]);
 
 	$effect(() => {
-		api.listHosts().then((data) => (hosts = data));
+		listHosts().then((data) => (hosts = data));
 	});
 
 	let rebootHosts = $derived(hosts.filter((h) => h.needs_reboot > 0));

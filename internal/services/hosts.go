@@ -59,6 +59,16 @@ type Hosts interface {
 	GetLatestSnapshot(ctx context.Context, hostID string) (HostSnapshotInfo, error)
 	RunSSHPull(ctx context.Context, hostID string) error
 	ListSSHPullJobs(ctx context.Context, hostID string) ([]HostSSHPullJobInfo, error)
+	GetDashboardOverview(ctx context.Context) (DashboardOverview, error)
+}
+
+type DashboardOverview struct {
+	TotalHosts         int64 `json:"total_hosts"`
+	NeedAttention      int64 `json:"need_attention"`
+	RebootQueue        int64 `json:"reboot_queue"`
+	UnknownInvestigate int64 `json:"unknown_investigate"`
+	TotalAdvisories    int64 `json:"total_advisories"`
+	TotalStreams       int64 `json:"total_streams"`
 }
 
 type hosts struct {
@@ -1133,4 +1143,19 @@ func (s *hosts) ListSSHPullJobs(ctx context.Context, hostID string) ([]HostSSHPu
 		})
 	}
 	return jobs, nil
+}
+
+func (s *hosts) GetDashboardOverview(ctx context.Context) (DashboardOverview, error) {
+	row, err := s.sql.GetDashboardOverview(ctx)
+	if err != nil {
+		return DashboardOverview{}, fmt.Errorf("get dashboard overview: %w", err)
+	}
+	return DashboardOverview{
+		TotalHosts:         row.TotalHosts,
+		NeedAttention:      row.NeedAttention,
+		RebootQueue:        row.RebootQueue,
+		UnknownInvestigate: row.UnknownInvestigate,
+		TotalAdvisories:    row.TotalAdvisories,
+		TotalStreams:       row.TotalStreams,
+	}, nil
 }

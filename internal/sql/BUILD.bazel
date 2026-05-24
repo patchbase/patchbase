@@ -17,7 +17,6 @@ go_library(
         "host_ssh_pull_jobs.sql.go",
         "hosts.sql.go",
         "injector.go",
-        "matcher.sql.go",
         "models.go",
         "product_streams.sql.go",
         "querier.go",

@@ -2,15 +2,17 @@
 	import AppLayout from '$lib/components/AppLayout.svelte';
 	import StatsRow from '$lib/components/StatsRow.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
-	import { api } from '$lib/mocks/api.js';
+	import { getDashboardOverview } from '$lib/api/dashboard.js';
+	import { listHosts } from '$lib/api/hosts.js';
 	import { relativeTime } from '$lib/format';
+	import type { Host } from '$lib/types';
 
-	let overview = $state<{ total_hosts: number; need_attention: number; reboot_queue: number; unknown_investigate: number; total_advisories: number; total_streams: number } | null>(null);
-	let recentHosts = $state<Awaited<ReturnType<typeof api.listHosts>>>([]);
+	let overview = $state<Awaited<ReturnType<typeof getDashboardOverview>> | null>(null);
+	let recentHosts = $state<Host[]>([]);
 
 	$effect(() => {
-		api.getOverview().then((data) => (overview = data));
-		api.listHosts().then((data) => (recentHosts = data.slice(0, 5)));
+		getDashboardOverview().then((data) => (overview = data));
+		listHosts().then((data) => (recentHosts = data.slice(0, 5)));
 	});
 
 	let stats = $derived(

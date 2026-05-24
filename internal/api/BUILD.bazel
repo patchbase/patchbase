@@ -16,6 +16,7 @@ go_library(
         "//internal/api/v1/advisories",
         "//internal/api/v1/agent",
         "//internal/api/v1/auth",
+        "//internal/api/v1/dashboard",
         "//internal/api/v1/health",
         "//internal/api/v1/hosts",
         "//internal/api/v1/setup",

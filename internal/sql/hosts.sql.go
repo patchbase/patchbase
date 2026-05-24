@@ -96,6 +96,39 @@ func (q *Queries) DeleteHostByID(ctx context.Context, id string) (Host, error) {
 	return i, err
 }
 
+const getDashboardOverview = `-- name: GetDashboardOverview :one
+SELECT
+    (SELECT COUNT(*) FROM hosts) AS total_hosts,
+    (SELECT COUNT(*) FROM hosts h JOIN host_current_state hcs ON h.id = hcs.host_id WHERE hcs.overall_action <> 'none') AS need_attention,
+    (SELECT COUNT(*) FROM hosts h JOIN host_current_state hcs ON h.id = hcs.host_id WHERE hcs.needs_reboot > 0) AS reboot_queue,
+    (SELECT COUNT(*) FROM hosts h JOIN host_current_state hcs ON h.id = hcs.host_id WHERE hcs.overall_action = 'investigate') AS unknown_investigate,
+    (SELECT COUNT(*) FROM advisories) AS total_advisories,
+    (SELECT COUNT(*) FROM product_streams) AS total_streams
+`
+
+type GetDashboardOverviewRow struct {
+	TotalHosts         int64
+	NeedAttention      int64
+	RebootQueue        int64
+	UnknownInvestigate int64
+	TotalAdvisories    int64
+	TotalStreams       int64
+}
+
+func (q *Queries) GetDashboardOverview(ctx context.Context) (GetDashboardOverviewRow, error) {
+	row := q.db.QueryRow(ctx, getDashboardOverview)
+	var i GetDashboardOverviewRow
+	err := row.Scan(
+		&i.TotalHosts,
+		&i.NeedAttention,
+		&i.RebootQueue,
+		&i.UnknownInvestigate,
+		&i.TotalAdvisories,
+		&i.TotalStreams,
+	)
+	return i, err
+}
+
 const getHostByID = `-- name: GetHostByID :one
 SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
 FROM hosts
