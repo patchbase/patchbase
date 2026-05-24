@@ -138,7 +138,7 @@
 									{scope.last_success_at ? relativeTime(scope.last_success_at) : 'Never'}
 								</td>
 								<td>
-									{scope.next_refresh_at ? relativeTime(scope.next_refresh_at) : 'Never'}
+									{scope.next_refresh_at ? relativeTime(scope.next_refresh_at, true) : 'Never'}
 								</td>
 								<td style="text-align: right; white-space: nowrap;">
 									<button

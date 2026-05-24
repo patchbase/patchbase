@@ -4,9 +4,24 @@ export function formatTime(iso: string | null | undefined): string {
   return `${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })} ${date.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}`;
 }
 
-export function relativeTime(iso: string | null | undefined): string {
+export function relativeTime(iso: string | null | undefined, isFuture = false): string {
   if (!iso) return "-";
   const diff = Date.now() - new Date(iso).getTime();
+  if (isFuture) {
+    if (diff >= 0) {
+      return "now";
+    }
+    const mins = Math.floor(Math.abs(diff) / 60000);
+    if (mins < 1) return "in <1m";
+    if (mins < 60) return `in ${mins}m`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `in ${hrs}h`;
+    return `in ${Math.floor(hrs / 24)}d`;
+  }
+
+  if (diff < 0) {
+    return "just now";
+  }
   const mins = Math.floor(diff / 60000);
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
