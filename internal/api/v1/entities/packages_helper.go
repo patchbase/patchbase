@@ -2,6 +2,7 @@ package entities
 
 import (
 	"encoding/json"
+	"sort"
 	"strings"
 
 	"go.patchbase.net/server/internal/sql"
@@ -87,11 +88,71 @@ func GroupDecisionsByRemediation(decisions []DecisionItem) []DecisionGroup {
 		}
 	}
 
+	for groupIndex := range grouped {
+		sort.Slice(grouped[groupIndex].Advisories, func(i, j int) bool {
+			left := grouped[groupIndex].Advisories[i]
+			right := grouped[groupIndex].Advisories[j]
+
+			leftSeverity := severityPriorityLabel(left.SeverityLabel)
+			rightSeverity := severityPriorityLabel(right.SeverityLabel)
+			if leftSeverity != rightSeverity {
+				return leftSeverity > rightSeverity
+			}
+
+			leftUpdated := displayTimestampPriority(left.AdvisoryUpdatedAt, left.ComputedAt)
+			rightUpdated := displayTimestampPriority(right.AdvisoryUpdatedAt, right.ComputedAt)
+			if leftUpdated != rightUpdated {
+				return leftUpdated > rightUpdated
+			}
+
+			return left.AdvisoryID < right.AdvisoryID
+		})
+
+		for advisoryIndex := range grouped[groupIndex].Advisories {
+			sort.Slice(grouped[groupIndex].Advisories[advisoryIndex].Items, func(i, j int) bool {
+				left := grouped[groupIndex].Advisories[advisoryIndex].Items[i]
+				right := grouped[groupIndex].Advisories[advisoryIndex].Items[j]
+
+				if left.PackageName != right.PackageName {
+					return left.PackageName < right.PackageName
+				}
+				return left.InstalledNevra < right.InstalledNevra
+			})
+		}
+	}
+
+	sort.Slice(grouped, func(i, j int) bool {
+		left := grouped[i]
+		right := grouped[j]
+
+		leftAction := actionPriorityLabel(left.ActionLabel)
+		rightAction := actionPriorityLabel(right.ActionLabel)
+		if leftAction != rightAction {
+			return leftAction > rightAction
+		}
+
+		leftSeverity := severityPriorityLabel(left.SeverityLabel)
+		rightSeverity := severityPriorityLabel(right.SeverityLabel)
+		if leftSeverity != rightSeverity {
+			return leftSeverity > rightSeverity
+		}
+
+		return strings.ToLower(left.FamilyLabel) < strings.ToLower(right.FamilyLabel)
+	})
+
 	return grouped
 }
 
 func MapDecisionRow(row sql.ListDecisionPageRowsBySnapshotRow, sourceRPMs map[string]string) DecisionItem {
-	severity := row.Severity.UnwrapOr("")
+	severity := ""
+	switch value := row.Severity.(type) {
+	case string:
+		severity = value
+	case []byte:
+		severity = string(value)
+	case utils.Option[string]:
+		severity = value.UnwrapOr("")
+	}
 	sourceRPM := sourceRPMs[row.PackageName]
 
 	cves := make([]CVEInfo, 0)
@@ -136,17 +197,35 @@ func MapDecisionRow(row sql.ListDecisionPageRowsBySnapshotRow, sourceRPMs map[st
 }
 
 func packageFamilyLabel(packageName string, sourceRPM string) string {
+	name := strings.TrimSpace(packageName)
+	if isKernelPackageName(name) {
+		return "kernel"
+	}
+
 	if sourcePackage := sourceRPMName(sourceRPM); sourcePackage != "" {
+		if isKernelPackageName(sourcePackage) {
+			return "kernel"
+		}
 		return sourcePackage
 	}
 
-	name := strings.TrimSpace(packageName)
 	if name == "" {
 		return "packages"
 	}
 
 	parts := strings.Split(name, "-")
 	return parts[0]
+}
+
+func isKernelPackageName(name string) bool {
+	trimmed := strings.TrimSpace(name)
+	if trimmed == "" {
+		return false
+	}
+	if strings.HasPrefix(trimmed, "linux-") {
+		return true
+	}
+	return trimmed == "kernel" || strings.HasPrefix(trimmed, "kernel-")
 }
 
 func sourceRPMName(value string) string {
@@ -223,16 +302,19 @@ func displayPackageBuild(packageName string, value string) string {
 	}
 
 	suffix := trimmed[lastDot+1:]
-	if !isRPMArch(suffix) {
+	if !isKnownArch(suffix) {
 		return trimmed
 	}
 
 	return trimmed[:lastDot]
 }
 
-func isRPMArch(value string) bool {
-	switch value {
-	case "x86_64", "aarch64", "noarch", "ppc64le", "s390x", "armv7hl", "i686":
+func isKnownArch(value string) bool {
+	switch strings.ToLower(value) {
+	case "x86_64", "aarch64", "noarch", "ppc64le", "s390x", "armv7hl", "i686",
+		"amd64", "arm64", "armel", "armhf", "i386", "mips64el", "mipsel", "powerpc", "ppc64el", "riscv64", "loong64",
+		"alpha", "hppa", "ia64", "m68k", "sh4", "sparc64", "x32", "sparc", "ppc64", "mips", "mips64",
+		"all", "any", "binary", "source":
 		return true
 	default:
 		return false
@@ -240,15 +322,16 @@ func isRPMArch(value string) bool {
 }
 
 func severityLabel(severity string) string {
-	if severity == "" {
+	normalized := normalizeSeverity(severity)
+	if normalized == "" {
 		return "Unknown"
 	}
 
-	return strings.ToUpper(severity[:1]) + strings.ToLower(severity[1:])
+	return strings.ToUpper(normalized[:1]) + strings.ToLower(normalized[1:])
 }
 
 func severityTone(severity string) string {
-	switch strings.ToLower(severity) {
+	switch normalizeSeverity(severity) {
 	case "critical":
 		return "danger"
 	case "important":
@@ -263,7 +346,7 @@ func severityTone(severity string) string {
 }
 
 func severityPriorityLabel(label string) int {
-	switch strings.ToLower(strings.TrimSpace(label)) {
+	switch normalizeSeverity(label) {
 	case "critical":
 		return 4
 	case "important":
@@ -274,6 +357,18 @@ func severityPriorityLabel(label string) int {
 		return 1
 	default:
 		return 0
+	}
+}
+
+func normalizeSeverity(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	switch normalized {
+	case "high":
+		return "important"
+	case "medium":
+		return "moderate"
+	default:
+		return normalized
 	}
 }
 

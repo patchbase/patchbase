@@ -1,6 +1,12 @@
 import { request } from "$lib/api/request.js";
 import { getSession } from "$lib/auth/session.js";
-import type { Host, HostSnapshot, HostPullJob, MatcherDecisionGroup } from "$lib/types";
+import type {
+  Host,
+  HostSnapshot,
+  HostPullJob,
+  HostKernelPosture,
+  MatcherDecisionGroup,
+} from "$lib/types";
 
 export interface RegistrationTokenInfo {
   id: string;
@@ -127,6 +133,10 @@ export async function getHostVulnerablePackages(id: string): Promise<MatcherDeci
 
 export async function getHostUpgradablePackages(id: string): Promise<MatcherDecisionGroup[]> {
   return authenticatedRequest(`/api/v1/hosts/${id}/packages/upgradable`);
+}
+
+export async function getHostKernelPosture(id: string): Promise<HostKernelPosture> {
+  return authenticatedRequest(`/api/v1/hosts/${id}/kernel-posture`);
 }
 
 export async function createManualHost(

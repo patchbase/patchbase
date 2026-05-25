@@ -171,3 +171,28 @@ export interface MatcherDecisionGroup {
   package_count: number;
   advisories: DecisionAdvisoryGroup[];
 }
+
+export interface KernelSeverityCounts {
+  critical: number;
+  important: number;
+  moderate: number;
+  low: number;
+  unknown: number;
+}
+
+export interface KernelRiskView {
+  advisory_count: number;
+  package_count: number;
+  cve_count: number;
+  severity_counts: KernelSeverityCounts;
+  latest_updated_at: string;
+  advisories: DecisionAdvisoryGroup[];
+}
+
+export interface HostKernelPosture {
+  running_kernel: string;
+  latest_installed_kernel: string;
+  reboot_would_reduce_cve_count: boolean;
+  active_kernel: KernelRiskView;
+  latest_installed: KernelRiskView;
+}

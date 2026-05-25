@@ -6,14 +6,16 @@
 	import DeleteHostButton from '$lib/components/DeleteHostButton.svelte';
 	import {
 		getHost,
+		getHostKernelPosture,
 		getHostSnapshot,
 		listPullJobs,
 		getHostVulnerablePackages,
-		getHostUpgradablePackages
+		getHostUpgradablePackages,
+		ingestManualReport
 	} from '$lib/api/hosts.js';
 	import { formatTime, formatDuration } from '$lib/format';
 	import { goto } from '$app/navigation';
-	import type { Host, HostSnapshot, HostPullJob, MatcherDecisionGroup } from '$lib/types';
+	import type { Host, HostKernelPosture, HostSnapshot, HostPullJob, MatcherDecisionGroup } from '$lib/types';
 
 	interface Props {
 		params: { hostId: string };
@@ -26,11 +28,60 @@
 	let pullJobs = $state<HostPullJob[]>([]);
 	let vulnerableGroups = $state<MatcherDecisionGroup[]>([]);
 	let upgradableGroups = $state<MatcherDecisionGroup[]>([]);
-	let activeTab = $state<'vulnerabilities' | 'updates'>('vulnerabilities');
+	let kernelPosture = $state<HostKernelPosture | null>(null);
+	let activeTab = $state<'vulnerabilities' | 'updates' | 'kernel'>('vulnerabilities');
 	let expandedGroups = $state<Record<string, boolean>>({});
 	let loading = $state(true);
 	let error = $state('');
 	let packagesError = $state('');
+	let kernelError = $state('');
+
+	let manualFileContent = $state('');
+	let manualFileName = $state('');
+	let uploading = $state(false);
+	let uploadError = $state('');
+	let uploadSuccess = $state(false);
+	let fileInput = $state<HTMLInputElement | null>(null);
+
+	function handleFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		if (input.files && input.files[0]) {
+			const file = input.files[0];
+			manualFileName = file.name;
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				manualFileContent = e.target?.result as string || '';
+			};
+			reader.readAsText(file);
+		} else {
+			manualFileContent = '';
+			manualFileName = '';
+		}
+	}
+
+	async function submitReport() {
+		if (!manualFileContent || !host) {
+			uploadError = 'Please select a report file first.';
+			return;
+		}
+		uploading = true;
+		uploadError = '';
+		uploadSuccess = false;
+		try {
+			await ingestManualReport(host.id, manualFileContent);
+			uploadSuccess = true;
+			manualFileContent = '';
+			manualFileName = '';
+			if (fileInput) {
+				fileInput.value = '';
+			}
+			await loadData(true);
+		} catch (err) {
+			uploadError = err instanceof Error ? err.message : 'Failed to upload report.';
+		} finally {
+			uploading = false;
+		}
+	}
 
 	function toggleGroup(familyLabel: string) {
 		expandedGroups[familyLabel] = !expandedGroups[familyLabel];
@@ -42,9 +93,10 @@
 			loading = true;
 			error = '';
 			packagesError = '';
+			kernelError = '';
 		}
 		try {
-			const [hostData, snapshotData, jobsData, vulnsData, updatesData] = await Promise.all([
+			const [hostData, snapshotData, jobsData, vulnsData, updatesData, kernelData] = await Promise.all([
 				getHost(id),
 				getHostSnapshot(id).catch(() => null),
 				listPullJobs(id).catch(() => [] as HostPullJob[]),
@@ -55,6 +107,10 @@
 				getHostUpgradablePackages(id).catch((err) => {
 					packagesError = err instanceof Error ? err.message : 'Failed to load upgradable packages';
 					return [] as MatcherDecisionGroup[];
+				}),
+				getHostKernelPosture(id).catch((err) => {
+					kernelError = err instanceof Error ? err.message : 'Failed to load kernel posture';
+					return null;
 				})
 			]);
 
@@ -72,6 +128,9 @@
 			}
 			if (JSON.stringify(upgradableGroups) !== JSON.stringify(updatesData)) {
 				upgradableGroups = updatesData;
+			}
+			if (JSON.stringify(kernelPosture) !== JSON.stringify(kernelData)) {
+				kernelPosture = kernelData;
 			}
 		} catch (err) {
 			if (!silent) {
@@ -172,6 +231,53 @@
 			{/if}
 		</div>
 
+		{#if host.onboarding_mode === 'manual'}
+			<div class="detail-card" style="margin-bottom:24px">
+				<h3>Upload New Report</h3>
+				<p class="form-hint" style="margin-bottom: 16px; color: var(--text-secondary); font-size: 13px; max-width: 600px;">
+					Run the collector script on the host to gather package and system data, then select the generated report text file to update this host's status.
+				</p>
+				
+				<div class="upload-container" style="display: flex; flex-direction: column; gap: 12px; max-width: 500px;">
+					{#if uploadError}
+						<div class="upload-error" style="color: var(--red); font-size: 13px; background: var(--red-bg); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--red);">
+							{uploadError}
+						</div>
+					{/if}
+					
+					{#if uploadSuccess}
+						<div class="upload-success" style="color: var(--green); font-size: 13px; background: var(--green-bg); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--green);">
+							Report uploaded and processed successfully!
+						</div>
+					{/if}
+
+					<div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+						<input
+							bind:this={fileInput}
+							type="file"
+							accept=".txt,.sh,.log"
+							onchange={handleFileChange}
+							class="form-input"
+							style="flex: 1; min-width: 200px; padding: 6px 12px; border: 1px solid var(--border); border-radius: 6px; background: var(--bg-secondary); color: var(--text-primary); cursor: pointer;"
+						/>
+						<button
+							class="btn btn-primary btn-sm"
+							type="button"
+							onclick={submitReport}
+							disabled={!manualFileContent || uploading}
+							style="min-width: 120px;"
+						>
+							{#if uploading}
+								Uploading...
+							{:else}
+								Upload Report
+							{/if}
+						</button>
+					</div>
+				</div>
+			</div>
+		{/if}
+
 		{#if snapshot}
 			<div class="detail-card" style="margin-bottom:24px">
 				<h3>Latest Snapshot</h3>
@@ -205,6 +311,15 @@
 					Updates
 					{#if upgradableGroups.reduce((acc, g) => acc + g.package_count, 0) > 0}
 						<span class="tab-badge badge badge-blue">{upgradableGroups.reduce((acc, g) => acc + g.package_count, 0)}</span>
+					{/if}
+				</button>
+				<button
+					class="tab-btn {activeTab === 'kernel' ? 'active' : ''}"
+					onclick={() => activeTab = 'kernel'}
+				>
+					Kernel
+					{#if kernelPosture && kernelPosture.active_kernel.cve_count > 0}
+						<span class="tab-badge badge badge-warn">{kernelPosture.active_kernel.cve_count}</span>
 					{/if}
 				</button>
 			</div>
@@ -299,7 +414,7 @@
 						{/each}
 					</div>
 				{/if}
-			{:else}
+			{:else if activeTab === 'updates'}
 				{#if upgradableGroups.length === 0}
 					<div class="empty-state-card">
 						{#if host.available_updates > 0}
@@ -390,6 +505,101 @@
 						{/each}
 					</div>
 				{/if}
+			{:else}
+				<div class="detail-card">
+					<h3>Kernel Vulnerability Posture</h3>
+					{#if kernelError}
+						<div class="packages-error-banner" style="margin-top:12px">{kernelError}</div>
+					{:else if kernelPosture}
+						<div class="detail-row"><span class="label">Running Kernel</span><span class="value mono">{kernelPosture.running_kernel || '-'}</span></div>
+						<div class="detail-row"><span class="label">Latest Installed Kernel</span><span class="value mono">{kernelPosture.latest_installed_kernel || '-'}</span></div>
+						<div class="detail-row"><span class="label">Reboot Impact</span><span class="value">{kernelPosture.reboot_would_reduce_cve_count ? 'Reboot would reduce active kernel CVEs' : 'No CVE reduction expected from reboot'}</span></div>
+
+						<div style="margin-top:12px; display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px;">
+							<div style="border:1px solid var(--border); border-radius:10px; padding:12px;">
+								<div style="font-weight:600; margin-bottom:8px;">Active Kernel</div>
+								<div class="detail-row"><span class="label">Advisories</span><span class="value">{kernelPosture.active_kernel.advisory_count}</span></div>
+								<div class="detail-row"><span class="label">CVEs</span><span class="value">{kernelPosture.active_kernel.cve_count}</span></div>
+								<div class="detail-row"><span class="label">Packages</span><span class="value">{kernelPosture.active_kernel.package_count}</span></div>
+							</div>
+							<div style="border:1px solid var(--border); border-radius:10px; padding:12px;">
+								<div style="font-weight:600; margin-bottom:8px;">Latest Installed Kernel</div>
+								<div class="detail-row"><span class="label">Advisories</span><span class="value">{kernelPosture.latest_installed.advisory_count}</span></div>
+								<div class="detail-row"><span class="label">CVEs</span><span class="value">{kernelPosture.latest_installed.cve_count}</span></div>
+								<div class="detail-row"><span class="label">Packages</span><span class="value">{kernelPosture.latest_installed.package_count}</span></div>
+							</div>
+						</div>
+
+						{#if kernelPosture.active_kernel.advisories.length > 0}
+							<div style="margin-top:16px;">
+								<h4 style="margin-bottom:8px;">Active Kernel Advisories</h4>
+								<div class="groups-list">
+									{#each kernelPosture.active_kernel.advisories as advisory}
+										<div class="group-card">
+											<div class="group-header">
+												<div class="group-title-section">
+													{#if advisory.advisory_url}
+														<a href={advisory.advisory_url} target="_blank" class="advisory-link">{advisory.advisory_id}</a>
+													{:else}
+														<span class="group-title">{advisory.advisory_id}</span>
+													{/if}
+													<span class="badge badge-{advisory.severity_tone}">{advisory.severity_label}</span>
+													<span class="badge badge-{advisory.action_tone}">{advisory.action_label}</span>
+												</div>
+											</div>
+											<div class="group-content">
+												<div class="advisory-title">{advisory.title}</div>
+												{#if advisory.cves && advisory.cves.length > 0}
+													<div class="advisory-cves" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+														{#each advisory.cves as cve}
+															<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size:11px; text-decoration:none; padding:2px 6px;">{cve.id}</a>
+														{/each}
+													</div>
+												{/if}
+											</div>
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+						{#if kernelPosture.latest_installed.advisories.length > 0}
+							<div style="margin-top:16px;">
+								<h4 style="margin-bottom:8px;">Latest Installed Kernel Advisories</h4>
+								<div class="groups-list">
+									{#each kernelPosture.latest_installed.advisories as advisory}
+										<div class="group-card">
+											<div class="group-header">
+												<div class="group-title-section">
+													{#if advisory.advisory_url}
+														<a href={advisory.advisory_url} target="_blank" class="advisory-link">{advisory.advisory_id}</a>
+													{:else}
+														<span class="group-title">{advisory.advisory_id}</span>
+													{/if}
+													<span class="badge badge-{advisory.severity_tone}">{advisory.severity_label}</span>
+													<span class="badge badge-{advisory.action_tone}">{advisory.action_label}</span>
+												</div>
+											</div>
+											<div class="group-content">
+												<div class="advisory-title">{advisory.title}</div>
+												{#if advisory.cves && advisory.cves.length > 0}
+													<div class="advisory-cves" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+														{#each advisory.cves as cve}
+															<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size:11px; text-decoration:none; padding:2px 6px;">{cve.id}</a>
+														{/each}
+													</div>
+												{/if}
+											</div>
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+					{:else}
+						<div class="empty-state-card" style="margin-top:12px;">
+							<p>No kernel posture data available.</p>
+						</div>
+					{/if}
+				</div>
 			{/if}
 		{/if}
 

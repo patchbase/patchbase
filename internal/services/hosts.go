@@ -1170,8 +1170,8 @@ func (s *hosts) GetCollectorScript() string {
 func (s *hosts) CreateManualHost(ctx context.Context, displayName string, hostname string) (HostInfo, error) {
 	displayName = strings.TrimSpace(displayName)
 	hostname = strings.TrimSpace(hostname)
-	if hostname == "" {
-		return HostInfo{}, fmt.Errorf("hostname is required")
+	if displayName == "" && hostname == "" {
+		return HostInfo{}, fmt.Errorf("display name or hostname is required")
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})

@@ -37,7 +37,6 @@
 	let sshCopied = $state(false);
 
 	let manualDisplayName = $state('');
-	let manualHostname = $state('');
 	let manualHostID = $state('');
 	let manualFileContent = $state('');
 	let manualFileName = $state('');
@@ -48,7 +47,7 @@
 		event.preventDefault();
 		error = '';
 		try {
-			const result = await createManualHost(manualDisplayName, manualHostname);
+			const result = await createManualHost(manualDisplayName, '');
 			manualHostID = result.host_id;
 			manualStep = 2;
 			void loadScriptContent();
@@ -371,11 +370,7 @@
 
 				<div class="form-group">
 					<label>Display Name</label>
-					<input class="form-input" bind:value={manualDisplayName} placeholder="my-manual-server" />
-				</div>
-				<div class="form-group">
-					<label>Hostname</label>
-					<input class="form-input" bind:value={manualHostname} placeholder="server.local" required />
+					<input class="form-input" bind:value={manualDisplayName} placeholder="my-manual-server" required />
 				</div>
 
 				<button class="btn btn-primary btn-sm" type="submit">Create Manual Host</button>

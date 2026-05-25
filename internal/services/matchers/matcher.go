@@ -416,7 +416,37 @@ func buildDecisions(
 				compared = compareEVR(installed, fixed)
 			}
 			if compared < 0 {
-				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), "affected_fix_available", "update_package", evidenceTier, "vendor_fix_available_not_installed", "a vendor fixed package is available but not installed", computedAt)
+				status := "affected_fix_available"
+				action := "update_package"
+				reasonCode := "vendor_fix_available_not_installed"
+				reasonText := "a vendor fixed package is available but not installed"
+
+				// If this is a versioned kernel package, check if a newer version of the same flavor/name is already installed
+				if isKernelPackage(pkg.GetName(), osFamily) {
+					if osFamily == "apt" {
+						if isVersionedKernelPackageAPT(pkg.GetName()) {
+							flavor := "generic"
+							if idx := strings.LastIndex(pkg.GetName(), "-"); idx >= 0 {
+								flavor = pkg.GetName()[idx+1:]
+							}
+							if latest, found := latestInstalledKernelEVRAPT(packages, flavor); found && compareDebianEVR(latest, fixed) >= 0 {
+								status = "fixed_package_installed_pending_activation"
+								action = "reboot_host"
+								reasonCode = "fixed_package_installed_kernel_not_running"
+								reasonText = "fixed kernel package is installed but the running kernel is older"
+							}
+						}
+					} else {
+						if latest, found := latestInstalledKernelEVRRPM(packages, pkg.GetName()); found && compareEVR(latest, fixed) >= 0 {
+							status = "fixed_package_installed_pending_activation"
+							action = "reboot_host"
+							reasonCode = "fixed_package_installed_kernel_not_running"
+							reasonText = "fixed kernel package is installed but the running kernel is older"
+						}
+					}
+				}
+
+				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), status, action, evidenceTier, reasonCode, reasonText, computedAt)
 				record.FixedNevra = utils.Some(bestFix.Nevra)
 				decisions = append(decisions, decision{record: record, severity: advisorySeverity(advisory)})
 				continue
@@ -470,7 +500,36 @@ func decisionFromFixedPackageOnly(
 		compared = compareEVR(installed, fixed)
 	}
 	if compared < 0 {
-		record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(bestFix.ProductStreamID), "affected_fix_available", "update_package", evidenceTier, "vendor_fix_available_not_installed", "a vendor fixed package is available but not installed", computedAt)
+		status := "affected_fix_available"
+		action := "update_package"
+		reasonCode := "vendor_fix_available_not_installed"
+		reasonText := "a vendor fixed package is available but not installed"
+
+		if isKernelPackage(pkg.GetName(), osFamily) {
+			if osFamily == "apt" {
+				if isVersionedKernelPackageAPT(pkg.GetName()) {
+					flavor := "generic"
+					if idx := strings.LastIndex(pkg.GetName(), "-"); idx >= 0 {
+						flavor = pkg.GetName()[idx+1:]
+					}
+					if latest, found := latestInstalledKernelEVRAPT(packages, flavor); found && compareDebianEVR(latest, fixed) >= 0 {
+						status = "fixed_package_installed_pending_activation"
+						action = "reboot_host"
+						reasonCode = "fixed_package_installed_kernel_not_running"
+						reasonText = "fixed kernel package is installed but the running kernel is older"
+					}
+				}
+			} else {
+				if latest, found := latestInstalledKernelEVRRPM(packages, pkg.GetName()); found && compareEVR(latest, fixed) >= 0 {
+					status = "fixed_package_installed_pending_activation"
+					action = "reboot_host"
+					reasonCode = "fixed_package_installed_kernel_not_running"
+					reasonText = "fixed kernel package is installed but the running kernel is older"
+				}
+			}
+		}
+
+		record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(bestFix.ProductStreamID), status, action, evidenceTier, reasonCode, reasonText, computedAt)
 		record.FixedNevra = utils.Some(bestFix.Nevra)
 		return record, true, nil
 	}
@@ -959,4 +1018,58 @@ func parseDecisionFixedEVR(record sql.InsertDecisionRecordParams, osFamily strin
 	}
 
 	return parsed, true
+}
+
+func isVersionedKernelPackageAPT(name string) bool {
+	if !strings.HasPrefix(name, "linux-image-") {
+		return false
+	}
+	trimmed := strings.TrimPrefix(name, "linux-image-")
+	trimmed = strings.TrimPrefix(trimmed, "unsigned-")
+	return len(trimmed) > 0 && isDigit(trimmed[0])
+}
+
+func latestInstalledKernelEVRAPT(packages []*agentpb.Package, flavor string) (evr, bool) {
+	var maxEVR evr
+	found := false
+	for _, p := range packages {
+		name := p.GetName()
+		if isVersionedKernelPackageAPT(name) {
+			f := "generic"
+			if idx := strings.LastIndex(name, "-"); idx >= 0 {
+				f = name[idx+1:]
+			}
+			if f == flavor {
+				pEVR := evr{
+					epoch:   int64(p.GetEpoch()),
+					version: p.GetVersion(),
+					release: p.GetRelease(),
+				}
+				if !found || compareDebianEVR(pEVR, maxEVR) > 0 {
+					maxEVR = pEVR
+					found = true
+				}
+			}
+		}
+	}
+	return maxEVR, found
+}
+
+func latestInstalledKernelEVRRPM(packages []*agentpb.Package, packageName string) (evr, bool) {
+	var maxEVR evr
+	found := false
+	for _, p := range packages {
+		if p.GetName() == packageName {
+			pEVR := evr{
+				epoch:   int64(p.GetEpoch()),
+				version: p.GetVersion(),
+				release: p.GetRelease(),
+			}
+			if !found || compareEVR(pEVR, maxEVR) > 0 {
+				maxEVR = pEVR
+				found = true
+			}
+		}
+	}
+	return maxEVR, found
 }

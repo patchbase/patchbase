@@ -4,6 +4,7 @@ go_api_library(
     name = "entities",
     srcs = [
         "hosts.go",
+        "kernel.go",
         "matcher.go",
         "packages_helper.go",
         "timestamp.go",
@@ -30,5 +31,6 @@ integration_test(
         "//internal/sql",
         "//internal/utils",
         "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
     ],
 )

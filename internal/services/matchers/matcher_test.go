@@ -614,3 +614,34 @@ func TestCollapseSupersededDecisions_APT(t *testing.T) {
 	require.Len(t, collapsed, 1)
 	assert.Equal(t, "openssl-1.0-1.deb12u2", collapsed[0].record.FixedNevra.UnwrapOr(""))
 }
+
+func TestLatestInstalledKernel(t *testing.T) {
+	t.Run("APT packages", func(t *testing.T) {
+		packages := []*agentpb.Package{
+			{Name: "linux-image-5.15.0-120-generic", Version: "5.15.0", Release: "120.130"},
+			{Name: "linux-image-5.15.0-176-generic", Version: "5.15.0", Release: "176.186"},
+			{Name: "linux-image-5.15.0-156-generic", Version: "5.15.0", Release: "156.166"},
+			{Name: "linux-image-generic", Version: "5.15.0.176.163", Release: "1"},
+		}
+
+		latest, found := latestInstalledKernelEVRAPT(packages, "generic")
+		require.True(t, found)
+		assert.Equal(t, int64(0), latest.epoch)
+		assert.Equal(t, "5.15.0", latest.version)
+		assert.Equal(t, "176.186", latest.release)
+	})
+
+	t.Run("RPM packages", func(t *testing.T) {
+		packages := []*agentpb.Package{
+			{Name: "kernel", Version: "5.14.0", Release: "70.el9"},
+			{Name: "kernel", Version: "5.14.0", Release: "362.24.1.el9"},
+			{Name: "kernel", Version: "5.14.0", Release: "284.11.1.el9"},
+		}
+
+		latest, found := latestInstalledKernelEVRRPM(packages, "kernel")
+		require.True(t, found)
+		assert.Equal(t, int64(0), latest.epoch)
+		assert.Equal(t, "5.14.0", latest.version)
+		assert.Equal(t, "362.24.1.el9", latest.release)
+	})
+}

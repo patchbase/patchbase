@@ -10,6 +10,7 @@ go_api_library(
         "delete_host.go",
         "get_collector_script.go",
         "get_host.go",
+        "kernel_posture.go",
         "get_latest_snapshot.go",
         "ingest_manual_report.go",
         "list_hosts.go",
