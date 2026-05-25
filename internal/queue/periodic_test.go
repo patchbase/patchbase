@@ -33,8 +33,8 @@ func TestPeriodicJobManager_Initialize(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = pool.Exec(ctx, `
-		INSERT INTO host_ssh_pull (host_id, pull_frequency_minutes, onboarded)
-		VALUES ('h_host1', 60, true), ('h_host2', 120, true), ('h_host3', 180, false)
+		INSERT INTO host_ssh_pull (host_id, pull_hostname, pull_frequency_minutes, onboarded)
+		VALUES ('h_host1', 'h_host1', 60, true), ('h_host2', 'h_host2', 120, true), ('h_host3', 'h_host3', 180, false)
 	`)
 	require.NoError(t, err)
 

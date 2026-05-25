@@ -307,7 +307,8 @@ CREATE TABLE public.host_ssh_pull (
     pull_last_run_at timestamp with time zone,
     pull_last_run_status text,
     pull_last_run_error text,
-    onboarded boolean DEFAULT false NOT NULL
+    onboarded boolean DEFAULT false NOT NULL,
+    pull_hostname text NOT NULL
 );
 
 
@@ -353,7 +354,7 @@ CREATE TABLE public.hosts (
     advisory_scope_key text,
     CONSTRAINT hosts_approval_status_check CHECK ((approval_status = ANY (ARRAY['waiting_approval'::text, 'approved'::text, 'rejected'::text]))),
     CONSTRAINT hosts_id_prefix_check CHECK ((id ~~ like_escape('h\_%'::text, '\'::text))),
-    CONSTRAINT hosts_onboarding_mode_check CHECK ((onboarding_mode = ANY (ARRAY['agent'::text, 'ssh'::text])))
+    CONSTRAINT hosts_onboarding_mode_check CHECK ((onboarding_mode = ANY (ARRAY['agent'::text, 'ssh'::text, 'manual'::text])))
 );
 
 

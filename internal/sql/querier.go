@@ -51,6 +51,7 @@ type Querier interface {
 	InsertHostAccessToken(ctx context.Context, arg InsertHostAccessTokenParams) (HostAccessToken, error)
 	InsertHostSSHPullJob(ctx context.Context, arg InsertHostSSHPullJobParams) (HostSshPullJob, error)
 	InsertHostSnapshot(ctx context.Context, arg InsertHostSnapshotParams) (HostSnapshot, error)
+	InsertManualHost(ctx context.Context, arg InsertManualHostParams) (Host, error)
 	InsertRegistrationToken(ctx context.Context, arg InsertRegistrationTokenParams) (RegistrationToken, error)
 	InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (InsertSSHHostRow, error)
 	ListAdvisoriesByStreamIDs(ctx context.Context, dollar_1 []string) ([]Advisory, error)

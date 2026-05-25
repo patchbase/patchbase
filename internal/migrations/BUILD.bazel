@@ -13,6 +13,8 @@ go_library(
         "files/007_add_onboarded_to_host_ssh_pull.sql",
         "files/008_add_matcher_tables.sql",
         "files/009_add_advisory_references_cve_idx.sql",
+        "files/010_add_manual_onboarding.sql",
+        "files/011_add_pull_hostname_to_host_ssh_pull.sql",
     ],
     importpath = "go.patchbase.net/server/internal/migrations",
     visibility = ["//:__subpackages__"],

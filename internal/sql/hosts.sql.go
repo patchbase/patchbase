@@ -249,7 +249,7 @@ func (q *Queries) GetHostWithStateByID(ctx context.Context, id string) (GetHostW
 }
 
 const getSSHPullConfigByHostID = `-- name: GetSSHPullConfigByHostID :one
-SELECT host_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, onboarded
+SELECT host_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, onboarded, pull_hostname
 FROM host_ssh_pull
 WHERE host_id = $1
 `
@@ -267,6 +267,7 @@ func (q *Queries) GetSSHPullConfigByHostID(ctx context.Context, hostID string) (
 		&i.PullLastRunStatus,
 		&i.PullLastRunError,
 		&i.Onboarded,
+		&i.PullHostname,
 	)
 	return i, err
 }
@@ -350,6 +351,63 @@ func (q *Queries) InsertAgentHost(ctx context.Context, arg InsertAgentHostParams
 	return i, err
 }
 
+const insertManualHost = `-- name: InsertManualHost :one
+INSERT INTO hosts (
+    id,
+    onboarding_mode,
+    approval_status,
+    approved_at,
+    display_name,
+    hostname,
+    status
+)
+VALUES (
+    $1,
+    'manual',
+    'approved',
+    now(),
+    $2,
+    $3,
+    'active'
+)
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+`
+
+type InsertManualHostParams struct {
+	ID          string
+	DisplayName utils.Option[string]
+	Hostname    utils.Option[string]
+}
+
+func (q *Queries) InsertManualHost(ctx context.Context, arg InsertManualHostParams) (Host, error) {
+	row := q.db.QueryRow(ctx, insertManualHost, arg.ID, arg.DisplayName, arg.Hostname)
+	var i Host
+	err := row.Scan(
+		&i.ID,
+		&i.OnboardingMode,
+		&i.ApprovalStatus,
+		&i.ApprovedAt,
+		&i.DisplayName,
+		&i.MachineID,
+		&i.Hostname,
+		&i.IpAddress,
+		&i.OsFamily,
+		&i.OsName,
+		&i.OsMajor,
+		&i.OsVersion,
+		&i.Architecture,
+		&i.Status,
+		&i.LastSeenAt,
+		&i.LastAdvisoryCheckAt,
+		&i.FirstSeenAt,
+		&i.LastSnapshotID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AdvisoryScopeKey,
+	)
+	return i, err
+}
+
 const insertSSHHost = `-- name: InsertSSHHost :one
 WITH new_host AS (
     INSERT INTO hosts (
@@ -377,6 +435,7 @@ WITH new_host AS (
 new_ssh_pull AS (
     INSERT INTO host_ssh_pull (
         host_id,
+        pull_hostname,
         pull_ssh_user,
         pull_frequency_minutes,
         pull_public_key,
@@ -384,16 +443,18 @@ new_ssh_pull AS (
     )
     VALUES (
         $1,
+        $3,
         $5,
         $6,
         $7,
         $8
     )
-    RETURNING host_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, onboarded
+    RETURNING host_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, onboarded, pull_hostname
 )
 SELECT
     hosts.id, hosts.onboarding_mode, hosts.approval_status, hosts.approved_at, hosts.display_name, hosts.machine_id, hosts.hostname, hosts.ip_address, hosts.os_family, hosts.os_name, hosts.os_major, hosts.os_version, hosts.architecture, hosts.status, hosts.last_seen_at, hosts.last_advisory_check_at, hosts.first_seen_at, hosts.last_snapshot_id, hosts.created_at, hosts.updated_at, hosts.advisory_scope_key,
     nsp.pull_ssh_user,
+    nsp.pull_hostname,
     nsp.pull_frequency_minutes,
     nsp.pull_public_key,
     nsp.pull_private_key,
@@ -418,6 +479,7 @@ type InsertSSHHostParams struct {
 type InsertSSHHostRow struct {
 	Host                 Host
 	PullSshUser          utils.Option[string]
+	PullHostname         string
 	PullFrequencyMinutes *int32
 	PullPublicKey        utils.Option[string]
 	PullPrivateKey       utils.Option[string]
@@ -461,6 +523,7 @@ func (q *Queries) InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (I
 		&i.Host.UpdatedAt,
 		&i.Host.AdvisoryScopeKey,
 		&i.PullSshUser,
+		&i.PullHostname,
 		&i.PullFrequencyMinutes,
 		&i.PullPublicKey,
 		&i.PullPrivateKey,

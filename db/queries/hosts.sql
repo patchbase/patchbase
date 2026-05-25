@@ -54,6 +54,7 @@ WITH new_host AS (
 new_ssh_pull AS (
     INSERT INTO host_ssh_pull (
         host_id,
+        pull_hostname,
         pull_ssh_user,
         pull_frequency_minutes,
         pull_public_key,
@@ -61,6 +62,7 @@ new_ssh_pull AS (
     )
     VALUES (
         $1,
+        $3,
         $5,
         $6,
         $7,
@@ -71,6 +73,7 @@ new_ssh_pull AS (
 SELECT
     sqlc.embed(hosts),
     nsp.pull_ssh_user,
+    nsp.pull_hostname,
     nsp.pull_frequency_minutes,
     nsp.pull_public_key,
     nsp.pull_private_key,
@@ -240,3 +243,24 @@ SELECT
     (SELECT COUNT(*) FROM hosts h JOIN host_current_state hcs ON h.id = hcs.host_id WHERE hcs.overall_action = 'investigate') AS unknown_investigate,
     (SELECT COUNT(*) FROM advisories) AS total_advisories,
     (SELECT COUNT(*) FROM product_streams) AS total_streams;
+
+-- name: InsertManualHost :one
+INSERT INTO hosts (
+    id,
+    onboarding_mode,
+    approval_status,
+    approved_at,
+    display_name,
+    hostname,
+    status
+)
+VALUES (
+    $1,
+    'manual',
+    'approved',
+    now(),
+    $2,
+    $3,
+    'active'
+)
+RETURNING *;

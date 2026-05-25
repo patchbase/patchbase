@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"testing"
 	"time"
 
@@ -212,6 +213,26 @@ func TestCreateSSHHost(t *testing.T) {
 		apitesting.WithBearerToken(adminToken),
 	)
 	require.Equal(t, http.StatusNoContent, onboardRecorder.Code)
+}
+
+func TestGetCollectorScriptIncludesContentLength(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPGet(
+		"/api/v1/hosts/manual/script",
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	assert.Equal(t, `attachment; filename="patchbase-collector.sh"`, recorder.Header().Get("Content-Disposition"))
+	assert.Equal(t, "text/x-shellscript", recorder.Header().Get("Content-Type"))
+	assert.Equal(t, strconv.Itoa(recorder.Body.Len()), recorder.Header().Get("Content-Length"))
+	assert.NotEmpty(t, recorder.Body.String())
 }
 
 func TestHostVulnerableAndUpgradablePackages(t *testing.T) {

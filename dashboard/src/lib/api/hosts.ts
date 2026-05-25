@@ -128,3 +128,21 @@ export async function getHostVulnerablePackages(id: string): Promise<MatcherDeci
 export async function getHostUpgradablePackages(id: string): Promise<MatcherDecisionGroup[]> {
   return authenticatedRequest(`/api/v1/hosts/${id}/packages/upgradable`);
 }
+
+export async function createManualHost(
+  displayName: string,
+  hostname: string,
+): Promise<{ host_id: string; approval_status: string }> {
+  return authenticatedRequest("/api/v1/hosts/manual", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ display_name: displayName, hostname }),
+  });
+}
+
+export async function ingestManualReport(hostId: string, reportContent: string): Promise<void> {
+  await authenticatedRequest(`/api/v1/hosts/${hostId}/report`, {
+    method: "POST",
+    body: reportContent,
+  });
+}

@@ -10,11 +10,14 @@
 		listRegistrationTokens,
 		revokeRegistrationToken,
 		onboardSSHHost,
+		createManualHost,
+		ingestManualReport,
 		type RegistrationTokenInfo,
 	} from '$lib/api/hosts.js';
 	import type { Host } from '$lib/types';
+	import { getSession } from '$lib/auth/session.js';
 
-	type Mode = 'agent' | 'ssh';
+	type Mode = 'agent' | 'ssh' | 'manual';
 
 	let mode = $state<Mode>('agent');
 	let loadingTokens = $state(true);
@@ -32,6 +35,96 @@
 	let sshHostID = $state('');
 	let showSSHModal = $state(false);
 	let sshCopied = $state(false);
+
+	let manualDisplayName = $state('');
+	let manualHostname = $state('');
+	let manualHostID = $state('');
+	let manualFileContent = $state('');
+	let manualFileName = $state('');
+	let manualStep = $state(1);
+	let scriptContent = $state('');
+
+	async function submitManualHost(event: SubmitEvent): Promise<void> {
+		event.preventDefault();
+		error = '';
+		try {
+			const result = await createManualHost(manualDisplayName, manualHostname);
+			manualHostID = result.host_id;
+			manualStep = 2;
+			void loadScriptContent();
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to create manual host.';
+		}
+	}
+
+	async function loadScriptContent(): Promise<void> {
+		try {
+			const session = getSession();
+			const response = await fetch('/api/v1/hosts/manual/script', {
+				headers: {
+					Authorization: `Bearer ${session?.accessToken || ''}`
+				}
+			});
+			if (response.ok) {
+				scriptContent = await response.text();
+			}
+		} catch (err) {
+			console.error(err);
+		}
+	}
+
+	async function downloadScript(): Promise<void> {
+		error = '';
+		try {
+			const session = getSession();
+			const response = await fetch('/api/v1/hosts/manual/script', {
+				headers: {
+					Authorization: `Bearer ${session?.accessToken || ''}`
+				}
+			});
+			if (!response.ok) {
+				throw new Error('Failed to download script');
+			}
+			const blob = await response.blob();
+			const url = window.URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = url;
+			a.download = 'patchbase-collector.sh';
+			document.body.appendChild(a);
+			a.click();
+			a.remove();
+			window.URL.revokeObjectURL(url);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to download script.';
+		}
+	}
+
+	function handleFileChange(event: Event) {
+		const input = event.target as HTMLInputElement;
+		if (input.files && input.files[0]) {
+			const file = input.files[0];
+			manualFileName = file.name;
+			const reader = new FileReader();
+			reader.onload = (e) => {
+				manualFileContent = e.target?.result as string || '';
+			};
+			reader.readAsText(file);
+		}
+	}
+
+	async function submitReport(): Promise<void> {
+		if (!manualFileContent) {
+			error = 'Please select a report file first.';
+			return;
+		}
+		error = '';
+		try {
+			await ingestManualReport(manualHostID, manualFileContent);
+			void goto(`/hosts/${manualHostID}`);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to upload report.';
+		}
+	}
 
 	async function refreshTokens(): Promise<void> {
 		loadingTokens = true;
@@ -131,6 +224,7 @@
 	<div class="segmented-toggle" role="group" aria-label="Registration mode" style="margin-bottom:16px">
 		<button type="button" class:active={mode === 'agent'} onclick={() => (mode = 'agent')}>Agent mode</button>
 		<button type="button" class:active={mode === 'ssh'} onclick={() => (mode = 'ssh')}>SSH mode</button>
+		<button type="button" class:active={mode === 'manual'} onclick={() => (mode = 'manual')}>Manual mode</button>
 	</div>
 
 	{#if error}
@@ -217,7 +311,7 @@
 				</table>
 			{/if}
 		</div>
-	{:else}
+	{:else if mode === 'ssh'}
 		<form class="detail-card" onsubmit={submitSSHHost}>
 			<h3>Create SSH Host</h3>
 			<p class="form-hint">PatchBase will generate an SSH keypair. Add the public key on the host, then the system runs an immediate first collection attempt.</p>
@@ -261,8 +355,6 @@
 				</button>
 			</div>
 
-
-
 			{#snippet footer()}
 				{#if sshCopied}
 					<button class="btn btn-primary btn-sm" type="button" onclick={finishSSHRegistration}>
@@ -271,6 +363,64 @@
 				{/if}
 			{/snippet}
 		</Modal>
+	{:else if mode === 'manual'}
+		{#if manualStep === 1}
+			<form class="detail-card" onsubmit={submitManualHost}>
+				<h3>Create Manual Host</h3>
+				<p class="form-hint">Create a manual host record. You can then run the collection script on the host and upload the results.</p>
+
+				<div class="form-group">
+					<label>Display Name</label>
+					<input class="form-input" bind:value={manualDisplayName} placeholder="my-manual-server" />
+				</div>
+				<div class="form-group">
+					<label>Hostname</label>
+					<input class="form-input" bind:value={manualHostname} placeholder="server.local" required />
+				</div>
+
+				<button class="btn btn-primary btn-sm" type="submit">Create Manual Host</button>
+			</form>
+		{:else if manualStep === 2}
+			<div class="detail-card">
+				<h3>Onboard Manual Host</h3>
+				<p class="form-hint">Follow the instructions below to capture package and system data from the target host and upload it here.</p>
+
+				<div class="onboarding-steps" style="margin-top: 20px;">
+					<div class="step-item" style="margin-bottom: 24px;">
+						<h4>1. Download the Collector Script</h4>
+						<p class="form-hint" style="margin-bottom: 12px;">This script gathers system metadata, package versions, and available updates without modifying your system.</p>
+						<button class="btn btn-secondary btn-sm" type="button" onclick={downloadScript}>
+							Download Collector Script
+						</button>
+					</div>
+
+					<div class="step-item" style="margin-bottom: 24px;">
+						<h4>2. Run Script on Host</h4>
+						<p class="form-hint" style="margin-bottom: 12px;">Upload the script to the target host and execute it, capturing all stdout to a file:</p>
+						<pre class="mono" style="padding:12px; border:1px solid var(--border); border-radius:8px; overflow:auto; background:var(--bg-card); white-space:pre-wrap; word-break:break-all;">chmod +x patchbase-collector.sh
+./patchbase-collector.sh > report.txt</pre>
+					</div>
+
+					<div class="step-item" style="margin-bottom: 24px;">
+						<h4>3. Upload the Generated Report</h4>
+						<p class="form-hint" style="margin-bottom: 12px;">Select the <span class="mono">report.txt</span> file generated from the step above.</p>
+						<div style="display: flex; gap: 12px; align-items: center;">
+							<input type="file" accept=".txt,.sh,.log" onchange={handleFileChange} class="form-input" style="max-width: 300px;" />
+							<button class="btn btn-primary btn-sm" type="button" onclick={submitReport} disabled={!manualFileContent}>
+								Upload Report
+							</button>
+						</div>
+					</div>
+
+					{#if scriptContent}
+						<div class="step-item" style="margin-top: 32px;">
+							<h4>Collector Script Contents (Preview)</h4>
+							<pre class="mono" style="padding:12px; border:1px solid var(--border); border-radius:8px; max-height:250px; overflow:auto; background:var(--bg-card); font-size:12px;">{scriptContent}</pre>
+						</div>
+					{/if}
+				</div>
+			</div>
+		{/if}
 	{/if}
 </AppLayout>
 

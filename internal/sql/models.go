@@ -234,6 +234,7 @@ type HostSshPull struct {
 	PullLastRunStatus    utils.Option[string]
 	PullLastRunError     utils.Option[string]
 	Onboarded            bool
+	PullHostname         string
 }
 
 type HostSshPullJob struct {

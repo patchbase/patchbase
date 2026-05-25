@@ -337,11 +337,13 @@ func TestHosts_DeleteHost_HandlesPeriodicJobRemovalError(t *testing.T) {
 
 type mockSSHPullRunner struct {
 	services.SSHPullRunner
-	result services.SSHPullResult
-	err    error
+	result     services.SSHPullResult
+	err        error
+	calledHost string
 }
 
 func (m *mockSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string, user string, host string) (services.SSHPullResult, error) {
+	m.calledHost = host
 	return m.result, m.err
 }
 
@@ -408,7 +410,7 @@ func TestHosts_RunSSHPull_ProducesMatcherDecisions(t *testing.T) {
 	_, err = queries.InsertAgentHost(ctx, db.InsertAgentHostParams{
 		ID:          hostID,
 		DisplayName: utils.Some("ssh-host-test"),
-		Hostname:    utils.Some("ssh-host-test"),
+		Hostname:    utils.Some("ssh-target.example.com"),
 	})
 	require.NoError(t, err)
 
@@ -424,8 +426,8 @@ func TestHosts_RunSSHPull_ProducesMatcherDecisions(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = backend.DB().Exec(ctx, `
-		INSERT INTO host_ssh_pull (host_id, pull_ssh_user, pull_frequency_minutes, pull_private_key, onboarded)
-		VALUES ($1, 'root', 60, $2, true)
+		INSERT INTO host_ssh_pull (host_id, pull_hostname, pull_ssh_user, pull_frequency_minutes, pull_private_key, onboarded)
+		VALUES ($1, 'ssh-target.example.com', 'root', 60, $2, true)
 	`, hostID, encryptedKey)
 	require.NoError(t, err)
 
@@ -441,6 +443,12 @@ func TestHosts_RunSSHPull_ProducesMatcherDecisions(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, updatedHost.LastSnapshotID.IsPresent())
 	assert.Equal(t, snapshot.ID, updatedHost.LastSnapshotID.UnwrapOr(""))
+	assert.Equal(t, "ssh-host-test", updatedHost.Hostname.UnwrapOr(""))
+	assert.Equal(t, "ssh-target.example.com:22", mockRunner.calledHost)
+
+	err = hostsService.RunSSHPull(ctx, string(hostID))
+	require.NoError(t, err)
+	assert.Equal(t, "ssh-target.example.com:22", mockRunner.calledHost)
 
 	decisions, err := queries.ListDecisionPageRowsBySnapshot(ctx, snapshot.ID)
 	require.NoError(t, err)
@@ -484,8 +492,8 @@ func TestHosts_RunSSHPull_CollectErrorPreserved(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = backend.DB().Exec(ctx, `
-		INSERT INTO host_ssh_pull (host_id, pull_ssh_user, pull_frequency_minutes, pull_private_key, onboarded)
-		VALUES ($1, 'root', 60, $2, true)
+		INSERT INTO host_ssh_pull (host_id, pull_hostname, pull_ssh_user, pull_frequency_minutes, pull_private_key, onboarded)
+		VALUES ($1, 'ssh-host-typed-nil', 'root', 60, $2, true)
 	`, hostID, encryptedKey)
 	require.NoError(t, err)
 
@@ -536,4 +544,83 @@ func mockProtobufPayload(t *testing.T) []byte {
 	b, err := proto.Marshal(snap)
 	require.NoError(t, err)
 	return b
+}
+
+func TestHosts_IngestManualReport(t *testing.T) {
+	backend := apitesting.NewBackend(t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+
+	queries := do.MustInvoke[db.Querier](backend.Injector())
+	ctx := context.Background()
+
+	// Seed product stream and advisory rule so matcher can match
+	_, err := backend.DB().Exec(ctx, `
+		INSERT INTO product_streams (id, vendor, distro_family, distro_name, major_version, repo_family, status)
+		VALUES ('rocky:9-baseos', 'rocky', 'rpm', 'Rocky Linux', 9, 'baseos', 'active')
+	`)
+	require.NoError(t, err)
+
+	_, err = backend.DB().Exec(ctx, `
+		INSERT INTO advisories (id, source_system, raw_source_id, vendor, advisory_type, severity, summary, evidence_tier, is_security)
+		VALUES ('RLSA-2023:9999', 'rocky_errata_api', '9999', 'rocky', 'security', 'critical', 'Vulnerability', 'vendor_db', true)
+	`)
+	require.NoError(t, err)
+
+	_, err = backend.DB().Exec(ctx, `
+		INSERT INTO advisory_product_streams (advisory_id, product_stream_id)
+		VALUES ('RLSA-2023:9999', 'rocky:9-baseos')
+	`)
+	require.NoError(t, err)
+
+	_, err = backend.DB().Exec(ctx, `
+		INSERT INTO affected_package_rules (id, advisory_id, product_stream_id, package_name, rpm_evr_rule, evidence_tier)
+		VALUES ('rule_9999', 'RLSA-2023:9999', 'rocky:9-baseos', 'openssl', '< 0:3.0.7-2.el9', 'vendor_db')
+	`)
+	require.NoError(t, err)
+
+	hostsService := do.MustInvoke[services.Hosts](backend.Injector())
+
+	// Create Manual Host
+	hostInfo, err := hostsService.CreateManualHost(ctx, "manual-test", "manual-host-test")
+	require.NoError(t, err)
+	assert.Equal(t, "manual", hostInfo.OnboardingMode)
+	assert.Equal(t, "approved", hostInfo.ApprovalStatus)
+
+	reportContent := `_PB_METADATA_HOSTNAME=manual-host-test
+_PB_METADATA_ARCH=x86_64
+_PB_METADATA_KERNEL=5.14.0
+_PB_METADATA_MACHINE_ID=machine-manual-999
+_PB_METADATA_IP=10.0.0.99
+_PB_METADATA_BOOT_TIME=1672531199
+_PB_METADATA_OS_ID=rocky
+_PB_METADATA_OS_NAME=Rocky Linux
+_PB_METADATA_OS_VERSION=9.3
+---UPDATES_START---
+openssl.x86_64 3.0.7-2.el9 baseos
+---PACKAGES_START---
+openssl|0|3.0.7|1.el9|x86_64|openssl-3.0.7-1.el9.src.rpm|Rocky
+---REPOS_START---
+repo-baseos Enabled`
+
+	err = hostsService.IngestManualReport(ctx, hostInfo.ID, []byte(reportContent))
+	require.NoError(t, err)
+
+	// Verify snapshot and matching decision
+	snapshot, err := queries.GetLatestHostSnapshotByHostID(ctx, hostInfo.ID)
+	require.NoError(t, err)
+
+	updatedHost, err := queries.GetHostByID(ctx, hostInfo.ID)
+	require.NoError(t, err)
+	require.True(t, updatedHost.LastSnapshotID.IsPresent())
+	assert.Equal(t, snapshot.ID, updatedHost.LastSnapshotID.UnwrapOr(""))
+	assert.Equal(t, "manual-host-test", updatedHost.Hostname.UnwrapOr(""))
+	assert.Equal(t, "Rocky Linux", updatedHost.OsName)
+	assert.Equal(t, "9.3", updatedHost.OsVersion)
+
+	decisions, err := queries.ListDecisionPageRowsBySnapshot(ctx, snapshot.ID)
+	require.NoError(t, err)
+	assert.Len(t, decisions, 1)
+	assert.Equal(t, "RLSA-2023:9999", decisions[0].AdvisoryID)
+	assert.Equal(t, "openssl", decisions[0].PackageName)
 }

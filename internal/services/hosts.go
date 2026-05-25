@@ -60,6 +60,9 @@ type Hosts interface {
 	RunSSHPull(ctx context.Context, hostID string) error
 	ListSSHPullJobs(ctx context.Context, hostID string) ([]HostSSHPullJobInfo, error)
 	GetDashboardOverview(ctx context.Context) (DashboardOverview, error)
+	CreateManualHost(ctx context.Context, displayName string, hostname string) (HostInfo, error)
+	IngestManualReport(ctx context.Context, hostID string, reportContent []byte) error
+	GetCollectorScript() string
 }
 
 type DashboardOverview struct {
@@ -1081,16 +1084,16 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 		return fmt.Errorf("decrypt private key: %w", err)
 	}
 
-	hostname := host.Hostname.UnwrapOr("")
-	if hostname == "" {
-		upErr := updateJobResult("failed", "hostname is empty", nil)
+	sshHost := strings.TrimSpace(cfg.PullHostname)
+	if sshHost == "" {
+		upErr := updateJobResult("failed", "ssh pull hostname is empty", nil)
 		if upErr != nil {
-			return fmt.Errorf("empty hostname, and job update failed: %w", upErr)
+			return fmt.Errorf("empty ssh pull hostname, and job update failed: %w", upErr)
 		}
-		return fmt.Errorf("hostname is empty")
+		return fmt.Errorf("ssh pull hostname is empty")
 	}
 
-	address := hostname
+	address := sshHost
 	if !strings.Contains(address, ":") {
 		address = net.JoinHostPort(address, "22")
 	}
@@ -1158,4 +1161,161 @@ func (s *hosts) GetDashboardOverview(ctx context.Context) (DashboardOverview, er
 		TotalAdvisories:    row.TotalAdvisories,
 		TotalStreams:       row.TotalStreams,
 	}, nil
+}
+
+func (s *hosts) GetCollectorScript() string {
+	return sshPullReportScript
+}
+
+func (s *hosts) CreateManualHost(ctx context.Context, displayName string, hostname string) (HostInfo, error) {
+	displayName = strings.TrimSpace(displayName)
+	hostname = strings.TrimSpace(hostname)
+	if hostname == "" {
+		return HostInfo{}, fmt.Errorf("hostname is required")
+	}
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return HostInfo{}, fmt.Errorf("begin create manual host transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) // nolint:errcheck
+
+	queries := sql.New(tx)
+
+	host, err := queries.InsertManualHost(ctx, sql.InsertManualHostParams{
+		ID:          id.New("h"),
+		DisplayName: optionString(displayName),
+		Hostname:    optionString(hostname),
+	})
+	if err != nil {
+		return HostInfo{}, fmt.Errorf("insert manual host: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return HostInfo{}, fmt.Errorf("commit create manual host transaction: %w", err)
+	}
+
+	return mapHost(host, nil), nil
+}
+
+func (s *hosts) IngestManualReport(ctx context.Context, hostID string, reportContent []byte) error {
+	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(ErrHostNotFound)
+	if err != nil {
+		return fmt.Errorf("get host: %w", err)
+	}
+
+	if host.OnboardingMode != "manual" {
+		return fmt.Errorf("host onboarding mode is not manual")
+	}
+
+	collectedAt := time.Now().UTC()
+	res, err := ParseSSHPullReport(reportContent, collectedAt)
+	if err != nil {
+		return fmt.Errorf("parse manual report: %w", err)
+	}
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return fmt.Errorf("begin manual report ingest transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) // nolint:errcheck
+
+	queries := sql.New(tx)
+
+	bootTime := pgtype.Timestamptz{}
+	if res.BootTime != nil {
+		bootTime = pgTime(*res.BootTime)
+	}
+
+	snapshotRow, err := queries.InsertHostSnapshot(ctx, sql.InsertHostSnapshotParams{
+		ID:                 id.New("snap"),
+		HostID:             hostID,
+		CollectedAt:        pgTime(collectedAt),
+		Payload:            res.Payload,
+		RunningKernelNevra: res.RunningKernel,
+		BootTime:           bootTime,
+		HasProcessData:     res.HasProcessData,
+	})
+	if err != nil {
+		return fmt.Errorf("insert host snapshot: %w", err)
+	}
+	snapshotID := snapshotRow.ID
+
+	_, err = queries.UpdateHostFromSnapshot(ctx, sql.UpdateHostFromSnapshotParams{
+		ID:             hostID,
+		MachineID:      optionString(res.MachineID),
+		Hostname:       optionString(res.Hostname),
+		IpAddress:      optionString(res.IPAddress),
+		OsFamily:       res.OSFamily,
+		OsName:         res.OSName,
+		OsMajor:        res.OSMajor,
+		OsVersion:      res.OSVersion,
+		Architecture:   res.Architecture,
+		LastSeenAt:     pgTime(collectedAt),
+		LastSnapshotID: optionString(snapshotID),
+	})
+	if err != nil {
+		return fmt.Errorf("update host from snapshot: %w", err)
+	}
+
+	if err := queries.UpsertHostCurrentState(ctx, sql.UpsertHostCurrentStateParams{
+		HostID:           hostID,
+		SnapshotID:       snapshotID,
+		OverallAction:    res.OverallAction,
+		CriticalCount:    res.CriticalCount,
+		ImportantCount:   res.ImportantCount,
+		ModerateCount:    res.ModerateCount,
+		ActionableCount:  res.ActionableCount,
+		AvailableUpdates: res.AvailableUpdates,
+		NeedsReboot:      res.NeedsReboot,
+		NeedsRestart:     res.NeedsRestart,
+		NoFix:            res.NoFix,
+		Unknown:          res.Unknown,
+	}); err != nil {
+		return fmt.Errorf("upsert host current state: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit manual report ingest transaction: %w", err)
+	}
+
+	// Post-commit work
+	advisoriesService, err := do.Invoke[AdvisorySyncService](s.injector)
+	if err == nil {
+		scopeKey, err := advisoriesService.ResolveScopeKey(ctx, res.OSFamily, res.OSName, res.OSVersion, res.OSMajor, res.Architecture)
+		if err == nil {
+			var registerErr error
+			if scopeKey != "" {
+				registerErr = advisoriesService.RegisterScopeDemand(ctx, scopeKey)
+				if registerErr != nil {
+					utils.GetLogger(ctx).Warn("register scope demand failed", "error", registerErr)
+				}
+			}
+			if registerErr == nil {
+				err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
+					ID:               hostID,
+					AdvisoryScopeKey: optionString(scopeKey),
+				})
+				if err != nil {
+					utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
+				}
+			}
+		} else {
+			utils.GetLogger(ctx).Warn("resolve scope key failed", "error", err)
+		}
+	} else {
+		utils.GetLogger(ctx).Warn("invoke advisory sync service failed", "error", err)
+	}
+
+	// Trigger MatchSnapshot
+	matcher, err := do.Invoke[matchers.Matcher](s.injector)
+	if err == nil {
+		if _, err := matcher.MatchSnapshot(ctx, hostID, snapshotID); err != nil {
+			utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", hostID, "snapshot_id", snapshotID, "error", err)
+		}
+	} else {
+		utils.GetLogger(ctx).Warn("invoke matcher service failed", "error", err)
+	}
+
+	return nil
 }

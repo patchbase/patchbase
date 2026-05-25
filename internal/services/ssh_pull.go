@@ -68,6 +68,52 @@ func NewSSHPullRunner(i do.Injector) (SSHPullRunner, error) {
 
 type defaultSSHPullRunner struct{}
 
+const sshPullReportScript = `
+h=$(hostname 2>/dev/null || true)
+a=$(uname -m 2>/dev/null || true)
+k=$(uname -r 2>/dev/null || true)
+m=$(cat /etc/machine-id 2>/dev/null || true)
+ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+b=$(awk '/^btime / {print $2}' /proc/stat 2>/dev/null || true)
+. /etc/os-release 2>/dev/null || true
+
+echo "_PB_METADATA_HOSTNAME=$h"
+echo "_PB_METADATA_ARCH=$a"
+echo "_PB_METADATA_KERNEL=$k"
+echo "_PB_METADATA_MACHINE_ID=$m"
+echo "_PB_METADATA_IP=$ip"
+echo "_PB_METADATA_BOOT_TIME=$b"
+echo "_PB_METADATA_OS_ID=${ID:-unknown}"
+echo "_PB_METADATA_OS_NAME=${NAME:-Unknown}"
+echo "_PB_METADATA_OS_VERSION=${VERSION_ID:-unknown}"
+
+echo "---UPDATES_START---"
+if command -v apt >/dev/null 2>&1; then
+	apt list --upgradable 2>/dev/null || true
+elif command -v dnf >/dev/null 2>&1; then
+	dnf -q --cacheonly check-update 2>/dev/null || true
+elif command -v yum >/dev/null 2>&1; then
+	yum check-update -q 2>/dev/null || true
+fi
+
+echo "---PACKAGES_START---"
+if command -v rpm >/dev/null 2>&1; then
+	rpm -qa --queryformat "%{NAME}|%{EPOCHNUM}|%{VERSION}|%{RELEASE}|%{ARCH}|%{SOURCERPM}|%{VENDOR}\n" 2>/dev/null || true
+elif command -v dpkg-query >/dev/null 2>&1; then
+	dpkg-query -W -f='${Package}|${Version}|${Architecture}|${Maintainer}\n' 2>/dev/null || true
+fi
+
+echo "---REPOS_START---"
+if command -v dnf >/dev/null 2>&1; then
+	dnf repolist -q 2>/dev/null || true
+elif command -v yum >/dev/null 2>&1; then
+	yum repolist -q 2>/dev/null || true
+elif [ -d /etc/apt ]; then
+	grep -h -r -d skip "^deb " /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null || true
+	awk '/^Suites:[[:space:]]*/ { for (i = 2; i <= NF; i++) print "deb http://deb822.local " $i }' /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+fi
+`
+
 func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string, user string, host string) (SSHPullResult, error) {
 	tmpFile, err := os.CreateTemp("", "patchbase-ssh-key-*")
 	if err != nil {
@@ -103,7 +149,7 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 		"-i", tmpFile.Name(),
 		fmt.Sprintf("%s@%s", user, sshHost),
 		"sh", "-lc",
-		`h=$(hostname 2>/dev/null || true); a=$(uname -m 2>/dev/null || true); k=$(uname -r 2>/dev/null || true); m=$(cat /etc/machine-id 2>/dev/null || true); ip=$(hostname -I 2>/dev/null | awk '{print $1}'); b=$(awk '/^btime / {print $2}' /proc/stat 2>/dev/null || true); . /etc/os-release 2>/dev/null || true; echo "_PB_METADATA_HOSTNAME=$h"; echo "_PB_METADATA_ARCH=$a"; echo "_PB_METADATA_KERNEL=$k"; echo "_PB_METADATA_MACHINE_ID=$m"; echo "_PB_METADATA_IP=$ip"; echo "_PB_METADATA_BOOT_TIME=$b"; echo "_PB_METADATA_OS_ID=${ID:-unknown}"; echo "_PB_METADATA_OS_NAME=${NAME:-Unknown}"; echo "_PB_METADATA_OS_VERSION=${VERSION_ID:-unknown}"; echo "---UPDATES_START---"; if command -v apt >/dev/null 2>&1; then apt list --upgradable 2>/dev/null || true; elif command -v dnf >/dev/null 2>&1; then dnf -q --cacheonly check-update 2>/dev/null || true; elif command -v yum >/dev/null 2>&1; then yum check-update -q 2>/dev/null || true; fi; echo "---PACKAGES_START---"; if command -v rpm >/dev/null 2>&1; then rpm -qa --queryformat "%{NAME}|%{EPOCHNUM}|%{VERSION}|%{RELEASE}|%{ARCH}|%{SOURCERPM}|%{VENDOR}\n" 2>/dev/null || true; elif command -v dpkg-query >/dev/null 2>&1; then dpkg-query -W -f='${Package}|${Version}|${Architecture}|${Maintainer}\n' 2>/dev/null || true; fi; echo "---REPOS_START---"; if command -v dnf >/dev/null 2>&1; then dnf repolist -q 2>/dev/null || true; elif command -v yum >/dev/null 2>&1; then yum repolist -q 2>/dev/null || true; elif [ -d /etc/apt ]; then grep -h -r -d skip "^deb " /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null || true; awk '/^Suites:[[:space:]]*/ { for (i = 2; i <= NF; i++) print "deb http://deb822.local " $i }' /etc/apt/sources.list.d/*.sources 2>/dev/null || true; fi`,
+		sshPullReportScript,
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -122,6 +168,11 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 		}
 	}
 
+	collectedAt := time.Now().UTC()
+	return ParseSSHPullReport(output, collectedAt)
+}
+
+func ParseSSHPullReport(output []byte, collectedAt time.Time) (SSHPullResult, error) {
 	outputStr := string(output)
 	parts := strings.Split(outputStr, "---UPDATES_START---\n")
 	if len(parts) < 2 {
@@ -172,8 +223,6 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 	if arch == "" {
 		arch = "unknown"
 	}
-
-	collectedAt := time.Now().UTC()
 
 	var packages []*agentpb.Package
 	var repos []*agentpb.Repo
