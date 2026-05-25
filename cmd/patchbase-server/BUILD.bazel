@@ -1,4 +1,8 @@
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@rules_go//go:def.bzl", "go_binary", "go_library")
+load("@rules_img//img:image.bzl", "image_from_binary")
+load("@rules_img//img:load.bzl", "image_load")
+load("@rules_img//img:push.bzl", "image_push")
 load("//:version.bzl", "VERSION")
 load("//third_party/bazel:multiarch_go_binary.bzl", "multiarch_go_binary")
 
@@ -12,6 +16,7 @@ go_library(
 
 go_binary(
     name = "patchbase-server",
+    args = ["serve"],
     embed = [":patchbase-server_lib"],
     visibility = ["//visibility:public"],
     x_defs = {
@@ -25,4 +30,36 @@ multiarch_go_binary(
     x_defs = {
         "go.patchbase.net/server/internal/buildinfo.Version": VERSION,
     },
+)
+
+image_from_binary(
+    name = "image",
+    binary = ":patchbase-server",
+    include_runfiles = False,
+    platforms = [
+        "//third_party/bazel:linux_amd64",
+        "//third_party/bazel:linux_arm64",
+    ],
+)
+
+_IMAGE_REF_SETTINGS = {
+    "REGISTRY": "//:image_registry",
+    "REPOSITORY": "//:image_repository",
+    "TAG": "//:image_tag",
+}
+
+image_load(
+    name = "load",
+    image = ":image",
+    tag = "{{.REGISTRY}}/{{.REPOSITORY}}:{{.TAG}}",
+    build_settings = _IMAGE_REF_SETTINGS,
+)
+
+image_push(
+    name = "push",
+    image = ":image",
+    registry = "{{.REGISTRY}}",
+    repository = "{{.REPOSITORY}}",
+    tag = "{{.TAG}}",
+    build_settings = _IMAGE_REF_SETTINGS,
 )

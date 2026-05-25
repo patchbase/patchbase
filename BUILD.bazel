@@ -1,4 +1,6 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
+load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("//:version.bzl", "VERSION")
 
 # gazelle:prefix go.patchbase.net/server
 # gazelle:proto disable
@@ -12,4 +14,22 @@ gazelle(
         "dashboard",
         ".",
     ],
+)
+
+string_flag(
+    name = "image_registry",
+    build_setting_default = "ghcr.io",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "image_repository",
+    build_setting_default = "patchbase/patchbase",
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "image_tag",
+    build_setting_default = VERSION,
+    visibility = ["//visibility:public"],
 )
