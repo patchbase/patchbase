@@ -16,7 +16,6 @@ go_library(
 
 go_binary(
     name = "patchbase-server",
-    args = ["serve"],
     embed = [":patchbase-server_lib"],
     visibility = ["//visibility:public"],
     x_defs = {
@@ -35,6 +34,7 @@ multiarch_go_binary(
 image_from_binary(
     name = "image",
     binary = ":patchbase-server",
+    cmd = ["serve"],
     include_runfiles = False,
     platforms = [
         "//third_party/bazel:linux_amd64",
@@ -50,16 +50,16 @@ _IMAGE_REF_SETTINGS = {
 
 image_load(
     name = "load",
+    build_settings = _IMAGE_REF_SETTINGS,
     image = ":image",
     tag = "{{.REGISTRY}}/{{.REPOSITORY}}:{{.TAG}}",
-    build_settings = _IMAGE_REF_SETTINGS,
 )
 
 image_push(
     name = "push",
+    build_settings = _IMAGE_REF_SETTINGS,
     image = ":image",
     registry = "{{.REGISTRY}}",
     repository = "{{.REPOSITORY}}",
     tag = "{{.TAG}}",
-    build_settings = _IMAGE_REF_SETTINGS,
 )

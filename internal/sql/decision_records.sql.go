@@ -78,7 +78,13 @@ SELECT
     a.source_url AS advisory_source_url,
     a.advisory_type AS advisory_type,
     a.source_system AS advisory_source_system,
-    a.updated_at AS advisory_updated_at
+    a.updated_at AS advisory_updated_at,
+    COALESCE(
+        (SELECT json_agg(json_build_object('id', ref_value, 'url', COALESCE(url, '')))
+         FROM advisory_references
+         WHERE advisory_id = dr.advisory_id AND ref_type = 'cve'),
+        '[]'::json
+    ) AS cves
 FROM decision_records dr
 JOIN advisories a ON a.id = dr.advisory_id
 WHERE dr.snapshot_id = $1
@@ -107,6 +113,7 @@ type ListDecisionPageRowsBySnapshotRow struct {
 	AdvisoryType         string
 	AdvisorySourceSystem string
 	AdvisoryUpdatedAt    utils.Option[string]
+	Cves                 interface{}
 }
 
 func (q *Queries) ListDecisionPageRowsBySnapshot(ctx context.Context, snapshotID string) ([]ListDecisionPageRowsBySnapshotRow, error) {
@@ -141,6 +148,7 @@ func (q *Queries) ListDecisionPageRowsBySnapshot(ctx context.Context, snapshotID
 			&i.AdvisoryType,
 			&i.AdvisorySourceSystem,
 			&i.AdvisoryUpdatedAt,
+			&i.Cves,
 		); err != nil {
 			return nil, err
 		}

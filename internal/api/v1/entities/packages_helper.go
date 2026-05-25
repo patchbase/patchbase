@@ -1,6 +1,7 @@
 package entities
 
 import (
+	"encoding/json"
 	"strings"
 
 	"go.patchbase.net/server/internal/sql"
@@ -64,6 +65,7 @@ func GroupDecisionsByRemediation(decisions []DecisionItem) []DecisionGroup {
 				AdvisorySourceSystem: item.AdvisorySourceSystem,
 				AdvisoryURL:          item.AdvisoryURL,
 				AdvisoryUpdatedAt:    item.AdvisoryUpdatedAt,
+				CVEs:                 item.CVEs,
 				PackageCount:         0,
 				Items:                []DecisionItem{},
 			})
@@ -92,6 +94,22 @@ func MapDecisionRow(row sql.ListDecisionPageRowsBySnapshotRow, sourceRPMs map[st
 	severity := row.Severity.UnwrapOr("")
 	sourceRPM := sourceRPMs[row.PackageName]
 
+	cves := make([]CVEInfo, 0)
+	if row.Cves != nil {
+		var data []byte
+		switch v := row.Cves.(type) {
+		case []byte:
+			data = v
+		case string:
+			data = []byte(v)
+		default:
+			data, _ = json.Marshal(v)
+		}
+		if len(data) > 0 {
+			_ = json.Unmarshal(data, &cves)
+		}
+	}
+
 	return DecisionItem{
 		AdvisoryID:           row.AdvisoryID,
 		Title:                fallback(row.AdvisorySummary.UnwrapOr(""), row.AdvisoryID),
@@ -113,6 +131,7 @@ func MapDecisionRow(row sql.ListDecisionPageRowsBySnapshotRow, sourceRPMs map[st
 		AdvisorySourceSystem: advisorySourceLabel(row.AdvisorySourceSystem),
 		AdvisoryURL:          row.AdvisorySourceUrl.UnwrapOr(""),
 		AdvisoryUpdatedAt:    row.AdvisoryUpdatedAt.UnwrapOr(""),
+		CVEs:                 cves,
 	}
 }
 

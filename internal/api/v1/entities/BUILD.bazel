@@ -1,4 +1,4 @@
-load("//third_party/bazel:go_rules.bzl", "go_api_library")
+load("//third_party/bazel:go_rules.bzl", "go_api_library", "integration_test")
 
 go_api_library(
     name = "entities",
@@ -18,5 +18,17 @@ go_api_library(
         "//internal/utils",
         "//proto/agent",
         "@com_github_jackc_pgx_v5//pgtype",
+    ],
+)
+
+integration_test(
+    name = "packages_helper_test",
+    size = "small",
+    srcs = ["packages_helper_test.go"],
+    embed = [":entities"],
+    deps = [
+        "//internal/sql",
+        "//internal/utils",
+        "@com_github_stretchr_testify//assert",
     ],
 )

@@ -816,6 +816,13 @@ CREATE INDEX hosts_hostname_idx ON public.hosts USING btree (hostname);
 
 
 --
+-- Name: idx_advisory_references_advisory_id_ref_type; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_advisory_references_advisory_id_ref_type ON public.advisory_references USING btree (advisory_id, ref_type);
+
+
+--
 -- Name: registration_tokens_active_idx; Type: INDEX; Schema: public; Owner: -
 --
 

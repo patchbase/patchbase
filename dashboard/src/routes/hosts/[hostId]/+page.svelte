@@ -253,6 +253,13 @@
 															<span class="advisory-id">{adv.advisory_id}</span>
 														{/if}
 														<span class="advisory-title">{adv.title}</span>
+														{#if adv.cves && adv.cves.length > 0}
+															<span class="advisory-cves" style="display: inline-flex; gap: 4px; margin-left: 8px; flex-wrap: wrap; align-items: center; vertical-align: middle;">
+																{#each adv.cves as cve}
+																	<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size: 11px; text-decoration: none; padding: 2px 6px;">{cve.id}</a>
+																{/each}
+															</span>
+														{/if}
 													</div>
 													{#if adv.severity_label}
 														<div class="advisory-badges">
@@ -337,6 +344,13 @@
 															<span class="advisory-id">{adv.advisory_id}</span>
 														{/if}
 														<span class="advisory-title">{adv.title}</span>
+														{#if adv.cves && adv.cves.length > 0}
+															<span class="advisory-cves" style="display: inline-flex; gap: 4px; margin-left: 8px; flex-wrap: wrap; align-items: center; vertical-align: middle;">
+																{#each adv.cves as cve}
+																	<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size: 11px; text-decoration: none; padding: 2px 6px;">{cve.id}</a>
+																{/each}
+															</span>
+														{/if}
 													</div>
 													{#if adv.severity_label}
 														<div class="advisory-badges">

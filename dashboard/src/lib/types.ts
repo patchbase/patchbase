@@ -114,6 +114,11 @@ export interface HostPullJob {
   error: string | null;
 }
 
+export interface CVEInfo {
+  id: string;
+  url: string;
+}
+
 export interface DecisionItem {
   advisory_id: string;
   title: string;
@@ -135,6 +140,7 @@ export interface DecisionItem {
   advisory_source_system: string;
   advisory_url: string;
   advisory_updated_at: string;
+  cves?: CVEInfo[];
 }
 
 export interface DecisionAdvisoryGroup {
@@ -151,6 +157,7 @@ export interface DecisionAdvisoryGroup {
   advisory_updated_at: string;
   package_count: number;
   items: DecisionItem[];
+  cves?: CVEInfo[];
 }
 
 export interface MatcherDecisionGroup {

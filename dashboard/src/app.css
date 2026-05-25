@@ -366,6 +366,11 @@ tbody td.mono {
   color: var(--orange);
 }
 
+.badge-secondary {
+  background: var(--border-light);
+  color: var(--text-secondary);
+}
+
 .badge-dot {
   width: 6px;
   height: 6px;
