@@ -117,6 +117,33 @@
 		return '';
 	}
 
+	function compactKernelValue(value: string | null | undefined) {
+		const trimmed = (value || '').trim();
+		if (!trimmed) {
+			return '-';
+		}
+
+		// APT latest kernel values are often full package identifiers like:
+		// linux-image-6.8.0-117-generic-0:6.8.0-117.117.amd64
+		if (trimmed.startsWith('linux-image-')) {
+			let normalized = trimmed.replace(/^linux-image-(unsigned-)?/, '');
+			const epochMatch = /-\d+:/.exec(normalized);
+			if (epochMatch && epochMatch.index > 0) {
+				normalized = normalized.slice(0, epochMatch.index);
+			}
+			return normalized || trimmed;
+		}
+
+		// RPM latest kernel values are often full NEVRA-like strings:
+		// kernel-0:6.12.0-124.56.1.el10_1.x86_64
+		const rpmMatch = /^[A-Za-z0-9._+-]+-\d+:(.+)$/.exec(trimmed);
+		if (rpmMatch && rpmMatch[1]) {
+			return rpmMatch[1];
+		}
+
+		return trimmed;
+	}
+
 	async function loadData(silent = false) {
 		const id = params.hostId;
 		if (!silent) {
@@ -541,8 +568,8 @@
 					{#if kernelError}
 						<div class="packages-error-banner" style="margin-top:12px">{kernelError}</div>
 					{:else if kernelPosture}
-						<div class="detail-row"><span class="label">Running Kernel</span><span class="value mono">{kernelPosture.running_kernel || '-'}</span></div>
-						<div class="detail-row"><span class="label">Latest Installed Kernel</span><span class="value mono">{kernelPosture.latest_installed_kernel || '-'}</span></div>
+						<div class="detail-row"><span class="label">Running Kernel</span><span class="value mono">{compactKernelValue(kernelPosture.running_kernel)}</span></div>
+						<div class="detail-row"><span class="label">Latest Installed Kernel</span><span class="value mono" title={kernelPosture.latest_installed_kernel || ''}>{compactKernelValue(kernelPosture.latest_installed_kernel)}</span></div>
 						<div class="detail-row"><span class="label">Reboot Impact</span><span class="value">{kernelPosture.reboot_would_reduce_cve_count ? 'Reboot would reduce active kernel CVEs' : 'No CVE reduction expected from reboot'}</span></div>
 
 						<div style="margin-top:12px; display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:12px;">
