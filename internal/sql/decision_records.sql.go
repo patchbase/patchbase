@@ -117,7 +117,7 @@ SELECT
     a.source_system AS advisory_source_system,
     a.updated_at AS advisory_updated_at,
     COALESCE(
-        (SELECT json_agg(json_build_object('id', ref_value, 'url', COALESCE(url, '')))
+        (SELECT json_agg(json_build_object('id', ref_value, 'url', COALESCE(url, ''), 'score', severity_cvss))
          FROM advisory_references
          WHERE advisory_id = dr.advisory_id AND ref_type = 'cve'),
         '[]'::json

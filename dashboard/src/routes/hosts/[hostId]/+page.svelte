@@ -87,6 +87,18 @@
 		expandedGroups[familyLabel] = !expandedGroups[familyLabel];
 	}
 
+	function hasCveScore(score: number | null | undefined): score is number {
+		return score !== undefined && score !== null;
+	}
+
+	function getCveStyle(score: number | null | undefined) {
+		if (!hasCveScore(score)) return '';
+		if (score >= 7.0) return 'background-color: #dc2626; color: #ffffff; border-color: #dc2626;';
+		if (score >= 4.0) return 'background-color: #ea580c; color: #ffffff; border-color: #ea580c;';
+		if (score > 0) return 'background-color: #ca8a04; color: #ffffff; border-color: #ca8a04;';
+		return '';
+	}
+
 	async function loadData(silent = false) {
 		const id = params.hostId;
 		if (!silent) {
@@ -371,7 +383,7 @@
 														{#if adv.cves && adv.cves.length > 0}
 															<span class="advisory-cves" style="display: inline-flex; gap: 4px; margin-left: 8px; flex-wrap: wrap; align-items: center; vertical-align: middle;">
 																{#each adv.cves as cve}
-																	<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size: 11px; text-decoration: none; padding: 2px 6px;">{cve.id}</a>
+																	<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size: 11px; text-decoration: none; padding: 2px 6px; {getCveStyle(cve.score)}" title={hasCveScore(cve.score) ? `CVSS Score: ${cve.score}` : 'No CVSS score available'}>{cve.id}{hasCveScore(cve.score) ? ` (${cve.score})` : ''}</a>
 																{/each}
 															</span>
 														{/if}
@@ -462,7 +474,7 @@
 														{#if adv.cves && adv.cves.length > 0}
 															<span class="advisory-cves" style="display: inline-flex; gap: 4px; margin-left: 8px; flex-wrap: wrap; align-items: center; vertical-align: middle;">
 																{#each adv.cves as cve}
-																	<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size: 11px; text-decoration: none; padding: 2px 6px;">{cve.id}</a>
+																	<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size: 11px; text-decoration: none; padding: 2px 6px; {getCveStyle(cve.score)}" title={hasCveScore(cve.score) ? `CVSS Score: ${cve.score}` : 'No CVSS score available'}>{cve.id}{hasCveScore(cve.score) ? ` (${cve.score})` : ''}</a>
 																{/each}
 															</span>
 														{/if}
@@ -552,7 +564,7 @@
 												{#if advisory.cves && advisory.cves.length > 0}
 													<div class="advisory-cves" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
 														{#each advisory.cves as cve}
-															<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size:11px; text-decoration:none; padding:2px 6px;">{cve.id}</a>
+															<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size:11px; text-decoration:none; padding:2px 6px; {getCveStyle(cve.score)}" title={hasCveScore(cve.score) ? `CVSS Score: ${cve.score}` : 'No CVSS score available'}>{cve.id}{hasCveScore(cve.score) ? ` (${cve.score})` : ''}</a>
 														{/each}
 													</div>
 												{/if}
@@ -584,7 +596,7 @@
 												{#if advisory.cves && advisory.cves.length > 0}
 													<div class="advisory-cves" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
 														{#each advisory.cves as cve}
-															<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size:11px; text-decoration:none; padding:2px 6px;">{cve.id}</a>
+															<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size:11px; text-decoration:none; padding:2px 6px; {getCveStyle(cve.score)}" title={hasCveScore(cve.score) ? `CVSS Score: ${cve.score}` : 'No CVSS score available'}>{cve.id}{hasCveScore(cve.score) ? ` (${cve.score})` : ''}</a>
 														{/each}
 													</div>
 												{/if}

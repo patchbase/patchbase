@@ -1,8 +1,9 @@
 package entities
 
 type CVEInfo struct {
-	ID  string `json:"id"`
-	URL string `json:"url"`
+	ID    string   `json:"id"`
+	URL   string   `json:"url"`
+	Score *float64 `json:"score,omitempty"`
 }
 
 type DecisionItem struct {

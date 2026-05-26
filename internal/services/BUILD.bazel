@@ -64,6 +64,7 @@ go_test(
     srcs = ["advisory_sync_test.go"],
     deps = [
         ":services",
+        "//internal/config",
         "//internal/sql",
         "//internal/testing",
         "//internal/utils",
@@ -71,6 +72,7 @@ go_test(
         "@com_github_samber_do_v2//:do",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
+        "@org_modernc_sqlite//:sqlite",
     ],
 )
 

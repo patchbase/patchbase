@@ -260,6 +260,27 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 	exists, err := afero.Exists(s.fs, destPath)
 	needsDownload := !exists || err != nil || current.Sha256.UnwrapOr("") != detail.Sha256
 
+	if !needsDownload && current.Status == "synced" {
+		now := time.Now().UTC()
+		nextRefresh := now.Add(s.config.AdvisorySync.RefreshInterval)
+		_, err = s.queries.UpsertAdvisoryScope(ctx, db.UpsertAdvisoryScopeParams{
+			ScopeKey:      scopeKey,
+			Status:        "synced",
+			LastSyncAt:    pgtype.Timestamptz{Time: now, Valid: true},
+			LastSuccessAt: pgtype.Timestamptz{Time: now, Valid: true},
+			LastError:     utils.None[string](),
+			AdvisoryCount: current.AdvisoryCount,
+			Sha256:        utils.Some(detail.Sha256),
+			SizeBytes:     detail.SizeBytes,
+			LocalPath:     utils.Some(destPath),
+			NextRefreshAt: pgtype.Timestamptz{Time: nextRefresh, Valid: true},
+		})
+		if err != nil {
+			return handleFailure(fmt.Errorf("failed to save synced scope metadata: %w", err))
+		}
+		return nil
+	}
+
 	if needsDownload {
 		downloadURL := detail.URL
 		if downloadURL == "" {

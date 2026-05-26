@@ -362,6 +362,37 @@ func buildDecisions(
 				}
 			}
 
+			if osFamily == "apt" && len(matchedRules) > 1 {
+				streamRules := make(map[string]sql.AffectedPackageRule)
+				for _, rule := range matchedRules {
+					existing, exists := streamRules[rule.ProductStreamID]
+					if !exists {
+						streamRules[rule.ProductStreamID] = rule
+						continue
+					}
+					// Prefer binary over source
+					if existing.Arch.UnwrapOr("") == "source" && rule.Arch.UnwrapOr("") == "binary" {
+						streamRules[rule.ProductStreamID] = rule
+						continue
+					}
+					if existing.Arch.UnwrapOr("") == rule.Arch.UnwrapOr("") {
+						v1 := ruleVersionPart(existing.RpmEvrRule.UnwrapOr(""))
+						v2 := ruleVersionPart(rule.RpmEvrRule.UnwrapOr(""))
+						evr1, err1 := parseDebianEVR(v1)
+						evr2, err2 := parseDebianEVR(v2)
+						if err1 == nil && err2 == nil {
+							if compareDebianEVR(evr2, evr1) > 0 {
+								streamRules[rule.ProductStreamID] = rule
+							}
+						}
+					}
+				}
+				matchedRules = make([]sql.AffectedPackageRule, 0, len(streamRules))
+				for _, rule := range streamRules {
+					matchedRules = append(matchedRules, rule)
+				}
+			}
+
 			if len(matchedRules) == 0 {
 				if len(relevantFixes) == 0 {
 					continue
@@ -1072,4 +1103,12 @@ func latestInstalledKernelEVRRPM(packages []*agentpb.Package, packageName string
 		}
 	}
 	return maxEVR, found
+}
+
+func ruleVersionPart(rule string) string {
+	parts := strings.Fields(strings.TrimSpace(rule))
+	if len(parts) == 2 {
+		return parts[1]
+	}
+	return ""
 }

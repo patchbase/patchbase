@@ -117,6 +117,7 @@ export interface HostPullJob {
 export interface CVEInfo {
   id: string;
   url: string;
+  score?: number | null;
 }
 
 export interface DecisionItem {
