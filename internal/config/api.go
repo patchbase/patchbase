@@ -6,6 +6,7 @@ type API struct {
 	ListenAddress     string        `mapstructure:"listen_address" yaml:"listen_address,omitempty"`
 	Port              int           `mapstructure:"port" yaml:"port,omitempty"`
 	JWTSecretKey      string        `mapstructure:"jwt_secret_key" yaml:"jwt_secret_key,omitempty"`
+	RequestLogLevel   string        `mapstructure:"request_log_level" yaml:"request_log_level,omitempty"`
 	ReadTimeout       time.Duration `mapstructure:"read_timeout"`
 	ReadHeaderTimeout time.Duration `mapstructure:"read_header_timeout"`
 	WriteTimeout      time.Duration `mapstructure:"write_timeout"`
@@ -15,6 +16,11 @@ type API struct {
 func (a *API) Validate() error {
 	if a.JWTSecretKey == "" {
 		return ErrMissingConfig("api.jwt_secret_key")
+	}
+	if a.RequestLogLevel == "" {
+		return ErrMissingConfig("api.request_log_level")
+	} else if a.RequestLogLevel != "debug" && a.RequestLogLevel != "info" && a.RequestLogLevel != "warn" && a.RequestLogLevel != "error" {
+		return ErrInvalidConfig("api.request_log_level", "must be one of: debug, info, warn, error")
 	}
 	return nil
 }
@@ -26,6 +32,7 @@ const (
 	DefaultReadHeaderTimeout = 5 * time.Second
 	DefaultWriteTimeout      = 60 * time.Second
 	DefaultShutdownTimeout   = 10 * time.Second
+	DefaultRequestLogLevel   = "debug"
 )
 
 func init() {
@@ -35,4 +42,5 @@ func init() {
 	SetDefault("api.read_header_timeout", DefaultReadHeaderTimeout)
 	SetDefault("api.write_timeout", DefaultWriteTimeout)
 	SetDefault("api.shutdown_timeout", DefaultShutdownTimeout)
+	SetDefault("api.request_log_level", DefaultRequestLogLevel)
 }

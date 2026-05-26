@@ -40,13 +40,14 @@ func New(ctx context.Context, injector do.Injector) (*Server, error) {
 	}
 
 	addr := fmt.Sprintf("%s:%d", cfg.API.ListenAddress, cfg.API.Port)
+	logLevel := cfg.API.RequestLogLevel
 
 	return &Server{
 		config: cfg,
 		logger: logger,
 		server: &http.Server{
 			Addr:              addr,
-			Handler:           SecurityHeadersMiddleware(RequestContextMiddleware(logger, ids, LoggingMiddleware(mux))),
+			Handler:           SecurityHeadersMiddleware(RequestContextMiddleware(logger, ids, LoggingMiddleware(logLevel, mux))),
 			ReadTimeout:       cfg.API.ReadTimeout,
 			WriteTimeout:      cfg.API.WriteTimeout,
 			ReadHeaderTimeout: cfg.API.ReadHeaderTimeout,

@@ -31,7 +31,7 @@ func TestRequestContextMiddlewareAddsRequestIDAndLoggingMiddlewareLogsStatus(t *
 	handler := RequestContextMiddleware(
 		logger,
 		fixedIDGenerator{id: "req_test"},
-		LoggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		LoggingMiddleware("info", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusCreated)
 		})),
 	)
@@ -71,7 +71,7 @@ func TestLoggingMiddlewareSkipsStaticRequests(t *testing.T) {
 	handler := RequestContextMiddleware(
 		logger,
 		fixedIDGenerator{id: "req_static"},
-		LoggingMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		LoggingMiddleware("info", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		})),
 	)

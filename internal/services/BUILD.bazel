@@ -53,8 +53,8 @@ go_test(
     srcs = ["ssh_pull_test.go"],
     deps = [
         ":services",
-        "//proto/agent",
         "//internal/testing",
+        "//proto/agent",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",

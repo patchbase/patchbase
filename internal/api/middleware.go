@@ -86,7 +86,21 @@ func RequestContextMiddleware(logger *slog.Logger, rg utils.RandomStringGenerato
 	})
 }
 
-func LoggingMiddleware(next http.Handler) http.Handler {
+func LoggingMiddleware(level string, next http.Handler) http.Handler {
+	var slogLevel slog.Level
+	switch level {
+	case "debug":
+		slogLevel = slog.LevelDebug
+	case "info":
+		slogLevel = slog.LevelInfo
+	case "warn":
+		slogLevel = slog.LevelWarn
+	case "error":
+		slogLevel = slog.LevelError
+	default:
+		slogLevel = slog.LevelInfo
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		responseWriter := &statusResponseWriter{
 			ResponseWriter: w,
@@ -97,8 +111,10 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 		if shouldSkipAccessLog(r.URL.Path) {
 			return
 		}
-		utils.GetLogger(r.Context()).InfoContext(
+		logger := utils.GetLogger(r.Context())
+		logger.Log(
 			r.Context(),
+			slogLevel,
 			"http request",
 			"method", r.Method,
 			"path", r.URL.Path,
