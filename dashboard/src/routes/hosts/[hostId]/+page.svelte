@@ -9,6 +9,7 @@
 		getHostKernelPosture,
 		getHostSnapshot,
 		listPullJobs,
+		runPullNow,
 		getHostVulnerablePackages,
 		getHostUpgradablePackages,
 		ingestManualReport
@@ -42,6 +43,7 @@
 	let uploadError = $state('');
 	let uploadSuccess = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
+	let runningPullNow = $state(false);
 
 	function handleFileChange(event: Event) {
 		const input = event.target as HTMLInputElement;
@@ -80,6 +82,22 @@
 			uploadError = err instanceof Error ? err.message : 'Failed to upload report.';
 		} finally {
 			uploading = false;
+		}
+	}
+
+	async function runPullNowJob() {
+		if (!host || runningPullNow) {
+			return;
+		}
+
+		runningPullNow = true;
+		try {
+			await runPullNow(host.id);
+			await loadData(true);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to run SSH pull now.';
+		} finally {
+			runningPullNow = false;
 		}
 	}
 
@@ -615,12 +633,17 @@
 			{/if}
 		{/if}
 
-		{#if host.onboarding_mode === 'ssh'}
-			<div style="margin-top:24px; margin-bottom:24px">
-				<h3 style="font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-dim); margin-bottom:12px">
-					SSH Pull History
-				</h3>
-				<div class="table-container">
+			{#if host.onboarding_mode === 'ssh'}
+				<div style="margin-top:24px; margin-bottom:24px">
+					<div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px;">
+						<h3 style="font-size:13px; font-weight:600; text-transform:uppercase; letter-spacing:0.04em; color:var(--text-dim); margin:0">
+							SSH Pull History
+						</h3>
+						<button class="btn btn-secondary btn-sm" type="button" onclick={runPullNowJob} disabled={runningPullNow}>
+							{runningPullNow ? 'Running...' : 'Run Now'}
+						</button>
+					</div>
+					<div class="table-container">
 					{#if pullJobs.length === 0}
 						<div style="padding: 24px; text-align: center; color: var(--text-dim);">
 							No pull jobs recorded yet.

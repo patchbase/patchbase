@@ -121,6 +121,12 @@ export async function listPullJobs(id: string): Promise<HostPullJob[]> {
   return authenticatedRequest(`/api/v1/hosts/${id}/pull-jobs`);
 }
 
+export async function runPullNow(id: string): Promise<void> {
+  await authenticatedRequest(`/api/v1/hosts/${id}/pull-now`, {
+    method: "POST",
+  });
+}
+
 export async function onboardSSHHost(id: string): Promise<void> {
   await authenticatedRequest(`/api/v1/hosts/${id}/onboard-ssh`, {
     method: "POST",
