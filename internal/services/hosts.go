@@ -23,6 +23,7 @@ import (
 const (
 	defaultNextCheckInSeconds = int32(21600)
 	defaultSSHPullFrequency   = 360
+	sshPullHistoryLimit       = int32(10)
 )
 
 var (
@@ -1117,7 +1118,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 func (s *hosts) ListSSHPullJobs(ctx context.Context, hostID string) ([]HostSSHPullJobInfo, error) {
 	rows, err := s.sql.ListHostSSHPullJobsByHostID(ctx, sql.ListHostSSHPullJobsByHostIDParams{
 		HostID: hostID,
-		Limit:  50,
+		Limit:  sshPullHistoryLimit,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("list host ssh pull jobs by host id: %w", err)

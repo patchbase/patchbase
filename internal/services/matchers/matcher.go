@@ -329,8 +329,11 @@ func buildDecisions(
 		filteredRulesByPackage := filterRulesByPackage(rulesByAdvisory[advisory.ID], resolvedStreamIDs)
 		filteredFixesByPackage := filterFixesByPackage(fixesByAdvisory[advisory.ID], resolvedStreamIDs)
 		for _, pkg := range candidatePackages(packagesByName, filteredRulesByPackage, filteredFixesByPackage) {
-			relevantFixes := matchingFixedPackagesForPackage(pkg, filteredFixesByPackage[pkg.GetName()], osFamily)
-			relevantRules := matchingRulesForPackage(pkg, filteredRulesByPackage[pkg.GetName()], osFamily)
+			fixesForPackage := matchingFixesForPackageKeys(pkg, filteredFixesByPackage)
+			rulesForPackage := matchingRulesForPackageKeys(pkg, filteredRulesByPackage)
+
+			relevantFixes := matchingFixedPackagesForPackage(pkg, fixesForPackage, osFamily)
+			relevantRules := matchingRulesForPackage(pkg, rulesForPackage, osFamily)
 			if len(relevantRules) == 0 {
 				if len(relevantFixes) == 0 {
 					continue
@@ -420,7 +423,7 @@ func buildDecisions(
 			}
 
 			rule := matchedRules[0]
-			fixedPackages := matchingFixedPackagesForStream(pkg, rule.ProductStreamID, filteredFixesByPackage[pkg.GetName()], osFamily)
+			fixedPackages := matchingFixedPackagesForStream(pkg, rule.ProductStreamID, fixesForPackage, osFamily)
 			if len(fixedPackages) == 0 {
 				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), "affected_no_fix", "investigate", rule.EvidenceTier, "vendor_fix_not_available", "vendor advisory marks package affected but no fixed package is available", computedAt)
 				decisions = append(decisions, decision{record: record, severity: advisorySeverity(advisory)})
@@ -801,7 +804,10 @@ func streamIDSet(streams []sql.ProductStream) map[string]struct{} {
 func indexPackagesByName(packages []*agentpb.Package) map[string][]*agentpb.Package {
 	grouped := make(map[string][]*agentpb.Package, len(packages))
 	for _, pkg := range packages {
-		grouped[pkg.GetName()] = append(grouped[pkg.GetName()], pkg)
+		keys := packageMatchKeys(pkg)
+		for _, key := range keys {
+			grouped[key] = append(grouped[key], pkg)
+		}
 	}
 
 	return grouped
@@ -814,7 +820,9 @@ func filterRulesByPackage(rules []sql.AffectedPackageRule, resolvedStreams map[s
 			continue
 		}
 
-		grouped[rule.PackageName] = append(grouped[rule.PackageName], rule)
+		for _, key := range keysForPackageMatch(rule.PackageName, rule.SourceRpm.UnwrapOr("")) {
+			grouped[key] = append(grouped[key], rule)
+		}
 	}
 
 	return grouped
@@ -827,7 +835,9 @@ func filterFixesByPackage(fixes []sql.FixedPackage, resolvedStreams map[string]s
 			continue
 		}
 
-		grouped[fix.PackageName] = append(grouped[fix.PackageName], fix)
+		for _, key := range keysForPackageMatch(fix.PackageName, fix.SourceRpm.UnwrapOr("")) {
+			grouped[key] = append(grouped[key], fix)
+		}
 	}
 
 	return grouped
@@ -839,15 +849,86 @@ func candidatePackages(
 	fixesByPackage map[string][]sql.FixedPackage,
 ) []*agentpb.Package {
 	candidates := make([]*agentpb.Package, 0)
+	seen := make(map[string]struct{})
 	for packageName, packages := range packagesByName {
 		if len(rulesByPackage[packageName]) == 0 && len(fixesByPackage[packageName]) == 0 {
 			continue
 		}
 
-		candidates = append(candidates, packages...)
+		for _, pkg := range packages {
+			key := packageInstanceKey(pkg)
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			candidates = append(candidates, pkg)
+		}
 	}
 
 	return candidates
+}
+
+func packageMatchKeys(pkg *agentpb.Package) []string {
+	return keysForPackageMatch(pkg.GetName(), pkg.GetSourceRpm())
+}
+
+func keysForPackageMatch(name string, source string) []string {
+	keys := make([]string, 0, 2)
+	seen := make(map[string]struct{}, 2)
+	add := func(raw string) {
+		key := strings.TrimSpace(raw)
+		if key == "" {
+			return
+		}
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		keys = append(keys, key)
+	}
+	add(name)
+	add(source)
+	return keys
+}
+
+func packageInstanceKey(pkg *agentpb.Package) string {
+	nevra := strings.TrimSpace(pkg.GetNevra())
+	if nevra != "" {
+		return nevra
+	}
+	return strings.TrimSpace(pkg.GetName()) + "|" + strings.TrimSpace(pkg.GetVersion()) + "|" + strings.TrimSpace(pkg.GetRelease()) + "|" + strings.TrimSpace(pkg.GetArch())
+}
+
+func matchingRulesForPackageKeys(pkg *agentpb.Package, rulesByPackage map[string][]sql.AffectedPackageRule) []sql.AffectedPackageRule {
+	keys := packageMatchKeys(pkg)
+	rules := make([]sql.AffectedPackageRule, 0)
+	seen := make(map[string]struct{})
+	for _, key := range keys {
+		for _, rule := range rulesByPackage[key] {
+			if _, ok := seen[rule.ID]; ok {
+				continue
+			}
+			seen[rule.ID] = struct{}{}
+			rules = append(rules, rule)
+		}
+	}
+	return rules
+}
+
+func matchingFixesForPackageKeys(pkg *agentpb.Package, fixesByPackage map[string][]sql.FixedPackage) []sql.FixedPackage {
+	keys := packageMatchKeys(pkg)
+	fixes := make([]sql.FixedPackage, 0)
+	seen := make(map[string]struct{})
+	for _, key := range keys {
+		for _, fix := range fixesByPackage[key] {
+			if _, ok := seen[fix.ID]; ok {
+				continue
+			}
+			seen[fix.ID] = struct{}{}
+			fixes = append(fixes, fix)
+		}
+	}
+	return fixes
 }
 
 func isKernelPackage(name string, osFamily string) bool {

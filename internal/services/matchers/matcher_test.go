@@ -267,6 +267,46 @@ func TestResolveProductStreams(t *testing.T) {
 	}
 }
 
+func TestPackageMatchKeys(t *testing.T) {
+	t.Run("includes package and source package", func(t *testing.T) {
+		pkg := &agentpb.Package{
+			Name:      "linux-image-6.8.0-117-generic",
+			SourceRpm: "linux",
+		}
+		assert.Equal(t, []string{"linux-image-6.8.0-117-generic", "linux"}, packageMatchKeys(pkg))
+	})
+
+	t.Run("deduplicates identical package and source", func(t *testing.T) {
+		pkg := &agentpb.Package{
+			Name:      "openssl",
+			SourceRpm: "openssl",
+		}
+		assert.Equal(t, []string{"openssl"}, packageMatchKeys(pkg))
+	})
+}
+
+func TestCandidatePackagesDeduplicatesAcrossKeys(t *testing.T) {
+	pkg := &agentpb.Package{
+		Name:      "linux-image-6.8.0-117-generic",
+		SourceRpm: "linux",
+		Nevra:     "linux-image-6.8.0-117-generic-0:6.8.0-117.117.amd64",
+	}
+	packagesByKey := indexPackagesByName([]*agentpb.Package{pkg})
+
+	rulesByPackage := map[string][]sql.AffectedPackageRule{
+		"linux-image-6.8.0-117-generic": {
+			{ID: "rule-binary"},
+		},
+		"linux": {
+			{ID: "rule-source"},
+		},
+	}
+
+	candidates := candidatePackages(packagesByKey, rulesByPackage, map[string][]sql.FixedPackage{})
+	require.Len(t, candidates, 1)
+	assert.Equal(t, pkg.GetName(), candidates[0].GetName())
+}
+
 func TestMatchesPackageArch(t *testing.T) {
 	tests := []struct {
 		name      string
