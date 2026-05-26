@@ -52,9 +52,12 @@ go_test(
     size = "small",
     srcs = ["ssh_pull_test.go"],
     deps = [
+        ":services",
+        "//proto/agent",
         "//internal/testing",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
     ],
 )
 

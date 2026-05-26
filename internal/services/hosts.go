@@ -62,7 +62,7 @@ type Hosts interface {
 	GetDashboardOverview(ctx context.Context) (DashboardOverview, error)
 	CreateManualHost(ctx context.Context, displayName string, hostname string) (HostInfo, error)
 	IngestManualReport(ctx context.Context, hostID string, reportContent []byte) error
-	GetCollectorScript() string
+	GetCollectorScript(osFamily string) (string, error)
 }
 
 type DashboardOverview struct {
@@ -1163,8 +1163,8 @@ func (s *hosts) GetDashboardOverview(ctx context.Context) (DashboardOverview, er
 	}, nil
 }
 
-func (s *hosts) GetCollectorScript() string {
-	return sshPullReportScript
+func (s *hosts) GetCollectorScript(osFamily string) (string, error) {
+	return collectorScriptForOSFamily(osFamily)
 }
 
 func (s *hosts) CreateManualHost(ctx context.Context, displayName string, hostname string) (HostInfo, error) {

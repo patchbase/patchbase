@@ -68,7 +68,12 @@ func NewSSHPullRunner(i do.Injector) (SSHPullRunner, error) {
 
 type defaultSSHPullRunner struct{}
 
-const sshPullReportScript = `
+const sshPullDetectOSScript = `
+. /etc/os-release 2>/dev/null || true
+echo "${ID:-unknown}|${ID_LIKE:-}"
+`
+
+const sshPullReportScriptAPT = `
 h=$(hostname 2>/dev/null || true)
 a=$(uname -m 2>/dev/null || true)
 k=$(uname -r 2>/dev/null || true)
@@ -84,33 +89,56 @@ echo "_PB_METADATA_MACHINE_ID=$m"
 echo "_PB_METADATA_IP=$ip"
 echo "_PB_METADATA_BOOT_TIME=$b"
 echo "_PB_METADATA_OS_ID=${ID:-unknown}"
+echo "_PB_METADATA_OS_ID_LIKE=${ID_LIKE:-}"
 echo "_PB_METADATA_OS_NAME=${NAME:-Unknown}"
 echo "_PB_METADATA_OS_VERSION=${VERSION_ID:-unknown}"
 
 echo "---UPDATES_START---"
-if command -v apt >/dev/null 2>&1; then
-	apt list --upgradable 2>/dev/null || true
-elif command -v dnf >/dev/null 2>&1; then
+apt list --upgradable 2>/dev/null || true
+
+echo "---PACKAGES_START---"
+dpkg-query -W -f='${Package}|${Version}|${Architecture}|${Maintainer}|${source:Package}\n' 2>/dev/null || true
+
+echo "---REPOS_START---"
+grep -h -r -d skip "^deb " /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null || true
+awk '/^Suites:[[:space:]]*/ { for (i = 2; i <= NF; i++) print "deb http://deb822.local " $i }' /etc/apt/sources.list.d/*.sources 2>/dev/null || true
+`
+
+const sshPullReportScriptRPM = `
+h=$(hostname 2>/dev/null || true)
+a=$(uname -m 2>/dev/null || true)
+k=$(uname -r 2>/dev/null || true)
+m=$(cat /etc/machine-id 2>/dev/null || true)
+ip=$(hostname -I 2>/dev/null | awk '{print $1}')
+b=$(awk '/^btime / {print $2}' /proc/stat 2>/dev/null || true)
+. /etc/os-release 2>/dev/null || true
+
+echo "_PB_METADATA_HOSTNAME=$h"
+echo "_PB_METADATA_ARCH=$a"
+echo "_PB_METADATA_KERNEL=$k"
+echo "_PB_METADATA_MACHINE_ID=$m"
+echo "_PB_METADATA_IP=$ip"
+echo "_PB_METADATA_BOOT_TIME=$b"
+echo "_PB_METADATA_OS_ID=${ID:-unknown}"
+echo "_PB_METADATA_OS_ID_LIKE=${ID_LIKE:-}"
+echo "_PB_METADATA_OS_NAME=${NAME:-Unknown}"
+echo "_PB_METADATA_OS_VERSION=${VERSION_ID:-unknown}"
+
+echo "---UPDATES_START---"
+if command -v dnf >/dev/null 2>&1; then
 	dnf -q --cacheonly check-update 2>/dev/null || true
 elif command -v yum >/dev/null 2>&1; then
 	yum check-update -q 2>/dev/null || true
 fi
 
 echo "---PACKAGES_START---"
-if command -v rpm >/dev/null 2>&1; then
-	rpm -qa --queryformat "%{NAME}|%{EPOCHNUM}|%{VERSION}|%{RELEASE}|%{ARCH}|%{SOURCERPM}|%{VENDOR}\n" 2>/dev/null || true
-elif command -v dpkg-query >/dev/null 2>&1; then
-	dpkg-query -W -f='${Package}|${Version}|${Architecture}|${Maintainer}\n' 2>/dev/null || true
-fi
+rpm -qa --queryformat "%{NAME}|%{EPOCHNUM}|%{VERSION}|%{RELEASE}|%{ARCH}|%{SOURCERPM}|%{VENDOR}\n" 2>/dev/null || true
 
 echo "---REPOS_START---"
 if command -v dnf >/dev/null 2>&1; then
 	dnf repolist -q 2>/dev/null || true
 elif command -v yum >/dev/null 2>&1; then
 	yum repolist -q 2>/dev/null || true
-elif [ -d /etc/apt ]; then
-	grep -h -r -d skip "^deb " /etc/apt/sources.list /etc/apt/sources.list.d/ 2>/dev/null || true
-	awk '/^Suites:[[:space:]]*/ { for (i = 2; i <= NF; i++) print "deb http://deb822.local " $i }' /etc/apt/sources.list.d/*.sources 2>/dev/null || true
 fi
 `
 
@@ -138,38 +166,109 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 		sshPort = "22"
 	}
 
-	cmd := exec.CommandContext(
-		ctx,
-		"ssh",
-		"-p", sshPort,
-		"-o", "BatchMode=yes",
-		"-o", "ConnectTimeout=20",
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-i", tmpFile.Name(),
-		fmt.Sprintf("%s@%s", user, sshHost),
-		"sh", "-lc",
-		sshPullReportScript,
-	)
-	output, err := cmd.CombinedOutput()
+	sshAddress := fmt.Sprintf("%s@%s", user, sshHost)
+	detectOutput, err := runSSHScript(ctx, tmpFile.Name(), sshPort, sshAddress, sshPullDetectOSScript)
 	if err != nil {
-		message := strings.TrimSpace(string(output))
-		if message == "" {
-			message = err.Error()
-		}
-		exitCode := -1
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			exitCode = exitErr.ExitCode()
-		}
-		return SSHPullResult{}, &SSHPullError{
-			ExitCode: exitCode,
-			Message:  message,
-			Err:      err,
-		}
+		return SSHPullResult{}, err
+	}
+
+	osFamily := detectOSFamilyFromReleaseOutput(detectOutput)
+	script, err := collectorScriptForOSFamily(osFamily)
+	if err != nil {
+		return SSHPullResult{}, fmt.Errorf("detect os family for ssh pull: %w", err)
+	}
+
+	output, err := runSSHScript(ctx, tmpFile.Name(), sshPort, sshAddress, script)
+	if err != nil {
+		return SSHPullResult{}, err
 	}
 
 	collectedAt := time.Now().UTC()
 	return ParseSSHPullReport(output, collectedAt)
+}
+
+func runSSHScript(ctx context.Context, privateKeyPath string, port string, address string, script string) ([]byte, error) {
+	cmd := exec.CommandContext(
+		ctx,
+		"ssh",
+		"-p", port,
+		"-o", "BatchMode=yes",
+		"-o", "ConnectTimeout=20",
+		"-o", "StrictHostKeyChecking=no",
+		"-o", "UserKnownHostsFile=/dev/null",
+		"-i", privateKeyPath,
+		address,
+		"sh", "-lc",
+		script,
+	)
+	output, err := cmd.CombinedOutput()
+	if err == nil {
+		return output, nil
+	}
+
+	message := strings.TrimSpace(string(output))
+	if message == "" {
+		message = err.Error()
+	}
+	exitCode := -1
+	if exitErr, ok := err.(*exec.ExitError); ok {
+		exitCode = exitErr.ExitCode()
+	}
+	return nil, &SSHPullError{
+		ExitCode: exitCode,
+		Message:  message,
+		Err:      err,
+	}
+}
+
+func collectorScriptForOSFamily(osFamily string) (string, error) {
+	switch normalizeOSFamilyString(osFamily) {
+	case "apt":
+		return sshPullReportScriptAPT, nil
+	case "rpm":
+		return sshPullReportScriptRPM, nil
+	default:
+		return "", fmt.Errorf("unsupported os family %q", osFamily)
+	}
+}
+
+func detectOSFamilyFromReleaseOutput(output []byte) string {
+	line := strings.TrimSpace(string(output))
+	if line == "" {
+		return ""
+	}
+
+	for _, candidate := range strings.Split(line, "\n") {
+		trimmed := strings.TrimSpace(candidate)
+		if trimmed == "" {
+			continue
+		}
+
+		id, idLike, hasLike := strings.Cut(trimmed, "|")
+		if family := normalizeOSFamilyString(id); family != "" {
+			return family
+		}
+		if hasLike {
+			for _, token := range strings.Fields(strings.ReplaceAll(idLike, ",", " ")) {
+				if family := normalizeOSFamilyString(token); family != "" {
+					return family
+				}
+			}
+		}
+	}
+
+	return ""
+}
+
+func normalizeOSFamilyString(raw string) string {
+	switch strings.ToLower(strings.TrimSpace(CleanQuote(raw))) {
+	case "apt", "debian", "ubuntu", "linuxmint":
+		return "apt"
+	case "rpm", "rocky", "rhel", "almalinux", "centos", "fedora":
+		return "rpm"
+	default:
+		return ""
+	}
 }
 
 func ParseSSHPullReport(output []byte, collectedAt time.Time) (SSHPullResult, error) {
@@ -202,13 +301,17 @@ func ParseSSHPullReport(output []byte, collectedAt time.Time) (SSHPullResult, er
 		}
 	}
 
-	osID := strings.ToLower(strings.TrimSpace(fields["OS_ID"]))
-	osFamily := "unknown"
-	switch osID {
-	case "ubuntu", "debian":
-		osFamily = "apt"
-	case "rocky", "rhel", "almalinux", "centos", "fedora":
-		osFamily = "rpm"
+	osFamily := normalizeOSFamilyString(fields["OS_ID"])
+	if osFamily == "" {
+		for _, token := range strings.Fields(strings.ReplaceAll(fields["OS_ID_LIKE"], ",", " ")) {
+			osFamily = normalizeOSFamilyString(token)
+			if osFamily != "" {
+				break
+			}
+		}
+	}
+	if osFamily == "" {
+		osFamily = "unknown"
 	}
 
 	osMajor := int32(0)
@@ -608,8 +711,8 @@ func parseRPMPackageLine(line string) (*agentpb.Package, error) {
 
 func parseAPTPackageLine(line string) (*agentpb.Package, error) {
 	fields := strings.Split(line, "|")
-	if len(fields) != 4 {
-		return nil, fmt.Errorf("expected 4 fields, got %d", len(fields))
+	if len(fields) != 5 {
+		return nil, fmt.Errorf("expected 5 fields, got %d", len(fields))
 	}
 
 	name := strings.TrimSpace(fields[0])
@@ -624,16 +727,18 @@ func parseAPTPackageLine(line string) (*agentpb.Package, error) {
 
 	arch := strings.TrimSpace(fields[2])
 	vendor := optionalStr(fields[3])
+	sourcePackage := optionalStr(fields[4])
 
 	nevra := formatPackageIdentifier(name, epoch, version, release, arch)
 	return &agentpb.Package{
-		Name:    name,
-		Epoch:   epoch,
-		Version: version,
-		Release: release,
-		Arch:    arch,
-		Vendor:  vendor,
-		Nevra:   nevra,
+		Name:      name,
+		Epoch:     epoch,
+		Version:   version,
+		Release:   release,
+		Arch:      arch,
+		Vendor:    vendor,
+		Nevra:     nevra,
+		SourceRpm: sourcePackage,
 	}, nil
 }
 

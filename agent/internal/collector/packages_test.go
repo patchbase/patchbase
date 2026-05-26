@@ -80,7 +80,7 @@ Last metadata expiration check: 0:00:05 ago on Mon 24 Mar 2026 10:00:00 AM UTC.
 }
 
 func TestParseAptPackageLine(t *testing.T) {
-	line := "bash|5.2.21-2ubuntu4|amd64|Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>"
+	line := "bash|5.2.21-2ubuntu4|amd64|Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>|bash"
 	pkg, err := parseAptPackageLine(line)
 	require.NoError(t, err)
 	assert.Equal(t, "bash", pkg.Name)
@@ -89,20 +89,22 @@ func TestParseAptPackageLine(t *testing.T) {
 	assert.Equal(t, "2ubuntu4", pkg.Release)
 	assert.Equal(t, "amd64", pkg.Arch)
 	assert.Equal(t, "bash-0:5.2.21-2ubuntu4.amd64", pkg.Nevra)
+	assert.Equal(t, "bash", pkg.SourceRpm)
 }
 
 func TestParseAptPackageLineWithEpoch(t *testing.T) {
-	line := "systemd|255.4-1ubuntu8.8|amd64|Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>"
+	line := "systemd|255.4-1ubuntu8.8|amd64|Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>|systemd"
 	pkg, err := parseAptPackageLine(line)
 	require.NoError(t, err)
 	assert.Equal(t, int32(0), pkg.Epoch)
 
-	line = "libfreetype6|2:2.13.2+dfsg-1build3|amd64|Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>"
+	line = "libfreetype6|2:2.13.2+dfsg-1build3|amd64|Ubuntu Developers <ubuntu-devel-discuss@lists.ubuntu.com>|freetype"
 	pkg, err = parseAptPackageLine(line)
 	require.NoError(t, err)
 	assert.Equal(t, int32(2), pkg.Epoch)
 	assert.Equal(t, "2.13.2+dfsg", pkg.Version)
 	assert.Equal(t, "1build3", pkg.Release)
+	assert.Equal(t, "freetype", pkg.SourceRpm)
 }
 
 func TestParseAptPackageLineInvalid(t *testing.T) {
@@ -123,8 +125,8 @@ N: There is 1 additional version. Please use the '-a' switch to see it.
 func TestCollectInstalledPackagesAPT(t *testing.T) {
 	runner := staticRunner{
 		resultByCommand: map[string][]byte{
-			"dpkg-query|-W|-f=${Package}|${Version}|${Architecture}|${Maintainer}\\n": []byte(
-				"bash|5.2.21-2ubuntu4|amd64|Ubuntu Developers\n",
+			"dpkg-query|-W|-f=${Package}|${Version}|${Architecture}|${Maintainer}|${source:Package}\\n": []byte(
+				"bash|5.2.21-2ubuntu4|amd64|Ubuntu Developers|bash\n",
 			),
 		},
 	}
@@ -133,6 +135,7 @@ func TestCollectInstalledPackagesAPT(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, pkgs, 1)
 	assert.Equal(t, "bash", pkgs[0].Name)
+	assert.Equal(t, "bash", pkgs[0].SourceRpm)
 }
 
 func TestCollectInstalledPackagesRPM(t *testing.T) {

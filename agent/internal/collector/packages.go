@@ -68,7 +68,7 @@ func collectInstalledRPMPackages(ctx context.Context, runner ExecRunner) ([]*age
 func collectInstalledAPTPackages(ctx context.Context, runner ExecRunner) ([]*agent.Package, error) {
 	output, err := runner.Run(ctx,
 		"dpkg-query", "-W",
-		"-f=${Package}|${Version}|${Architecture}|${Maintainer}\n",
+		"-f=${Package}|${Version}|${Architecture}|${Maintainer}|${source:Package}\n",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("dpkg-query -W: %w", err)
@@ -139,8 +139,8 @@ func parsePackageLine(line string) (*agent.Package, error) {
 
 func parseAptPackageLine(line string) (*agent.Package, error) {
 	fields := strings.Split(line, "|")
-	if len(fields) != 4 {
-		return nil, fmt.Errorf("expected 4 fields, got %d", len(fields))
+	if len(fields) != 5 {
+		return nil, fmt.Errorf("expected 5 fields, got %d", len(fields))
 	}
 
 	name := strings.TrimSpace(fields[0])
@@ -155,16 +155,18 @@ func parseAptPackageLine(line string) (*agent.Package, error) {
 
 	arch := strings.TrimSpace(fields[2])
 	vendor := optionalStr(fields[3])
+	sourcePackage := optionalStr(fields[4])
 
 	nevra := formatPackageIdentifier(name, epoch, version, release, arch)
 	return &agent.Package{
-		Name:    name,
-		Epoch:   epoch,
-		Version: version,
-		Release: release,
-		Arch:    arch,
-		Vendor:  vendor,
-		Nevra:   nevra,
+		Name:      name,
+		Epoch:     epoch,
+		Version:   version,
+		Release:   release,
+		Arch:      arch,
+		Vendor:    vendor,
+		Nevra:     nevra,
+		SourceRpm: sourcePackage,
 	}, nil
 }
 

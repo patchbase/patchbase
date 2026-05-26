@@ -224,7 +224,7 @@ func TestGetCollectorScriptIncludesContentLength(t *testing.T) {
 	require.NoError(t, err)
 
 	recorder := backend.HTTPGet(
-		"/api/v1/hosts/manual/script",
+		"/api/v1/hosts/manual/script?os_family=apt",
 		apitesting.WithBearerToken(adminToken),
 	)
 	require.Equal(t, http.StatusOK, recorder.Code)
@@ -233,6 +233,38 @@ func TestGetCollectorScriptIncludesContentLength(t *testing.T) {
 	assert.Equal(t, "text/x-shellscript", recorder.Header().Get("Content-Type"))
 	assert.Equal(t, strconv.Itoa(recorder.Body.Len()), recorder.Header().Get("Content-Length"))
 	assert.NotEmpty(t, recorder.Body.String())
+}
+
+func TestGetCollectorScriptRequiresOSFamily(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPGet(
+		"/api/v1/hosts/manual/script",
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "missing required query parameter: os_family")
+}
+
+func TestGetCollectorScriptRejectsUnsupportedOSFamily(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPGet(
+		"/api/v1/hosts/manual/script?os_family=solaris",
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "unsupported os family")
 }
 
 func TestHostVulnerableAndUpgradablePackages(t *testing.T) {

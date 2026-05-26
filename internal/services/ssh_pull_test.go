@@ -2,10 +2,14 @@ package services_test
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	agentpb "go.patchbase.net/proto/agent"
+	"go.patchbase.net/server/internal/services"
 	apitesting "go.patchbase.net/server/internal/testing"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestCleanQuote(t *testing.T) {
@@ -107,4 +111,61 @@ openssl-libs.x86_64                    1:1.1.1k-14.el8_6               baseos
 	assert.Equal(t, "openssl-libs", pkgs[1].GetName())
 	assert.Equal(t, int32(1), pkgs[1].GetEpoch())
 	assert.Equal(t, "1.1.1k", pkgs[1].GetVersion())
+}
+
+func TestParseSSHPullReportAPTIncludesSourcePackage(t *testing.T) {
+	output := `_PB_METADATA_HOSTNAME=apt-host
+_PB_METADATA_ARCH=x86_64
+_PB_METADATA_KERNEL=6.8.0-63-generic
+_PB_METADATA_MACHINE_ID=machine-123
+_PB_METADATA_IP=10.0.0.10
+_PB_METADATA_BOOT_TIME=1716888000
+_PB_METADATA_OS_ID=ubuntu
+_PB_METADATA_OS_ID_LIKE=debian
+_PB_METADATA_OS_NAME=Ubuntu
+_PB_METADATA_OS_VERSION=24.04
+---UPDATES_START---
+Listing... Done
+bash/noble-updates 5.2.21-2ubuntu4 amd64 [upgradable from: 5.2.21-2ubuntu3]
+---PACKAGES_START---
+bash|5.2.21-2ubuntu4|amd64|Ubuntu Developers|bash
+linux-image-6.8.0-63-generic|6.8.0-63.63|amd64|Ubuntu Developers|linux
+---REPOS_START---
+deb http://archive.ubuntu.com/ubuntu noble main
+`
+
+	parsed, err := services.ParseSSHPullReport([]byte(output), time.Unix(1716888600, 0).UTC())
+	require.NoError(t, err)
+	require.Equal(t, "apt", parsed.OSFamily)
+	require.Equal(t, int32(1), parsed.AvailableUpdates)
+
+	var snapshot agentpb.AgentSnapshot
+	require.NoError(t, proto.Unmarshal(parsed.Payload, &snapshot))
+	require.Len(t, snapshot.GetPackages(), 2)
+	assert.Equal(t, "bash", snapshot.GetPackages()[0].GetSourceRpm())
+	assert.Equal(t, "linux", snapshot.GetPackages()[1].GetSourceRpm())
+}
+
+func TestParseSSHPullReportDetectsFamilyFromOSIDLike(t *testing.T) {
+	output := `_PB_METADATA_HOSTNAME=mint-host
+_PB_METADATA_ARCH=x86_64
+_PB_METADATA_KERNEL=6.8.0
+_PB_METADATA_MACHINE_ID=machine-999
+_PB_METADATA_IP=10.0.0.20
+_PB_METADATA_BOOT_TIME=1716888000
+_PB_METADATA_OS_ID=unknownmint
+_PB_METADATA_OS_ID_LIKE=ubuntu debian
+_PB_METADATA_OS_NAME=Linux Mint
+_PB_METADATA_OS_VERSION=22
+---UPDATES_START---
+Listing... Done
+---PACKAGES_START---
+base-files|12ubuntu4|amd64|Ubuntu Developers|base-files
+---REPOS_START---
+deb http://archive.ubuntu.com/ubuntu jammy main
+`
+
+	parsed, err := services.ParseSSHPullReport([]byte(output), time.Now().UTC())
+	require.NoError(t, err)
+	assert.Equal(t, "apt", parsed.OSFamily)
 }

@@ -18,6 +18,7 @@
 	import { getSession } from '$lib/auth/session.js';
 
 	type Mode = 'agent' | 'ssh' | 'manual';
+	type ManualCollectorOSFamily = 'apt' | 'rpm';
 
 	let mode = $state<Mode>('agent');
 	let loadingTokens = $state(true);
@@ -38,6 +39,7 @@
 
 	let manualDisplayName = $state('');
 	let manualHostID = $state('');
+	let manualOSFamily = $state<ManualCollectorOSFamily>('apt');
 	let manualFileContent = $state('');
 	let manualFileName = $state('');
 	let manualStep = $state(1);
@@ -56,31 +58,36 @@
 		}
 	}
 
-	async function loadScriptContent(): Promise<void> {
-		try {
-			const session = getSession();
-			const response = await fetch('/api/v1/hosts/manual/script', {
-				headers: {
-					Authorization: `Bearer ${session?.accessToken || ''}`
-				}
-			});
-			if (response.ok) {
-				scriptContent = await response.text();
+	function collectorScriptURL(): string {
+		const params = new URLSearchParams({ os_family: manualOSFamily });
+		return `/api/v1/hosts/manual/script?${params.toString()}`;
+	}
+
+		async function loadScriptContent(): Promise<void> {
+			try {
+				const session = getSession();
+				const response = await fetch(collectorScriptURL(), {
+					headers: {
+						Authorization: `Bearer ${session?.accessToken || ''}`
+					}
+				});
+				if (response.ok) {
+					scriptContent = await response.text();
 			}
 		} catch (err) {
 			console.error(err);
 		}
 	}
 
-	async function downloadScript(): Promise<void> {
-		error = '';
-		try {
-			const session = getSession();
-			const response = await fetch('/api/v1/hosts/manual/script', {
-				headers: {
-					Authorization: `Bearer ${session?.accessToken || ''}`
-				}
-			});
+		async function downloadScript(): Promise<void> {
+			error = '';
+			try {
+				const session = getSession();
+				const response = await fetch(collectorScriptURL(), {
+					headers: {
+						Authorization: `Bearer ${session?.accessToken || ''}`
+					}
+				});
 			if (!response.ok) {
 				throw new Error('Failed to download script');
 			}
@@ -372,6 +379,13 @@
 					<label>Display Name</label>
 					<input class="form-input" bind:value={manualDisplayName} placeholder="my-manual-server" required />
 				</div>
+				<div class="form-group">
+					<label>Host OS Family</label>
+					<select class="form-input" bind:value={manualOSFamily}>
+						<option value="apt">Debian / Ubuntu (APT)</option>
+						<option value="rpm">RHEL / Rocky / Alma / CentOS (RPM)</option>
+					</select>
+				</div>
 
 				<button class="btn btn-primary btn-sm" type="submit">Create Manual Host</button>
 			</form>
@@ -384,6 +398,7 @@
 					<div class="step-item" style="margin-bottom: 24px;">
 						<h4>1. Download the Collector Script</h4>
 						<p class="form-hint" style="margin-bottom: 12px;">This script gathers system metadata, package versions, and available updates without modifying your system.</p>
+						<p class="form-hint" style="margin-bottom: 12px;">Selected OS family: <span class="mono">{manualOSFamily}</span></p>
 						<button class="btn btn-secondary btn-sm" type="button" onclick={downloadScript}>
 							Download Collector Script
 						</button>
@@ -394,27 +409,27 @@
 						<p class="form-hint" style="margin-bottom: 12px;">Upload the script to the target host and execute it, capturing all stdout to a file:</p>
 						<pre class="mono" style="padding:12px; border:1px solid var(--border); border-radius:8px; overflow:auto; background:var(--bg-card); white-space:pre-wrap; word-break:break-all;">chmod +x patchbase-collector.sh
 ./patchbase-collector.sh > report.txt</pre>
-					</div>
-
-					<div class="step-item" style="margin-bottom: 24px;">
-						<h4>3. Upload the Generated Report</h4>
-						<p class="form-hint" style="margin-bottom: 12px;">Select the <span class="mono">report.txt</span> file generated from the step above.</p>
-						<div style="display: flex; gap: 12px; align-items: center;">
-							<input type="file" accept=".txt,.sh,.log" onchange={handleFileChange} class="form-input" style="max-width: 300px;" />
-							<button class="btn btn-primary btn-sm" type="button" onclick={submitReport} disabled={!manualFileContent}>
-								Upload Report
-							</button>
-						</div>
-					</div>
-
-					{#if scriptContent}
-						<div class="step-item" style="margin-top: 32px;">
-							<h4>Collector Script Contents (Preview)</h4>
-							<pre class="mono" style="padding:12px; border:1px solid var(--border); border-radius:8px; max-height:250px; overflow:auto; background:var(--bg-card); font-size:12px;">{scriptContent}</pre>
-						</div>
-					{/if}
 				</div>
+
+				<div class="step-item" style="margin-bottom: 24px;">
+					<h4>3. Upload the Generated Report</h4>
+					<p class="form-hint" style="margin-bottom: 12px;">Select the <span class="mono">report.txt</span> file generated from the step above.</p>
+					<div style="display: flex; gap: 12px; align-items: center;">
+						<input type="file" accept=".txt,.sh,.log" onchange={handleFileChange} class="form-input" style="max-width: 300px;" />
+						<button class="btn btn-primary btn-sm" type="button" onclick={submitReport} disabled={!manualFileContent}>
+							Upload Report
+						</button>
+					</div>
+				</div>
+
+				{#if scriptContent}
+					<div class="step-item" style="margin-top: 32px;">
+						<h4>Collector Script Contents (Preview)</h4>
+						<pre class="mono" style="padding:12px; border:1px solid var(--border); border-radius:8px; max-height:250px; overflow:auto; background:var(--bg-card); font-size:12px;">{scriptContent}</pre>
+					</div>
+				{/if}
 			</div>
+		</div>
 		{/if}
 	{/if}
 </AppLayout>
