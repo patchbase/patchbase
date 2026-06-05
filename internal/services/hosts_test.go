@@ -337,13 +337,15 @@ func TestHosts_DeleteHost_HandlesPeriodicJobRemovalError(t *testing.T) {
 
 type mockSSHPullRunner struct {
 	services.SSHPullRunner
-	result     services.SSHPullResult
-	err        error
-	calledHost string
+	result           services.SSHPullResult
+	err              error
+	calledHost       string
+	calledPrivateKey string
 }
 
 func (m *mockSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string, user string, host string) (services.SSHPullResult, error) {
 	m.calledHost = host
+	m.calledPrivateKey = privateKeyPEM
 	return m.result, m.err
 }
 
@@ -623,4 +625,95 @@ repo-baseos Enabled`
 	assert.Len(t, decisions, 1)
 	assert.Equal(t, "RLSA-2023:9999", decisions[0].AdvisoryID)
 	assert.Equal(t, "openssl", decisions[0].PackageName)
+}
+
+func TestHosts_SSHUniqueKeyPairFlagAndGlobalFallback(t *testing.T) {
+	mockRunner := &mockSSHPullRunner{
+		result: services.SSHPullResult{
+			MachineID:        "machine-ssh-999",
+			Hostname:         "ssh-host-test",
+			IPAddress:        "10.0.0.12",
+			OSFamily:         "rpm",
+			OSName:           "Rocky Linux",
+			OSVersion:        "9.3",
+			OSMajor:          9,
+			Architecture:     "x86_64",
+			RunningKernel:    "5.14.0",
+			CollectedAt:      time.Now().UTC(),
+			AvailableUpdates: 0,
+			Payload:          mockProtobufPayload(t),
+			OverallAction:    "none",
+		},
+	}
+
+	backend := apitesting.NewBackend(t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+		apitesting.WithInjectorOverride(func(i do.Injector) {
+			do.Override[services.SSHPullRunner](i, func(i do.Injector) (services.SSHPullRunner, error) {
+				return mockRunner, nil
+			})
+		}),
+	)
+
+	queries := do.MustInvoke[db.Querier](backend.Injector())
+	hostsService := do.MustInvoke[services.Hosts](backend.Injector())
+	settingsService := do.MustInvoke[services.Settings](backend.Injector())
+	ctx := context.Background()
+
+	// 1. Create a host using global SSH key (UniqueKeyPair = false)
+	resGlobal, err := hostsService.CreateSSHHost(ctx, services.CreateSSHHostInput{
+		DisplayName:      "global-key-host",
+		Hostname:         "global.example.com",
+		SSHUser:          "root",
+		FrequencyMinutes: 60,
+		UniqueKeyPair:    false,
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, resGlobal.HostID)
+
+	// Fetch global SSH key to make sure it matches
+	globalKey, err := settingsService.GetGlobalSSHKeyPair(ctx)
+	require.NoError(t, err)
+	assert.Equal(t, globalKey.PublicKey, resGlobal.PublicKey)
+
+	// Verify columns in DB are NULL/empty
+	cfgGlobal, err := queries.GetSSHPullConfigByHostID(ctx, resGlobal.HostID)
+	require.NoError(t, err)
+	assert.Empty(t, cfgGlobal.PullPublicKey.UnwrapOr(""))
+	assert.Empty(t, cfgGlobal.PullPrivateKey.UnwrapOr(""))
+
+	// Onboard and run SSH pull
+	err = hostsService.OnboardSSHHost(ctx, resGlobal.HostID)
+	require.NoError(t, err)
+
+	err = hostsService.RunSSHPull(ctx, resGlobal.HostID)
+	require.NoError(t, err)
+	assert.Equal(t, globalKey.PrivateKey, mockRunner.calledPrivateKey)
+
+	// 2. Create a host using unique SSH key (UniqueKeyPair = true)
+	resUnique, err := hostsService.CreateSSHHost(ctx, services.CreateSSHHostInput{
+		DisplayName:      "unique-key-host",
+		Hostname:         "unique.example.com",
+		SSHUser:          "root",
+		FrequencyMinutes: 60,
+		UniqueKeyPair:    true,
+	})
+	require.NoError(t, err)
+	assert.NotEmpty(t, resUnique.HostID)
+	assert.NotEqual(t, globalKey.PublicKey, resUnique.PublicKey)
+
+	// Verify columns in DB are NOT NULL/empty
+	cfgUnique, err := queries.GetSSHPullConfigByHostID(ctx, resUnique.HostID)
+	require.NoError(t, err)
+	assert.NotEmpty(t, cfgUnique.PullPublicKey.UnwrapOr(""))
+	assert.NotEmpty(t, cfgUnique.PullPrivateKey.UnwrapOr(""))
+
+	// Onboard and run SSH pull
+	err = hostsService.OnboardSSHHost(ctx, resUnique.HostID)
+	require.NoError(t, err)
+
+	err = hostsService.RunSSHPull(ctx, resUnique.HostID)
+	require.NoError(t, err)
+	assert.NotEqual(t, globalKey.PrivateKey, mockRunner.calledPrivateKey)
+	assert.NotEmpty(t, mockRunner.calledPrivateKey)
 }

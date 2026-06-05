@@ -32,6 +32,7 @@
 	let sshHostname = $state('');
 	let sshUser = $state('root');
 	let sshFrequencyMinutes = $state(360);
+	let sshUniqueKeyPair = $state(false);
 	let sshPublicKey = $state('');
 	let sshHostID = $state('');
 	let showSSHModal = $state(false);
@@ -63,34 +64,32 @@
 		return `/api/v1/hosts/manual/script?${params.toString()}`;
 	}
 
-		async function loadScriptContent(): Promise<void> {
-			try {
-				const session = getSession();
-				const response = await fetch(collectorScriptURL(), {
-					headers: {
-						Authorization: `Bearer ${session?.accessToken || ''}`
-					}
-				});
-				if (response.ok) {
-					scriptContent = await response.text();
+	async function fetchScriptResponse(): Promise<Response> {
+		const session = getSession();
+		const response = await fetch(collectorScriptURL(), {
+			headers: {
+				Authorization: `Bearer ${session?.accessToken || ''}`
 			}
+		});
+		if (!response.ok) {
+			throw new Error(`Failed to fetch script: ${response.statusText}`);
+		}
+		return response;
+	}
+
+	async function loadScriptContent(): Promise<void> {
+		try {
+			const response = await fetchScriptResponse();
+			scriptContent = await response.text();
 		} catch (err) {
 			console.error(err);
 		}
 	}
 
-		async function downloadScript(): Promise<void> {
-			error = '';
-			try {
-				const session = getSession();
-				const response = await fetch(collectorScriptURL(), {
-					headers: {
-						Authorization: `Bearer ${session?.accessToken || ''}`
-					}
-				});
-			if (!response.ok) {
-				throw new Error('Failed to download script');
-			}
+	async function downloadScript(): Promise<void> {
+		error = '';
+		try {
+			const response = await fetchScriptResponse();
 			const blob = await response.blob();
 			const url = window.URL.createObjectURL(blob);
 			const a = document.createElement('a');
@@ -194,6 +193,7 @@
 				hostname: sshHostname,
 				ssh_user: sshUser,
 				frequency_minutes: sshFrequencyMinutes,
+				unique_key_pair: sshUniqueKeyPair,
 			});
 			sshHostID = result.host_id;
 			sshPublicKey = result.public_key;
@@ -337,6 +337,10 @@
 			<div class="form-group">
 				<label>Frequency Minutes</label>
 				<input class="form-input" type="number" min="5" bind:value={sshFrequencyMinutes} />
+			</div>
+			<div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-top: 12px; margin-bottom: 16px;">
+				<input type="checkbox" id="sshUniqueKeyPair" bind:checked={sshUniqueKeyPair} style="width: 16px; height: 16px; accent-color: var(--accent); cursor: pointer;" />
+				<label for="sshUniqueKeyPair" style="margin: 0; cursor: pointer; user-select: none;">Use a unique SSH key pair for this host</label>
 			</div>
 
 			<button class="btn btn-primary btn-sm" type="submit">Create SSH Host</button>

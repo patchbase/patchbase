@@ -29,16 +29,23 @@ type CompleteInitialSetupInput struct {
 	Password string
 }
 
+type GlobalSSHKeyPair struct {
+	PublicKey  string `json:"public_key"`
+	PrivateKey string `json:"private_key"`
+}
+
 type Settings interface {
 	TryInitialSetup(ctx context.Context) (bool, error)
 	Status(ctx context.Context) (InitialSetupDone, error)
 	CompleteInitialSetup(ctx context.Context, userID string, input CompleteInitialSetupInput) (sql.User, error)
+	GetGlobalSSHKeyPair(ctx context.Context) (GlobalSSHKeyPair, error)
 }
 
 type settings struct {
 	pool   *pgxpool.Pool
 	sql    sql.Querier
 	random utils.RandomStringGenerator
+	crypto utils.Crypto
 }
 
 func NewSettings(i do.Injector) (Settings, error) {
@@ -54,10 +61,15 @@ func NewSettings(i do.Injector) (Settings, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get utils.RandomStringGenerator: %w", err)
 	}
+	crypto, err := do.Invoke[utils.Crypto](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get utils.Crypto: %w", err)
+	}
 	return &settings{
 		pool:   pool,
 		sql:    sql,
 		random: random,
+		crypto: crypto,
 	}, nil
 }
 
@@ -276,4 +288,91 @@ func logBootstrapAdminCredentials(logger *slog.Logger, email string, password st
 
 func normalizeEmail(email string) string {
 	return strings.ToLower(strings.TrimSpace(email))
+}
+
+type globalSSHKeyPairDB struct {
+	PublicKey           string `json:"public_key"`
+	EncryptedPrivateKey string `json:"encrypted_private_key"`
+}
+
+func (s *settings) GetGlobalSSHKeyPair(ctx context.Context) (GlobalSSHKeyPair, error) {
+	manager := NewSettingManager[globalSSHKeyPairDB]("global_ssh_key", s.sql)
+	val, err := manager.Get(ctx)
+	if err != nil {
+		return GlobalSSHKeyPair{}, fmt.Errorf("failed to get global ssh key: %w", err)
+	}
+	if val.PublicKey != "" {
+		decrypted, err := s.crypto.Decrypt(val.EncryptedPrivateKey)
+		if err != nil {
+			return GlobalSSHKeyPair{}, fmt.Errorf("failed to decrypt global ssh private key: %w", err)
+		}
+		return GlobalSSHKeyPair{
+			PublicKey:  val.PublicKey,
+			PrivateKey: decrypted,
+		}, nil
+	}
+
+	// Generate a new one
+	pubKey, privKey, err := utils.GenerateSSHKeyPair()
+	if err != nil {
+		return GlobalSSHKeyPair{}, fmt.Errorf("failed to generate global ssh key: %w", err)
+	}
+	encPrivKey, err := s.crypto.Encrypt(privKey)
+	if err != nil {
+		return GlobalSSHKeyPair{}, fmt.Errorf("failed to encrypt global ssh private key: %w", err)
+	}
+
+	dbVal := globalSSHKeyPairDB{
+		PublicKey:           pubKey,
+		EncryptedPrivateKey: encPrivKey,
+	}
+
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return GlobalSSHKeyPair{}, fmt.Errorf("failed to begin transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) // nolint:errcheck
+
+	txQueries := sql.New(tx)
+	txManager := NewSettingManager[globalSSHKeyPairDB]("global_ssh_key", txQueries)
+
+	// Fetch again inside transaction to handle races
+	val, err = txManager.Get(ctx)
+	if err != nil {
+		return GlobalSSHKeyPair{}, fmt.Errorf("failed to get global ssh key in tx: %w", err)
+	}
+	if val.PublicKey != "" {
+		decrypted, err := s.crypto.Decrypt(val.EncryptedPrivateKey)
+		if err != nil {
+			return GlobalSSHKeyPair{}, fmt.Errorf("failed to decrypt global ssh private key in tx: %w", err)
+		}
+		return GlobalSSHKeyPair{
+			PublicKey:  val.PublicKey,
+			PrivateKey: decrypted,
+		}, nil
+	}
+
+	// Insert
+	if err := txManager.Ensure(ctx, dbVal); err != nil {
+		return GlobalSSHKeyPair{}, fmt.Errorf("failed to ensure global ssh key: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return GlobalSSHKeyPair{}, fmt.Errorf("failed to commit global ssh key: %w", err)
+	}
+
+	// Fetch the final value from DB
+	finalVal, err := manager.Get(ctx)
+	if err != nil {
+		return GlobalSSHKeyPair{}, fmt.Errorf("failed to get global ssh key after commit: %w", err)
+	}
+	decrypted, err := s.crypto.Decrypt(finalVal.EncryptedPrivateKey)
+	if err != nil {
+		return GlobalSSHKeyPair{}, fmt.Errorf("failed to decrypt global ssh private key after commit: %w", err)
+	}
+
+	return GlobalSSHKeyPair{
+		PublicKey:  finalVal.PublicKey,
+		PrivateKey: decrypted,
+	}, nil
 }

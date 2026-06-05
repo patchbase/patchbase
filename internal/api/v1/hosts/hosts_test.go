@@ -247,6 +247,20 @@ func TestCreateSSHHost(t *testing.T) {
 	assert.Equal(t, "approved", payload["approval_status"])
 	assert.Empty(t, payload["last_run_status"])
 
+	// Test unique_key_pair = true
+	recorderUnique := backend.HTTPPost(
+		"/api/v1/hosts/ssh",
+		`{"display_name":"ssh-host-unique","hostname":"203.0.113.11","ssh_user":"root","frequency_minutes":60,"unique_key_pair":true}`,
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusCreated, recorderUnique.Code)
+
+	var payloadUnique map[string]any
+	require.NoError(t, json.Unmarshal(recorderUnique.Body.Bytes(), &payloadUnique))
+	assert.NotEmpty(t, payloadUnique["host_id"])
+	assert.NotEmpty(t, payloadUnique["public_key"])
+	assert.NotEqual(t, payload["public_key"], payloadUnique["public_key"])
+
 	// Test onboarding endpoint
 	onboardRecorder := backend.HTTPPost(
 		fmt.Sprintf("/api/v1/hosts/%s/onboard-ssh", hostID),

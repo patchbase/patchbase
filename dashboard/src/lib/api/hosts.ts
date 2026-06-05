@@ -1,5 +1,4 @@
-import { request } from "$lib/api/request.js";
-import { getSession } from "$lib/auth/session.js";
+import { authenticatedRequest } from "$lib/api/request.js";
 import type {
   Host,
   HostSnapshot,
@@ -30,6 +29,7 @@ export interface CreateSSHHostPayload {
   ip_address?: string;
   ssh_user: string;
   frequency_minutes: number;
+  unique_key_pair?: boolean;
 }
 
 export interface CreatedSSHHost {
@@ -38,25 +38,6 @@ export interface CreatedSSHHost {
   approval_status: string;
   last_run_status: string;
   last_run_error: string;
-}
-
-function requireAccessToken(): string {
-  const session = getSession();
-  if (!session?.accessToken) {
-    throw new Error("Missing session. Please sign in again.");
-  }
-  return session.accessToken;
-}
-
-async function authenticatedRequest(path: string, init?: RequestInit): Promise<any> {
-  const accessToken = requireAccessToken();
-  return request(path, {
-    ...init,
-    headers: {
-      ...init?.headers,
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
 }
 
 export async function listHosts(): Promise<Host[]> {

@@ -1,5 +1,4 @@
-import { request } from "$lib/api/request.js";
-import { getSession } from "$lib/auth/session.js";
+import { authenticatedRequest } from "$lib/api/request.js";
 
 export interface AdvisoryScopeStatus {
   scope_key: string;
@@ -19,25 +18,6 @@ export interface AdvisoryOverview {
   total_advisories: number;
   total_scopes: number;
   synced_scopes: number;
-}
-
-function requireAccessToken(): string {
-  const session = getSession();
-  if (!session?.accessToken) {
-    throw new Error("Missing session. Please sign in again.");
-  }
-  return session.accessToken;
-}
-
-async function authenticatedRequest(path: string, init?: RequestInit): Promise<any> {
-  const accessToken = requireAccessToken();
-  return request(path, {
-    ...init,
-    headers: {
-      ...init?.headers,
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
 }
 
 export async function listAdvisoryScopes(): Promise<AdvisoryScopeStatus[]> {

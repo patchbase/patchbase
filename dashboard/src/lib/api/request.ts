@@ -1,4 +1,23 @@
-import { clearSession } from "$lib/auth/session.js";
+import { getSession, clearSession } from "$lib/auth/session.js";
+
+export function requireAccessToken(): string {
+  const session = getSession();
+  if (!session?.accessToken) {
+    throw new Error("Missing session. Please sign in again.");
+  }
+  return session.accessToken;
+}
+
+export async function authenticatedRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const accessToken = requireAccessToken();
+  return request(path, {
+    ...init,
+    headers: {
+      ...init?.headers,
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+}
 
 export async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, init);

@@ -83,6 +83,9 @@ type hosts struct {
 	crypto             utils.Crypto
 	injector           do.Injector
 	periodicJobManager PeriodicJobManager
+	advisoriesService  AdvisorySyncService
+	matcher            matchers.Matcher
+	settingsService    Settings
 }
 
 type CreatedRegistrationToken struct {
@@ -160,6 +163,7 @@ type CreateSSHHostInput struct {
 	IPAddress        string
 	SSHUser          string
 	FrequencyMinutes int32
+	UniqueKeyPair    bool
 }
 
 type CreateSSHHostResult struct {
@@ -198,6 +202,21 @@ func NewHosts(i do.Injector) (Hosts, error) {
 		return nil, fmt.Errorf("failed to get ssh runner: %w", err)
 	}
 
+	advisoriesService, err := do.Invoke[AdvisorySyncService](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get advisory sync service: %w", err)
+	}
+
+	matcher, err := do.Invoke[matchers.Matcher](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get matcher: %w", err)
+	}
+
+	settingsService, err := do.Invoke[Settings](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get settings service: %w", err)
+	}
+
 	return &hosts{
 		pool:               pool,
 		sql:                queries,
@@ -206,6 +225,9 @@ func NewHosts(i do.Injector) (Hosts, error) {
 		crypto:             crypto,
 		injector:           i,
 		periodicJobManager: periodicJobManager,
+		advisoriesService:  advisoriesService,
+		matcher:            matcher,
+		settingsService:    settingsService,
 	}, nil
 }
 
@@ -471,41 +493,31 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 	}
 
 	// Resolve and update advisory scope key (post-commit, outside the transaction using s.sql)
-	advisoriesService, err := do.Invoke[AdvisorySyncService](s.injector)
+	scopeKey, err := s.advisoriesService.ResolveScopeKey(ctx, osFamily, osName, osVersion, osMajor, architecture)
 	if err == nil {
-		scopeKey, err := advisoriesService.ResolveScopeKey(ctx, osFamily, osName, osVersion, osMajor, architecture)
-		if err == nil {
-			var registerErr error
-			if scopeKey != "" {
-				registerErr = advisoriesService.RegisterScopeDemand(ctx, scopeKey)
-				if registerErr != nil {
-					utils.GetLogger(ctx).Warn("register scope demand failed", "error", registerErr)
-				}
+		var registerErr error
+		if scopeKey != "" {
+			registerErr = s.advisoriesService.RegisterScopeDemand(ctx, scopeKey)
+			if registerErr != nil {
+				utils.GetLogger(ctx).Warn("register scope demand failed", "error", registerErr)
 			}
-			if registerErr == nil {
-				err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
-					ID:               host.ID,
-					AdvisoryScopeKey: optionString(scopeKey),
-				})
-				if err != nil {
-					utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
-				}
+		}
+		if registerErr == nil {
+			err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
+				ID:               host.ID,
+				AdvisoryScopeKey: optionString(scopeKey),
+			})
+			if err != nil {
+				utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
 			}
-		} else {
-			utils.GetLogger(ctx).Warn("resolve scope key failed", "error", err)
 		}
 	} else {
-		utils.GetLogger(ctx).Warn("invoke advisory sync service failed", "error", err)
+		utils.GetLogger(ctx).Warn("resolve scope key failed", "error", err)
 	}
 
 	// Run MatchSnapshot post-commit
-	matcher, err := do.Invoke[matchers.Matcher](s.injector)
-	if err == nil {
-		if _, err := matcher.MatchSnapshot(ctx, host.ID, snapshotRow.ID); err != nil {
-			utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", host.ID, "snapshot_id", snapshotRow.ID, "error", err)
-		}
-	} else {
-		utils.GetLogger(ctx).Warn("invoke matcher service failed", "error", err)
+	if _, err := s.matcher.MatchSnapshot(ctx, host.ID, snapshotRow.ID); err != nil {
+		utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", host.ID, "snapshot_id", snapshotRow.ID, "error", err)
 	}
 
 	return &agentpb.SyncResponse{
@@ -550,14 +562,30 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 		frequency = defaultSSHPullFrequency
 	}
 
-	publicKey, privateKey, err := utils.GenerateSSHKeyPair()
-	if err != nil {
-		return CreateSSHHostResult{}, fmt.Errorf("generate ssh key pair: %w", err)
-	}
+	var publicKey string
+	var dbPublicKey, dbPrivateKey utils.Option[string]
 
-	encryptedPrivateKey, err := s.crypto.Encrypt(privateKey)
-	if err != nil {
-		return CreateSSHHostResult{}, fmt.Errorf("encrypt private key: %w", err)
+	if input.UniqueKeyPair {
+		var privateKey string
+		var err error
+		publicKey, privateKey, err = utils.GenerateSSHKeyPair()
+		if err != nil {
+			return CreateSSHHostResult{}, fmt.Errorf("generate ssh key pair: %w", err)
+		}
+		encryptedPrivateKey, err := s.crypto.Encrypt(privateKey)
+		if err != nil {
+			return CreateSSHHostResult{}, fmt.Errorf("encrypt private key: %w", err)
+		}
+		dbPublicKey = optionString(publicKey)
+		dbPrivateKey = optionString(encryptedPrivateKey)
+	} else {
+		globalKey, err := s.settingsService.GetGlobalSSHKeyPair(ctx)
+		if err != nil {
+			return CreateSSHHostResult{}, fmt.Errorf("get global ssh key: %w", err)
+		}
+		publicKey = globalKey.PublicKey
+		dbPublicKey = utils.None[string]()
+		dbPrivateKey = utils.None[string]()
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -575,8 +603,8 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 		IpAddress:            optionString(strings.TrimSpace(input.IPAddress)),
 		PullSshUser:          optionString(sshUser),
 		PullFrequencyMinutes: &frequency,
-		PullPublicKey:        optionString(publicKey),
-		PullPrivateKey:       optionString(encryptedPrivateKey),
+		PullPublicKey:        dbPublicKey,
+		PullPrivateKey:       dbPrivateKey,
 	})
 	if err != nil {
 		return CreateSSHHostResult{}, fmt.Errorf("insert ssh host: %w", err)
@@ -1035,54 +1063,58 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 
 		// Resolve and update advisory scope key (post-commit, outside the transaction using s.sql)
 		if status == "success" && res != nil {
-			advisoriesService, err := do.Invoke[AdvisorySyncService](s.injector)
+			scopeKey, err := s.advisoriesService.ResolveScopeKey(ctx, res.OSFamily, res.OSName, res.OSVersion, res.OSMajor, res.Architecture)
 			if err == nil {
-				scopeKey, err := advisoriesService.ResolveScopeKey(ctx, res.OSFamily, res.OSName, res.OSVersion, res.OSMajor, res.Architecture)
-				if err == nil {
-					var registerErr error
-					if scopeKey != "" {
-						registerErr = advisoriesService.RegisterScopeDemand(ctx, scopeKey)
-						if registerErr != nil {
-							utils.GetLogger(ctx).Warn("register scope demand failed", "error", registerErr)
-						}
+				var registerErr error
+				if scopeKey != "" {
+					registerErr = s.advisoriesService.RegisterScopeDemand(ctx, scopeKey)
+					if registerErr != nil {
+						utils.GetLogger(ctx).Warn("register scope demand failed", "error", registerErr)
 					}
-					if registerErr == nil {
-						err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
-							ID:               hostID,
-							AdvisoryScopeKey: optionString(scopeKey),
-						})
-						if err != nil {
-							utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
-						}
+				}
+				if registerErr == nil {
+					err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
+						ID:               hostID,
+						AdvisoryScopeKey: optionString(scopeKey),
+					})
+					if err != nil {
+						utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
 					}
-				} else {
-					utils.GetLogger(ctx).Warn("resolve scope key failed", "error", err)
 				}
 			} else {
-				utils.GetLogger(ctx).Warn("invoke advisory sync service failed", "error", err)
+				utils.GetLogger(ctx).Warn("resolve scope key failed", "error", err)
 			}
 
 			// Trigger MatchSnapshot
-			matcher, err := do.Invoke[matchers.Matcher](s.injector)
-			if err == nil {
-				if _, err := matcher.MatchSnapshot(ctx, hostID, snapshotID); err != nil {
-					utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", hostID, "snapshot_id", snapshotID, "error", err)
-				}
-			} else {
-				utils.GetLogger(ctx).Warn("invoke matcher service failed", "error", err)
+			if _, err := s.matcher.MatchSnapshot(ctx, hostID, snapshotID); err != nil {
+				utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", hostID, "snapshot_id", snapshotID, "error", err)
 			}
 		}
 
 		return nil
 	}
 
-	decryptedKey, err := s.crypto.Decrypt(cfg.PullPrivateKey.UnwrapOr(""))
-	if err != nil {
-		upErr := updateJobResult("failed", fmt.Sprintf("decrypt private key: %v", err), nil)
-		if upErr != nil {
-			return fmt.Errorf("decrypt private key failed (%v), and job update failed: %w", err, upErr)
+	var decryptedKey string
+	if key, ok := cfg.PullPrivateKey.Get(); ok && key != "" {
+		var err error
+		decryptedKey, err = s.crypto.Decrypt(key)
+		if err != nil {
+			upErr := updateJobResult("failed", fmt.Sprintf("decrypt private key: %v", err), nil)
+			if upErr != nil {
+				return fmt.Errorf("decrypt private key failed (%v), and job update failed: %w", err, upErr)
+			}
+			return fmt.Errorf("decrypt private key: %w", err)
 		}
-		return fmt.Errorf("decrypt private key: %w", err)
+	} else {
+		globalKey, err := s.settingsService.GetGlobalSSHKeyPair(ctx)
+		if err != nil {
+			upErr := updateJobResult("failed", fmt.Sprintf("get global ssh key: %v", err), nil)
+			if upErr != nil {
+				return fmt.Errorf("get global ssh key failed (%v), and job update failed: %w", err, upErr)
+			}
+			return fmt.Errorf("get global ssh key: %w", err)
+		}
+		decryptedKey = globalKey.PrivateKey
 	}
 
 	sshHost := strings.TrimSpace(cfg.PullHostname)
@@ -1281,41 +1313,31 @@ func (s *hosts) IngestManualReport(ctx context.Context, hostID string, reportCon
 	}
 
 	// Post-commit work
-	advisoriesService, err := do.Invoke[AdvisorySyncService](s.injector)
+	scopeKey, err := s.advisoriesService.ResolveScopeKey(ctx, res.OSFamily, res.OSName, res.OSVersion, res.OSMajor, res.Architecture)
 	if err == nil {
-		scopeKey, err := advisoriesService.ResolveScopeKey(ctx, res.OSFamily, res.OSName, res.OSVersion, res.OSMajor, res.Architecture)
-		if err == nil {
-			var registerErr error
-			if scopeKey != "" {
-				registerErr = advisoriesService.RegisterScopeDemand(ctx, scopeKey)
-				if registerErr != nil {
-					utils.GetLogger(ctx).Warn("register scope demand failed", "error", registerErr)
-				}
+		var registerErr error
+		if scopeKey != "" {
+			registerErr = s.advisoriesService.RegisterScopeDemand(ctx, scopeKey)
+			if registerErr != nil {
+				utils.GetLogger(ctx).Warn("register scope demand failed", "error", registerErr)
 			}
-			if registerErr == nil {
-				err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
-					ID:               hostID,
-					AdvisoryScopeKey: optionString(scopeKey),
-				})
-				if err != nil {
-					utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
-				}
+		}
+		if registerErr == nil {
+			err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
+				ID:               hostID,
+				AdvisoryScopeKey: optionString(scopeKey),
+			})
+			if err != nil {
+				utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
 			}
-		} else {
-			utils.GetLogger(ctx).Warn("resolve scope key failed", "error", err)
 		}
 	} else {
-		utils.GetLogger(ctx).Warn("invoke advisory sync service failed", "error", err)
+		utils.GetLogger(ctx).Warn("resolve scope key failed", "error", err)
 	}
 
 	// Trigger MatchSnapshot
-	matcher, err := do.Invoke[matchers.Matcher](s.injector)
-	if err == nil {
-		if _, err := matcher.MatchSnapshot(ctx, hostID, snapshotID); err != nil {
-			utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", hostID, "snapshot_id", snapshotID, "error", err)
-		}
-	} else {
-		utils.GetLogger(ctx).Warn("invoke matcher service failed", "error", err)
+	if _, err := s.matcher.MatchSnapshot(ctx, hostID, snapshotID); err != nil {
+		utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", hostID, "snapshot_id", snapshotID, "error", err)
 	}
 
 	return nil

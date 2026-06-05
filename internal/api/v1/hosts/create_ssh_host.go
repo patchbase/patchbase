@@ -15,6 +15,7 @@ type createSSHHostRequest struct {
 	Hostname         string `json:"hostname"`
 	SSHUser          string `json:"ssh_user"`
 	FrequencyMinutes int32  `json:"frequency_minutes"`
+	UniqueKeyPair    bool   `json:"unique_key_pair"`
 }
 
 type createSSHHostResponse struct {
@@ -45,6 +46,7 @@ func CreateSSHHost(i do.Injector) apiauth.AuthenticatedHandler {
 			Hostname:         req.Hostname,
 			SSHUser:          req.SSHUser,
 			FrequencyMinutes: req.FrequencyMinutes,
+			UniqueKeyPair:    req.UniqueKeyPair,
 		})
 		if err != nil {
 			webutil.LogError(r, "create ssh host failed", err)
