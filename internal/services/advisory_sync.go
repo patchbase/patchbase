@@ -181,7 +181,7 @@ func (s *advisorySyncService) RegisterScopeDemand(ctx context.Context, scopeKey 
 	}
 
 	// Trigger sync periodic job
-	if err := s.periodicJobManager.AddAdvisorySyncJob(ctx, scopeKey); err != nil {
+	if err := s.periodicJobManager.AddAdvisorySyncJob(ctx, scopeKey, true); err != nil {
 		return fmt.Errorf("failed to add periodic advisory sync job: %w", err)
 	}
 
@@ -472,7 +472,7 @@ func (s *advisorySyncService) TriggerManualSync(ctx context.Context, scopeKey st
 		return fmt.Errorf("commit: %w", err)
 	}
 
-	if err := s.periodicJobManager.AddAdvisorySyncJob(ctx, scopeKey); err != nil {
+	if err := s.periodicJobManager.AddAdvisorySyncJob(ctx, scopeKey, false); err != nil {
 		utils.GetLogger(ctx).
 			ErrorContext(ctx, "failed to add periodic advisory sync job after manual sync trigger", "scope_key", scopeKey, "error", err)
 	}

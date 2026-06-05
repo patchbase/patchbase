@@ -239,7 +239,7 @@ type mockPeriodicJobManager struct {
 	registeredScopes []string
 }
 
-func (m *mockPeriodicJobManager) AddAdvisorySyncJob(ctx context.Context, scopeKey string) error {
+func (m *mockPeriodicJobManager) AddAdvisorySyncJob(ctx context.Context, scopeKey string, runOnStart bool) error {
 	m.registeredScopes = append(m.registeredScopes, scopeKey)
 	return nil
 }

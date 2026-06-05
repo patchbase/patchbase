@@ -650,7 +650,7 @@ func (s *hosts) OnboardSSHHost(ctx context.Context, hostID string) error {
 		return fmt.Errorf("set ssh pull onboarded: %w", err)
 	}
 
-	if err := s.periodicJobManager.AddSSHPullJob(ctx, hostID, frequency); err != nil {
+	if err := s.periodicJobManager.AddSSHPullJob(ctx, hostID, frequency, true); err != nil {
 		return fmt.Errorf("add periodic job: %w", err)
 	}
 

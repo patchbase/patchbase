@@ -76,7 +76,7 @@ func TestPeriodicJobManager_AddAndRemove(t *testing.T) {
 	require.True(t, ok)
 
 	// Test dynamic addition of Advisory Sync job
-	err = concreteManager.AddAdvisorySyncJob(ctx, "dynamic-scope")
+	err = concreteManager.AddAdvisorySyncJob(ctx, "dynamic-scope", true)
 	require.NoError(t, err)
 	assert.True(t, concreteManager.HasSyncJobForTest("dynamic-scope"))
 
@@ -86,7 +86,7 @@ func TestPeriodicJobManager_AddAndRemove(t *testing.T) {
 	assert.False(t, concreteManager.HasSyncJobForTest("dynamic-scope"))
 
 	// Test dynamic addition of SSH Pull job
-	err = concreteManager.AddSSHPullJob(ctx, "h_dynamic_host", 30)
+	err = concreteManager.AddSSHPullJob(ctx, "h_dynamic_host", 30, true)
 	require.NoError(t, err)
 	assert.True(t, concreteManager.HasSSHJobForTest("h_dynamic_host"))
 
@@ -123,8 +123,8 @@ func TestPeriodicJobManager_DuplicateRegistration(t *testing.T) {
 	_, err = pool.Exec(ctx, "INSERT INTO advisory_scopes (scope_key) VALUES ('duplicate-scope')")
 	require.NoError(t, err)
 
-	// Add once
-	err = concreteManager.AddAdvisorySyncJob(ctx, "duplicate-scope")
+	// 1. Add it the first time
+	err = concreteManager.AddAdvisorySyncJob(ctx, "duplicate-scope", true)
 	require.NoError(t, err)
 	assert.True(t, concreteManager.HasSyncJobForTest("duplicate-scope"))
 
@@ -134,8 +134,8 @@ func TestPeriodicJobManager_DuplicateRegistration(t *testing.T) {
 		return err == nil && countFirst == 1
 	}, 2*time.Second, 50*time.Millisecond)
 
-	// Add again, should not create a second job
-	err = concreteManager.AddAdvisorySyncJob(ctx, "duplicate-scope")
+	// 2. Add it again (should not error and should not add duplicate to River queue)
+	err = concreteManager.AddAdvisorySyncJob(ctx, "duplicate-scope", true)
 	require.NoError(t, err)
 	assert.True(t, concreteManager.HasSyncJobForTest("duplicate-scope"))
 

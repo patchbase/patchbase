@@ -65,7 +65,7 @@ func (p *PeriodicJobManager) Initialize(ctx context.Context) error {
 		return fmt.Errorf("list advisory scopes: %w", err)
 	}
 	for _, scope := range scopes {
-		if err := p.AddAdvisorySyncJob(ctx, scope.ScopeKey); err != nil {
+		if err := p.AddAdvisorySyncJob(ctx, scope.ScopeKey, false); err != nil {
 			p.logger.ErrorContext(ctx, "failed to register initial advisory sync job", "scope_key", scope.ScopeKey, "error", err)
 		}
 	}
@@ -80,7 +80,7 @@ func (p *PeriodicJobManager) Initialize(ctx context.Context) error {
 		if host.PullFrequencyMinutes != nil && *host.PullFrequencyMinutes > 0 {
 			freq = *host.PullFrequencyMinutes
 		}
-		if err := p.AddSSHPullJob(ctx, host.ID, freq); err != nil {
+		if err := p.AddSSHPullJob(ctx, host.ID, freq, false); err != nil {
 			p.logger.ErrorContext(ctx, "failed to register initial ssh pull job", "host_id", host.ID, "error", err)
 		}
 	}
@@ -88,7 +88,7 @@ func (p *PeriodicJobManager) Initialize(ctx context.Context) error {
 	return nil
 }
 
-func (p *PeriodicJobManager) AddAdvisorySyncJob(ctx context.Context, scopeKey string) error {
+func (p *PeriodicJobManager) AddAdvisorySyncJob(ctx context.Context, scopeKey string, runOnStart bool) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -109,7 +109,7 @@ func (p *PeriodicJobManager) AddAdvisorySyncJob(ctx context.Context, scopeKey st
 		},
 		&river.PeriodicJobOpts{
 			ID:         "advisory-sync-" + scopeKey,
-			RunOnStart: true,
+			RunOnStart: runOnStart,
 		},
 	)
 
@@ -142,7 +142,7 @@ func (p *PeriodicJobManager) RemoveAdvisorySyncJob(ctx context.Context, scopeKey
 	return nil
 }
 
-func (p *PeriodicJobManager) AddSSHPullJob(ctx context.Context, hostID string, frequencyMinutes int32) error {
+func (p *PeriodicJobManager) AddSSHPullJob(ctx context.Context, hostID string, frequencyMinutes int32, runOnStart bool) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
@@ -168,7 +168,7 @@ func (p *PeriodicJobManager) AddSSHPullJob(ctx context.Context, hostID string, f
 		},
 		&river.PeriodicJobOpts{
 			ID:         "ssh-pull-" + hostID,
-			RunOnStart: true,
+			RunOnStart: runOnStart,
 		},
 	)
 
