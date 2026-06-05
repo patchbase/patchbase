@@ -32,6 +32,8 @@
 		failed: 'red',
 		running: 'blue',
 		pending: 'purple',
+		waiting_approval: 'purple',
+		rejected: 'red',
 	};
 
 	let color = $derived(colors[status] || 'purple');
@@ -50,6 +52,8 @@
 		failed: 'Failed',
 		running: 'Running',
 		pending: 'Pending',
+		waiting_approval: 'Needs approval',
+		rejected: 'Rejected',
 	};
 
 	let display = $derived(labels[status] || status.replace(/_/g, ' '));

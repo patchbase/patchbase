@@ -184,7 +184,11 @@
 						{host.os_name} {host.os_version} &middot; {host.architecture}
 					</div>
 					<div class="host-card-signals">
-						<StatusBadge status={host.approval_status || 'unknown'} />
+						{#if host.approval_status === 'waiting_approval'}
+							<StatusBadge status="waiting_approval" />
+						{:else if host.approval_status === 'rejected'}
+							<StatusBadge status="rejected" />
+						{/if}
 						{#if host.critical_count > 0}
 							<span class="badge badge-red"><span class="badge-dot"></span>{host.critical_count} critical</span>
 						{/if}
@@ -210,12 +214,11 @@
 			<thead>
 				<tr>
 					<th>Host</th>
-					<th>Approval</th>
 					<th>Platform</th>
 					<th>Action</th>
 					<th>Critical</th>
+					<th>Important</th>
 					<th>Updates</th>
-					<th>Reboot</th>
 					<th>Last Check</th>
 					<th></th>
 				</tr>
@@ -224,12 +227,19 @@
 				{#each sortedHosts as host (host.id)}
 					<tr>
 						<td><a href="/hosts/{host.id}">{hostLabel(host)}</a></td>
-						<td><StatusBadge status={host.approval_status || 'unknown'} /></td>
 						<td>{host.os_name} {host.os_version} ({host.architecture})</td>
-						<td><StatusBadge status={host.overall_action} /></td>
-						<td class="mono">{host.critical_count}</td>
-						<td class="mono">{host.available_updates}</td>
-						<td class="mono">{host.needs_reboot}</td>
+						<td>
+							{#if host.approval_status === 'waiting_approval'}
+								<StatusBadge status="waiting_approval" />
+							{:else if host.approval_status === 'rejected'}
+								<StatusBadge status="rejected" />
+							{:else}
+								<StatusBadge status={host.overall_action} />
+							{/if}
+						</td>
+						<td class="mono">{host.critical_count || '-'}</td>
+						<td class="mono">{host.important_count || '-'}</td>
+						<td class="mono">{host.available_updates || '-'}</td>
 						<td>{relativeTime(host.last_advisory_check_at || null)}</td>
 						<td class="host-actions-cell">
 							<div class="host-actions">
