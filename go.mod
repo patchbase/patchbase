@@ -1,6 +1,6 @@
 module go.patchbase.net/server
 
-go 1.25.10
+go 1.25.11
 
 require (
 	github.com/go-testfixtures/testfixtures/v3 v3.19.0
