@@ -173,8 +173,18 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 	}
 
 	for _, dec := range decisions {
+		if _, err := tx.Exec(ctx, "SAVEPOINT decision_insert"); err != nil {
+			return MatchResult{}, fmt.Errorf("create decision insert savepoint: %w", err)
+		}
+
 		if err := queries.InsertDecisionRecord(ctx, dec.record); err != nil {
 			if sql.IsForeignKeyViolation(err, "decision_records_advisory_id_fkey") {
+				if _, rbErr := tx.Exec(ctx, "ROLLBACK TO SAVEPOINT decision_insert"); rbErr != nil {
+					return MatchResult{}, fmt.Errorf("rollback decision insert savepoint: %w", rbErr)
+				}
+				if _, relErr := tx.Exec(ctx, "RELEASE SAVEPOINT decision_insert"); relErr != nil {
+					return MatchResult{}, fmt.Errorf("release decision insert savepoint: %w", relErr)
+				}
 				m.logger.WarnContext(
 					ctx,
 					"skipping decision record insertion due to concurrently deleted advisory",
@@ -185,6 +195,10 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 				continue
 			}
 			return MatchResult{}, fmt.Errorf("insert decision record: %w", err)
+		}
+
+		if _, err := tx.Exec(ctx, "RELEASE SAVEPOINT decision_insert"); err != nil {
+			return MatchResult{}, fmt.Errorf("release decision insert savepoint: %w", err)
 		}
 	}
 
@@ -329,6 +343,10 @@ func buildDecisions(
 		filteredRulesByPackage := filterRulesByPackage(rulesByAdvisory[advisory.ID], resolvedStreamIDs)
 		filteredFixesByPackage := filterFixesByPackage(fixesByAdvisory[advisory.ID], resolvedStreamIDs)
 		for _, pkg := range candidatePackages(packagesByName, filteredRulesByPackage, filteredFixesByPackage) {
+			if !isRelevantKernelPackage(pkg, osFamily, snapshot, packages) {
+				continue
+			}
+			
 			fixesForPackage := matchingFixesForPackageKeys(pkg, filteredFixesByPackage)
 			rulesForPackage := matchingRulesForPackageKeys(pkg, filteredRulesByPackage)
 
@@ -453,7 +471,7 @@ func buildDecisions(
 				status := "affected_fix_available"
 				action := "update_package"
 				reasonCode := "vendor_fix_available_not_installed"
-				reasonText := "a vendor fixed package is available but not installed"
+				reasonText := fmt.Sprintf("a vendor fixed package (%s) is available but not installed", bestFix.Nevra)
 
 				// If this is a versioned kernel package, check if a newer version of the same flavor/name is already installed
 				if isKernelPackage(pkg.GetName(), osFamily) {
@@ -467,7 +485,7 @@ func buildDecisions(
 								status = "fixed_package_installed_pending_activation"
 								action = "reboot_host"
 								reasonCode = "fixed_package_installed_kernel_not_running"
-								reasonText = "fixed kernel package is installed but the running kernel is older"
+								reasonText = fmt.Sprintf("fixed kernel package is installed, but the running kernel (%s) requires a reboot to activate the fix", snapshot.RunningKernelNevra)
 							}
 						}
 					} else {
@@ -475,7 +493,7 @@ func buildDecisions(
 							status = "fixed_package_installed_pending_activation"
 							action = "reboot_host"
 							reasonCode = "fixed_package_installed_kernel_not_running"
-							reasonText = "fixed kernel package is installed but the running kernel is older"
+							reasonText = fmt.Sprintf("fixed kernel package is installed, but the running kernel (%s) requires a reboot to activate the fix", snapshot.RunningKernelNevra)
 						}
 					}
 				}
@@ -496,7 +514,7 @@ func buildDecisions(
 					status = "fixed_package_installed_pending_activation"
 					action = "reboot_host"
 					reasonCode = "fixed_package_installed_kernel_not_running"
-					reasonText = "fixed kernel package is installed but the running kernel is older"
+					reasonText = fmt.Sprintf("fixed kernel package is installed, but the running kernel (%s) requires a reboot to activate the fix", snapshot.RunningKernelNevra)
 				}
 			}
 
@@ -537,7 +555,7 @@ func decisionFromFixedPackageOnly(
 		status := "affected_fix_available"
 		action := "update_package"
 		reasonCode := "vendor_fix_available_not_installed"
-		reasonText := "a vendor fixed package is available but not installed"
+		reasonText := fmt.Sprintf("a vendor fixed package (%s) is available but not installed", bestFix.Nevra)
 
 		if isKernelPackage(pkg.GetName(), osFamily) {
 			if osFamily == "apt" {
@@ -550,7 +568,7 @@ func decisionFromFixedPackageOnly(
 						status = "fixed_package_installed_pending_activation"
 						action = "reboot_host"
 						reasonCode = "fixed_package_installed_kernel_not_running"
-						reasonText = "fixed kernel package is installed but the running kernel is older"
+						reasonText = fmt.Sprintf("fixed kernel package is installed, but the running kernel (%s) requires a reboot to activate the fix", snapshot.RunningKernelNevra)
 					}
 				}
 			} else {
@@ -558,7 +576,7 @@ func decisionFromFixedPackageOnly(
 					status = "fixed_package_installed_pending_activation"
 					action = "reboot_host"
 					reasonCode = "fixed_package_installed_kernel_not_running"
-					reasonText = "fixed kernel package is installed but the running kernel is older"
+					reasonText = fmt.Sprintf("fixed kernel package is installed, but the running kernel (%s) requires a reboot to activate the fix", snapshot.RunningKernelNevra)
 				}
 			}
 		}
@@ -578,7 +596,7 @@ func decisionFromFixedPackageOnly(
 			status = "fixed_package_installed_pending_activation"
 			action = "reboot_host"
 			reasonCode = "fixed_package_installed_kernel_not_running"
-			reasonText = "fixed kernel package is installed but the running kernel is older"
+			reasonText = fmt.Sprintf("fixed kernel package is installed, but the running kernel (%s) requires a reboot to activate the fix", snapshot.RunningKernelNevra)
 		}
 	}
 
@@ -627,7 +645,7 @@ func kernelRunningSatisfiesFixedBuild(snapshot sql.HostSnapshot, packages []*age
 
 	if osFamily == "apt" {
 		runningAbi := strings.TrimSpace(snapshot.RunningKernelNevra)
-		fixedAbi := strings.TrimPrefix(packageName, "linux-image-")
+		fixedAbi, _ := trimKernelPackagePrefixAPT(packageName)
 
 		if len(fixedAbi) > 0 && isDigit(fixedAbi[0]) && len(runningAbi) > 0 && isDigit(runningAbi[0]) {
 			runningAbiEVR, err1 := parseRunningKernelDebianEVR(runningAbi)
@@ -869,7 +887,13 @@ func candidatePackages(
 }
 
 func packageMatchKeys(pkg *agentpb.Package) []string {
-	return keysForPackageMatch(pkg.GetName(), pkg.GetSourceRpm())
+	keys := keysForPackageMatch(pkg.GetName(), pkg.GetSourceRpm())
+	for _, derived := range derivedAPTSourceKeysFromBinary(pkg.GetName()) {
+		if !containsString(keys, derived) {
+			keys = append(keys, derived)
+		}
+	}
+	return keys
 }
 
 func keysForPackageMatch(name string, source string) []string {
@@ -889,6 +913,77 @@ func keysForPackageMatch(name string, source string) []string {
 	add(name)
 	add(source)
 	return keys
+}
+
+func containsString(items []string, target string) bool {
+	for _, item := range items {
+		if item == target {
+			return true
+		}
+	}
+	return false
+}
+
+func derivedAPTSourceKeysFromBinary(name string) []string {
+	trimmed := strings.ToLower(strings.TrimSpace(name))
+	if trimmed == "" {
+		return nil
+	}
+
+	if trimmed == "linux-libc-dev" || trimmed == "linux-tools-common" {
+		return []string{"linux"}
+	}
+
+	prefixes := []string{
+		"linux-image-",
+		"linux-headers-",
+		"linux-modules-",
+		"linux-modules-extra-",
+		"linux-tools-",
+	}
+	rest := ""
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(trimmed, prefix) {
+			rest = strings.TrimPrefix(trimmed, prefix)
+			break
+		}
+	}
+	if rest == "" {
+		return nil
+	}
+
+	lastDash := strings.LastIndex(rest, "-")
+	if lastDash <= 0 || lastDash == len(rest)-1 {
+		return nil
+	}
+
+	flavor := rest[lastDash+1:]
+	switch flavor {
+	case "generic":
+		return []string{"linux"}
+	case "lowlatency":
+		return []string{"linux-lowlatency"}
+	case "aws":
+		return []string{"linux-aws"}
+	case "azure":
+		return []string{"linux-azure"}
+	case "gcp":
+		return []string{"linux-gcp"}
+	case "gke":
+		return []string{"linux-gke"}
+	case "kvm":
+		return []string{"linux-kvm"}
+	case "ibm":
+		return []string{"linux-ibm"}
+	case "oracle":
+		return []string{"linux-oracle"}
+	case "nvidia":
+		return []string{"linux-nvidia"}
+	case "raspi":
+		return []string{"linux-raspi"}
+	default:
+		return nil
+	}
 }
 
 func packageInstanceKey(pkg *agentpb.Package) string {
@@ -931,11 +1026,96 @@ func matchingFixesForPackageKeys(pkg *agentpb.Package, fixesByPackage map[string
 	return fixes
 }
 
+func isKernelPackageAPT(name string) bool {
+	prefixes := []string{
+		"linux-image-unsigned-",
+		"linux-image-",
+		"linux-modules-extra-",
+		"linux-modules-",
+		"linux-headers-",
+		"linux-tools-",
+		"linux-cloud-tools-",
+		"linux-buildinfo-",
+	}
+	for _, p := range prefixes {
+		if strings.HasPrefix(name, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func trimKernelPackagePrefixAPT(name string) (string, bool) {
+	prefixes := []string{
+		"linux-image-unsigned-",
+		"linux-image-",
+		"linux-modules-extra-",
+		"linux-modules-",
+		"linux-headers-",
+		"linux-tools-",
+		"linux-cloud-tools-",
+		"linux-buildinfo-",
+	}
+	for _, p := range prefixes {
+		if strings.HasPrefix(name, p) {
+			return strings.TrimPrefix(name, p), true
+		}
+	}
+	return name, false
+}
+
 func isKernelPackage(name string, osFamily string) bool {
 	if osFamily == "apt" {
-		return strings.HasPrefix(name, "linux-image-")
+		return isKernelPackageAPT(name)
 	}
 	return name == "kernel" || strings.HasPrefix(name, "kernel-")
+}
+
+func isRelevantKernelPackage(pkg *agentpb.Package, osFamily string, snapshot sql.HostSnapshot, packages []*agentpb.Package) bool {
+	if !isKernelPackage(pkg.GetName(), osFamily) {
+		return true
+	}
+
+	if osFamily == "apt" {
+		runningAbi := strings.TrimSpace(snapshot.RunningKernelNevra)
+		if runningAbi != "" && strings.Contains(pkg.GetName(), runningAbi) {
+			return true
+		}
+
+		if isVersionedKernelPackageAPT(pkg.GetName()) {
+			flavor := "generic"
+			if idx := strings.LastIndex(pkg.GetName(), "-"); idx >= 0 {
+				flavor = pkg.GetName()[idx+1:]
+			}
+			if latest, found := latestInstalledKernelEVRAPT(packages, flavor); found {
+				installed := evr{epoch: int64(pkg.GetEpoch()), version: pkg.GetVersion(), release: pkg.GetRelease()}
+				if compareDebianEVR(installed, latest) >= 0 {
+					return true
+				}
+			}
+		} else {
+			return true
+		}
+	} else {
+		if snapshot.RunningKernelNevra != "" {
+			runningKernel, err := parseRunningKernelEVR(snapshot.RunningKernelNevra)
+			if err == nil {
+				installed := evr{epoch: int64(pkg.GetEpoch()), version: pkg.GetVersion(), release: pkg.GetRelease()}
+				if compareEVR(installed, runningKernel) == 0 {
+					return true
+				}
+			}
+		}
+
+		if latest, found := latestInstalledKernelEVRRPM(packages, pkg.GetName()); found {
+			installed := evr{epoch: int64(pkg.GetEpoch()), version: pkg.GetVersion(), release: pkg.GetRelease()}
+			if compareEVR(installed, latest) >= 0 {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 func overallAction(decisions []decision) string {
@@ -1133,11 +1313,10 @@ func parseDecisionFixedEVR(record sql.InsertDecisionRecordParams, osFamily strin
 }
 
 func isVersionedKernelPackageAPT(name string) bool {
-	if !strings.HasPrefix(name, "linux-image-") {
+	trimmed, ok := trimKernelPackagePrefixAPT(name)
+	if !ok {
 		return false
 	}
-	trimmed := strings.TrimPrefix(name, "linux-image-")
-	trimmed = strings.TrimPrefix(trimmed, "unsigned-")
 	return len(trimmed) > 0 && isDigit(trimmed[0])
 }
 

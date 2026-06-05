@@ -117,6 +117,16 @@
 		return '';
 	}
 
+
+	function sortCvesByScore(cves: CVEInfo[] | null | undefined): CVEInfo[] {
+		if (!cves) return [];
+		return [...cves].sort((a, b) => {
+			const sa = a.score ?? -1;
+			const sb = b.score ?? -1;
+			return sb - sa;
+		});
+	}
+
 	function compactKernelValue(value: string | null | undefined) {
 		const trimmed = (value || '').trim();
 		if (!trimmed) {
@@ -427,7 +437,7 @@
 														<span class="advisory-title">{adv.title}</span>
 														{#if adv.cves && adv.cves.length > 0}
 															<span class="advisory-cves" style="display: inline-flex; gap: 4px; margin-left: 8px; flex-wrap: wrap; align-items: center; vertical-align: middle;">
-																{#each adv.cves as cve}
+																{#each sortCvesByScore(adv.cves) as cve}
 																	<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size: 11px; text-decoration: none; padding: 2px 6px; {getCveStyle(cve.score)}" title={hasCveScore(cve.score) ? `CVSS Score: ${cve.score}` : 'No CVSS score available'}>{cve.id}{hasCveScore(cve.score) ? ` (${cve.score})` : ''}</a>
 																{/each}
 															</span>
@@ -457,6 +467,9 @@
 																	<td class="mono">{item.fixed_nevra}</td>
 																	<td>
 																		<span class="badge badge-{item.package_state_tone}">{item.package_state_label}</span>
+																		{#if item.reason_text}
+																			<div style="font-size: 11px; color: var(--text-dim); margin-top: 4px; max-width: 280px; line-height: 1.3;">{item.reason_text}</div>
+																		{/if}
 																	</td>
 																</tr>
 															{/each}
@@ -518,7 +531,7 @@
 														<span class="advisory-title">{adv.title}</span>
 														{#if adv.cves && adv.cves.length > 0}
 															<span class="advisory-cves" style="display: inline-flex; gap: 4px; margin-left: 8px; flex-wrap: wrap; align-items: center; vertical-align: middle;">
-																{#each adv.cves as cve}
+																{#each sortCvesByScore(adv.cves) as cve}
 																	<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size: 11px; text-decoration: none; padding: 2px 6px; {getCveStyle(cve.score)}" title={hasCveScore(cve.score) ? `CVSS Score: ${cve.score}` : 'No CVSS score available'}>{cve.id}{hasCveScore(cve.score) ? ` (${cve.score})` : ''}</a>
 																{/each}
 															</span>
@@ -548,6 +561,9 @@
 																	<td class="mono">{item.fixed_nevra}</td>
 																	<td>
 																		<span class="badge badge-{item.package_state_tone}">{item.package_state_label}</span>
+																		{#if item.reason_text}
+																			<div style="font-size: 11px; color: var(--text-dim); margin-top: 4px; max-width: 280px; line-height: 1.3;">{item.reason_text}</div>
+																		{/if}
 																	</td>
 																</tr>
 															{/each}
@@ -608,7 +624,7 @@
 												<div class="advisory-title">{advisory.title}</div>
 												{#if advisory.cves && advisory.cves.length > 0}
 													<div class="advisory-cves" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
-														{#each advisory.cves as cve}
+														{#each sortCvesByScore(advisory.cves) as cve}
 															<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size:11px; text-decoration:none; padding:2px 6px; {getCveStyle(cve.score)}" title={hasCveScore(cve.score) ? `CVSS Score: ${cve.score}` : 'No CVSS score available'}>{cve.id}{hasCveScore(cve.score) ? ` (${cve.score})` : ''}</a>
 														{/each}
 													</div>
@@ -640,7 +656,7 @@
 												<div class="advisory-title">{advisory.title}</div>
 												{#if advisory.cves && advisory.cves.length > 0}
 													<div class="advisory-cves" style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
-														{#each advisory.cves as cve}
+														{#each sortCvesByScore(advisory.cves) as cve}
 															<a href={cve.url || `https://nvd.nist.gov/vuln/detail/${cve.id}`} target="_blank" rel="noopener noreferrer" class="badge badge-secondary" style="font-size:11px; text-decoration:none; padding:2px 6px; {getCveStyle(cve.score)}" title={hasCveScore(cve.score) ? `CVSS Score: ${cve.score}` : 'No CVSS score available'}>{cve.id}{hasCveScore(cve.score) ? ` (${cve.score})` : ''}</a>
 														{/each}
 													</div>

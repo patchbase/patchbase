@@ -244,9 +244,14 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 		return handleFailure(fmt.Errorf("scope %q not found in manifest", scopeKey))
 	}
 
+	if !isValidSha256Hex(detail.Sha256) {
+		return handleFailure(fmt.Errorf("invalid sha256 checksum format in manifest for scope %q: %q", scopeKey, detail.Sha256))
+	}
+
 	// Get current db record for previous files clean up
 	current, err := s.queries.GetAdvisoryScope(ctx, scopeKey)
-	hasPrevious := err == nil && current.Sha256.IsPresent() && current.LocalPath.IsPresent()
+	currentExists := err == nil
+	hasPrevious := currentExists && current.Sha256.IsPresent() && current.LocalPath.IsPresent()
 
 	// 4. Download if hash changed or local file doesn't exist
 	destDir := s.config.AdvisorySync.StorageDir
@@ -258,9 +263,20 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 	destPath := filepath.Join(destDir, destFilename)
 
 	exists, err := afero.Exists(s.fs, destPath)
-	needsDownload := !exists || err != nil || current.Sha256.UnwrapOr("") != detail.Sha256
+	sameHash := currentExists && current.Sha256.UnwrapOr("") == detail.Sha256
+	hasSuccessfulImportForHash := sameHash && current.LastSuccessAt.Valid
+	needsDownload := !exists || err != nil || !sameHash
 
-	if !needsDownload && current.Status == "synced" {
+	if !needsDownload && hasSuccessfulImportForHash {
+		// If this exact hash was successfully imported before, skip re-import and just rematch hosts.
+		matcherSvc, err := do.Invoke[matchers.Matcher](s.injector)
+		if err != nil {
+			return handleFailure(fmt.Errorf("failed to resolve Matcher service: %w", err))
+		}
+		if err := matcherSvc.MatchHostsForScope(ctx, scopeKey); err != nil {
+			return handleFailure(fmt.Errorf("failed to match hosts for scope: %w", err))
+		}
+
 		now := time.Now().UTC()
 		nextRefresh := now.Add(s.config.AdvisorySync.RefreshInterval)
 		_, err = s.queries.UpsertAdvisoryScope(ctx, db.UpsertAdvisoryScopeParams{
@@ -302,8 +318,14 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 			return handleFailure(fmt.Errorf("download scope database returned status: %d", dlResp.StatusCode))
 		}
 
+		// Download to a staging directory first, then atomically replace the destination on success.
+		stageDir := filepath.Join(destDir, ".tmp")
+		if err := s.fs.MkdirAll(stageDir, 0755); err != nil {
+			return handleFailure(fmt.Errorf("failed to create staging directory: %w", err))
+		}
+
 		// Create temp file for writing and hashing
-		tmpFile, err := afero.TempFile(s.fs, destDir, "advisory-dl-*")
+		tmpFile, err := afero.TempFile(s.fs, stageDir, "advisory-dl-*")
 		if err != nil {
 			return handleFailure(fmt.Errorf("failed to create temp file: %w", err))
 		}
@@ -315,9 +337,14 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 		hasher := sha256.New()
 		writer := io.MultiWriter(tmpFile, hasher)
 
-		if _, err := io.Copy(writer, dlResp.Body); err != nil {
+		writtenBytes, err := io.Copy(writer, dlResp.Body)
+		if err != nil {
 			tmpFile.Close() // nolint:errcheck
 			return handleFailure(fmt.Errorf("failed to write database file: %w", err))
+		}
+		if writtenBytes == 0 {
+			tmpFile.Close() // nolint:errcheck
+			return handleFailure(fmt.Errorf("downloaded database file is empty"))
 		}
 		if err := tmpFile.Close(); err != nil {
 			return handleFailure(fmt.Errorf("failed to close database file: %w", err))
@@ -810,4 +837,17 @@ func optFromPtr[T any](p *T) utils.Option[T] {
 		return utils.None[T]()
 	}
 	return utils.Some(*p)
+}
+
+func isValidSha256Hex(s string) bool {
+	if len(s) != 64 {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') && (c < 'A' || c > 'F') {
+			return false
+		}
+	}
+	return true
 }

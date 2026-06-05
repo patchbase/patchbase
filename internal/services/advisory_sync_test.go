@@ -460,4 +460,24 @@ func TestAdvisorySync_SyncScope_Caching(t *testing.T) {
 	scope, err = queries.GetAdvisoryScope(ctx, "rocky:9")
 	require.NoError(t, err)
 	assert.Equal(t, "synced", scope.Status)
+
+	// --- THIRD SYNC (retry path; status not synced, same hash already imported) ---
+	_, err = queries.UpdateAdvisoryScopeStatus(ctx, db.UpdateAdvisoryScopeStatusParams{
+		ScopeKey:  "rocky:9",
+		Status:    "failed",
+		LastError: utils.Some("transient failure"),
+	})
+	require.NoError(t, err)
+
+	manifestRequests = 0
+	dbRequests = 0
+
+	err = svc.SyncScope(ctx, "rocky:9")
+	require.NoError(t, err)
+	assert.Equal(t, 1, manifestRequests, "should still request manifest")
+	assert.Equal(t, 0, dbRequests, "should NOT request database on retry when hash is unchanged and previously imported")
+
+	scope, err = queries.GetAdvisoryScope(ctx, "rocky:9")
+	require.NoError(t, err)
+	assert.Equal(t, "synced", scope.Status)
 }
