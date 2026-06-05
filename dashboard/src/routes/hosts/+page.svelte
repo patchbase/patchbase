@@ -5,7 +5,7 @@
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import ApproveHostButton from '$lib/components/ApproveHostButton.svelte';
 	import DeleteHostButton from '$lib/components/DeleteHostButton.svelte';
-	import { listHosts } from '$lib/api/hosts.js';
+	import { listHosts, runPullNow } from '$lib/api/hosts.js';
 	import { relativeTime } from '$lib/format';
 	import type { Host } from '$lib/types';
 
@@ -17,6 +17,22 @@
 	let error = $state('');
 	let viewMode = $state<ViewMode>('grid');
 	let openActionsHostID = $state<string | null>(null);
+	let runningPullNowHostId = $state<string | null>(null);
+
+	async function runPullNowJob(hostID: string): Promise<void> {
+		if (runningPullNowHostId) return;
+		runningPullNowHostId = hostID;
+		error = '';
+		try {
+			await runPullNow(hostID);
+			void loadHosts(true);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to run SSH pull now.';
+		} finally {
+			runningPullNowHostId = null;
+			openActionsHostID = null;
+		}
+	}
 
 	async function loadHosts(silent = false): Promise<void> {
 		if (!silent) {
@@ -363,6 +379,16 @@
 												error = err.message;
 											}}
 										/>
+										{#if host.onboarding_mode === 'ssh'}
+											<button
+												type="button"
+												class="host-actions-item"
+												onclick={() => void runPullNowJob(host.id)}
+												disabled={runningPullNowHostId !== null}
+											>
+												{runningPullNowHostId === host.id ? 'Running...' : 'Run now'}
+											</button>
+										{/if}
 										<DeleteHostButton
 											{host}
 											class="host-actions-item host-actions-item-danger"
