@@ -1,0 +1,36 @@
+load("@rules_img//img:image.bzl", "image_from_binary")
+load("@rules_img//img:load.bzl", "image_load")
+load("@rules_img//img:push.bzl", "image_push")
+
+image_from_binary(
+    name = "image",
+    binary = "//cmd/patchbase-server",
+    cmd = ["serve"],
+    include_runfiles = False,
+    platforms = [
+        "//third_party/bazel:linux_amd64",
+        "//third_party/bazel:linux_arm64",
+    ],
+)
+
+_IMAGE_REF_SETTINGS = {
+    "REGISTRY": "//:image_registry",
+    "REPOSITORY": "//:image_repository",
+    "TAG": "//:image_tag",
+}
+
+image_load(
+    name = "load",
+    build_settings = _IMAGE_REF_SETTINGS,
+    image = ":image",
+    tag = "{{.REGISTRY}}/{{.REPOSITORY}}:{{.TAG}}",
+)
+
+image_push(
+    name = "push",
+    build_settings = _IMAGE_REF_SETTINGS,
+    image = ":image",
+    registry = "{{.REGISTRY}}",
+    repository = "{{.REPOSITORY}}",
+    tag = "{{.TAG}}",
+)
