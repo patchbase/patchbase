@@ -76,7 +76,7 @@ const (
 	DefaultEncryptionKey               = ""
 	DefaultAdvisorySyncBaseURL         = "https://dl.patchbase.net/v1/advisory-db"
 	DefaultAdvisorySyncRefreshInterval = 6 * time.Hour
-	DefaultAdvisorySyncStorageDir      = "./data/advisories"
+	DefaultAdvisorySyncStorageDir      = "/var/lib/patchbase-server/db/advisories"
 )
 
 func init() {

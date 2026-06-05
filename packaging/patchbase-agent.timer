@@ -1,0 +1,9 @@
+[Unit]
+Description=Run PatchBase Agent Sync periodically
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target

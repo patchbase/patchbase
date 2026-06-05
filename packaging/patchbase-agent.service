@@ -1,0 +1,12 @@
+[Unit]
+Description=PatchBase Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/patchbase-agent sync
+WorkingDirectory=/var/lib/patchbase-agent
+
+[Install]
+WantedBy=multi-user.target

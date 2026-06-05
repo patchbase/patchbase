@@ -1,0 +1,7 @@
+exports_files([
+    "patchbase-server.service",
+    "patchbase-server.spec",
+    "patchbase-agent.service",
+    "patchbase-agent.spec",
+    "patchbase-agent.timer",
+])

@@ -2,7 +2,11 @@ load("@rules_go//go:def.bzl", "go_binary", "go_library")
 load("@rules_img//img:image.bzl", "image_from_binary")
 load("@rules_img//img:load.bzl", "image_load")
 load("@rules_img//img:push.bzl", "image_push")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+load("@rules_pkg//pkg:rpm.bzl", "pkg_rpm")
+load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("//:version.bzl", "VERSION")
+load("//third_party/bazel:archs.bzl", "LINUX_ARCHES")
 load("//third_party/bazel:multiarch_go_binary.bzl", "multiarch_go_binary")
 
 go_library(
@@ -25,6 +29,7 @@ go_binary(
 multiarch_go_binary(
     name = "patchbase-server_linux",
     embed = [":patchbase-server_lib"],
+    visibility = ["//visibility:public"],
     x_defs = {
         "go.patchbase.net/server/internal/buildinfo.Version": VERSION,
     },
@@ -62,3 +67,62 @@ image_push(
     repository = "{{.REPOSITORY}}",
     tag = "{{.TAG}}",
 )
+
+BACKEND_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
+
+[
+    pkg_files(
+        name = "rpm_files_{name}".format(name = arch["name"]),
+        srcs = [
+            ":patchbase-server_linux_{name}".format(name = arch["name"]),
+            "//:config_example",
+            "//packaging:patchbase-server.service",
+        ],
+        renames = {
+            ":patchbase-server_linux_{name}".format(name = arch["name"]): "patchbase-server",
+            "//:config_example": "config.example.yaml",
+            "//packaging:patchbase-server.service": "patchbase-server.service",
+        },
+        tags = ["manual"],
+    )
+    for arch in LINUX_ARCHES
+]
+
+[
+    pkg_tar(
+        name = "archive_{name}".format(name = arch["name"]),
+        srcs = [
+            ":rpm_files_{name}".format(name = arch["name"]),
+        ],
+        extension = "tar.gz",
+        tags = ["manual"],
+    )
+    for arch in LINUX_ARCHES
+]
+
+[
+    genrule(
+        name = "patchbase-server_spec_{name}".format(name = arch["name"]),
+        srcs = ["//packaging:patchbase-server.spec"],
+        outs = ["patchbase-server_{name}.spec".format(name = arch["name"])],
+        cmd = "sed 's|@@ARCHIVE_PATH@@|bazel-out/k8-fastbuild/bin/cmd/patchbase-server/archive_{name}.tar.gz|g' $(location //packaging:patchbase-server.spec) > $@".format(name = arch["name"]),
+        tags = ["manual"],
+    )
+    for arch in LINUX_ARCHES
+]
+
+[
+    pkg_rpm(
+        name = "patchbase-server-{name}".format(name = arch["name"]),
+        architecture = arch["name"],
+        data = [
+            ":archive_{name}".format(name = arch["name"]),
+        ],
+        release = "1",
+        spec_file = ":patchbase-server_spec_{name}".format(name = arch["name"]),
+        tags = ["manual"],
+        version = BACKEND_VERSION,
+        visibility = ["//visibility:public"],
+    )
+    for arch in LINUX_ARCHES
+]

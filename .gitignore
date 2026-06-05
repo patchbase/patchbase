@@ -10,6 +10,7 @@ bazel-patchbase*
 bazel-out
 bazel-testlogs
 .bazelrc.local
+dist
 
 # Config files
 config.yaml

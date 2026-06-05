@@ -1,7 +1,59 @@
-api:
-  jwt_secret_key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
-database:
-  url: "postgres://postgres:postgres@localhost:5432/patchbase?sslmode=disable"
+# PatchBase Server Configuration File
+
+# Encryption key used for securing SSH/pull credentials in the database.
+# Must be set to a strong 32-character key for production environments.
+# Can be generated using: openssl rand -hex 32
 encryption_key: "this-is-not-a-real-encryption-key-please-provide-one"
+
+# API configuration
+api:
+  # The JWT secret key used to sign session tokens.
+  # Must be set to a strong random secret key.
+  # Can be generated using: openssl rand -hex 32
+  jwt_secret_key: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+  
+  # Address and port where the API server will listen
+  # listen_address: "0.0.0.0"
+  # port: 5199
+  
+  # Log level for requests. Supported: debug, info, warn, error
+  # request_log_level: "debug"
+  
+  # API timeout settings
+  # read_timeout: 5s
+  # read_header_timeout: 5s
+  # write_timeout: 60s
+  # shutdown_timeout: 10s
+
+# SSL configuration (HTTPS)
+ssl:
+  # Whether HTTPS is enabled
+  # enabled: false
+  # certificate_file: "/etc/patchbase-server/cert.pem"
+  # key_file: "/etc/patchbase-server/key.pem"
+
+# Database configuration
+database:
+  # Connection URL to the PostgreSQL database
+  url: "postgres://postgres:postgres@localhost:5432/patchbase?sslmode=disable"
+  
+  # Query logging level. Supported: trace, debug, info, warn, error
+  # log_level: "error"
+
+# Advisory Database Synchronizer configuration
 advisory_sync:
-  storage_dir: "/tmp/patchbase-dev"
+  # Base URL where advisory database manifests and database files are published.
+  # base_url: "https://dl.patchbase.net/v1/advisory-db"
+  
+  # Interval between synchronizations
+  # refresh_interval: 6h
+  
+  # Local directory where downloaded SQLite databases are stored
+  # storage_dir: "/var/lib/patchbase-server/db/advisories"
+  
+  # Custom scope mappings for hosts (optional)
+  # scope_mappings:
+  #   - scope: "rocky:9"
+  #     match:
+  #       os_family: "rocky"
+  #       os_major: 9

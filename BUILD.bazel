@@ -1,6 +1,9 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//:version.bzl", "VERSION")
+load("//third_party/bazel:archs.bzl", "LINUX_ARCHES")
 
 # gazelle:prefix go.patchbase.net/server
 # gazelle:proto disable
@@ -32,4 +35,62 @@ string_flag(
     name = "image_tag",
     build_setting_default = VERSION,
     visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "config_example",
+    srcs = ["config.example.yaml"],
+    visibility = ["//visibility:public"],
+)
+
+RELEASE_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
+
+write_file(
+    name = "dist_sh",
+    out = "dist.sh",
+    content = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd \"$BUILD_WORKSPACE_DIRECTORY\"",
+        "rm -rf dist",
+        "mkdir -p dist/binaries dist/rpm",
+    ] + [
+        "cp bazel-bin/cmd/patchbase-server/patchbase-server_linux_{name} dist/binaries/patchbase-server-linux-{name}".format(name = arch["name"])
+        for arch in LINUX_ARCHES
+    ] + [
+        "cp bazel-bin/agent/cmd/patchbase-agent/patchbase-agent_linux_{name} dist/binaries/patchbase-agent-linux-{name}".format(name = arch["name"])
+        for arch in LINUX_ARCHES
+    ] + [
+        "cp bazel-bin/agent/cmd/patchbase-agent/patchbase-agent-{name}-{version}-1.{name}.rpm dist/rpm/patchbase-agent-{version}-1.{name}.rpm".format(
+            name = arch["name"],
+            version = RELEASE_VERSION,
+        )
+        for arch in LINUX_ARCHES
+    ] + [
+        "cp bazel-bin/cmd/patchbase-server/patchbase-server-{name}-{version}-1.{name}.rpm dist/rpm/patchbase-server-{version}-1.{name}.rpm".format(
+            name = arch["name"],
+            version = RELEASE_VERSION,
+        )
+        for arch in LINUX_ARCHES
+    ],
+    is_executable = True,
+)
+
+sh_binary(
+    name = "dist",
+    srcs = [":dist_sh"],
+    data = [
+    ] + [
+        "//cmd/patchbase-server:patchbase-server_linux_{name}".format(name = arch["name"])
+        for arch in LINUX_ARCHES
+    ] + [
+        "//agent/cmd/patchbase-agent:patchbase-agent_linux_{name}".format(name = arch["name"])
+        for arch in LINUX_ARCHES
+    ] + [
+        "//agent/cmd/patchbase-agent:patchbase-agent-{name}".format(name = arch["name"])
+        for arch in LINUX_ARCHES
+    ] + [
+        "//cmd/patchbase-server:patchbase-server-{name}".format(name = arch["name"])
+        for arch in LINUX_ARCHES
+    ],
 )

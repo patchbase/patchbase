@@ -1,0 +1,14 @@
+[Unit]
+Description=PatchBase Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/patchbase-server serve
+Restart=on-failure
+RestartSec=5s
+WorkingDirectory=/var/lib/patchbase-server
+
+[Install]
+WantedBy=multi-user.target
