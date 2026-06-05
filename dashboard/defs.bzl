@@ -1,3 +1,5 @@
+"""Bazel rules for dashboard build/exec files."""
+
 def _exec_filegroup_impl(ctx):
     return [DefaultInfo(files = ctx.attr.src[DefaultInfo].files)]
 

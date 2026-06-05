@@ -93,8 +93,8 @@ sh_test(
         "*.ts",
         "*.js",
         "*.json",
-        ".oxfmtrc.json",
     ]) + [
+        ".oxfmtrc.json",
         ":node_modules",
     ],
 )
