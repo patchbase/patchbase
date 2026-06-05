@@ -92,6 +92,25 @@
 		{ label: 'Pending Updates', value: totalUpdates, color: 'blue' },
 	]);
 
+	type SortField = 'host' | 'platform' | 'critical' | 'important' | 'updates' | 'last_check';
+	type SortDirection = 'asc' | 'desc';
+
+	let sortField = $state<SortField | null>(null);
+	let sortDirection = $state<SortDirection>('asc');
+
+	function handleSort(field: SortField): void {
+		if (sortField === field) {
+			sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+		} else {
+			sortField = field;
+			if (field === 'host' || field === 'platform') {
+				sortDirection = 'asc';
+			} else {
+				sortDirection = 'desc';
+			}
+		}
+	}
+
 	const actionOrder: Record<string, number> = {
 		reboot_host: 0,
 		restart_service: 1,
@@ -101,7 +120,53 @@
 	};
 
 	let sortedHosts = $derived(
-		[...hosts].sort((a, b) => (actionOrder[a.overall_action] ?? 5) - (actionOrder[b.overall_action] ?? 5)),
+		[...hosts].sort((a, b) => {
+			if (!sortField) {
+				return (actionOrder[a.overall_action] ?? 5) - (actionOrder[b.overall_action] ?? 5);
+			}
+
+			if (sortField === 'host') {
+				const labelA = hostLabel(a).toLowerCase();
+				const labelB = hostLabel(b).toLowerCase();
+				if (labelA < labelB) return sortDirection === 'asc' ? -1 : 1;
+				if (labelA > labelB) return sortDirection === 'asc' ? 1 : -1;
+				return 0;
+			}
+
+			if (sortField === 'platform') {
+				const platA = `${a.os_name} ${a.os_version} ${a.architecture}`.toLowerCase();
+				const platB = `${b.os_name} ${b.os_version} ${b.architecture}`.toLowerCase();
+				if (platA < platB) return sortDirection === 'asc' ? -1 : 1;
+				if (platA > platB) return sortDirection === 'asc' ? 1 : -1;
+				return 0;
+			}
+
+			if (sortField === 'critical') {
+				const valA = a.critical_count || 0;
+				const valB = b.critical_count || 0;
+				return sortDirection === 'asc' ? valA - valB : valB - valA;
+			}
+
+			if (sortField === 'important') {
+				const valA = a.important_count || 0;
+				const valB = b.important_count || 0;
+				return sortDirection === 'asc' ? valA - valB : valB - valA;
+			}
+
+			if (sortField === 'updates') {
+				const valA = a.available_updates || 0;
+				const valB = b.available_updates || 0;
+				return sortDirection === 'asc' ? valA - valB : valB - valA;
+			}
+
+			if (sortField === 'last_check') {
+				const timeA = a.last_advisory_check_at ? new Date(a.last_advisory_check_at).getTime() : 0;
+				const timeB = b.last_advisory_check_at ? new Date(b.last_advisory_check_at).getTime() : 0;
+				return sortDirection === 'asc' ? timeA - timeB : timeB - timeA;
+			}
+
+			return 0;
+		}),
 	);
 </script>
 
@@ -213,13 +278,43 @@
 		<table>
 			<thead>
 				<tr>
-					<th>Host</th>
-					<th>Platform</th>
+					<th onclick={() => handleSort('host')} class="sortable-header">
+						Host
+						{#if sortField === 'host'}
+							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+						{/if}
+					</th>
+					<th onclick={() => handleSort('platform')} class="sortable-header">
+						Platform
+						{#if sortField === 'platform'}
+							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+						{/if}
+					</th>
 					<th>Action</th>
-					<th>Critical</th>
-					<th>Important</th>
-					<th>Updates</th>
-					<th>Last Check</th>
+					<th onclick={() => handleSort('critical')} class="sortable-header">
+						Critical
+						{#if sortField === 'critical'}
+							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+						{/if}
+					</th>
+					<th onclick={() => handleSort('important')} class="sortable-header">
+						Important
+						{#if sortField === 'important'}
+							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+						{/if}
+					</th>
+					<th onclick={() => handleSort('updates')} class="sortable-header">
+						Updates
+						{#if sortField === 'updates'}
+							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+						{/if}
+					</th>
+					<th onclick={() => handleSort('last_check')} class="sortable-header">
+						Last Check
+						{#if sortField === 'last_check'}
+							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+						{/if}
+					</th>
 					<th></th>
 				</tr>
 			</thead>
@@ -290,3 +385,22 @@
 		</table>
 	{/if}
 </AppLayout>
+
+<style>
+	.sortable-header {
+		cursor: pointer;
+		user-select: none;
+		transition: background-color 0.15s ease, color 0.15s ease;
+	}
+	.sortable-header:hover {
+		background: var(--bg-card-hover);
+		color: var(--text-primary);
+	}
+	.sort-direction {
+		font-size: 10px;
+		margin-left: 4px;
+		color: var(--accent);
+		display: inline-block;
+		vertical-align: middle;
+	}
+</style>
