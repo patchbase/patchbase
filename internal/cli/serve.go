@@ -17,6 +17,15 @@ func runServe(cmd *cobra.Command, args []string) {
 		slog.Default().Error("Failed to load configuration", "error", err)
 		os.Exit(1)
 	}
+
+	autoMigrate, _ := cmd.Flags().GetBool("automigrate")
+	if autoMigrate {
+		if err := runMigrateWithURL(cmd.Context(), cfg.Database.URL); err != nil {
+			slog.Default().Error("automigrate failed", "error", err)
+			os.Exit(1)
+		}
+	}
+
 	injector := di.New(cmd.Context(), *cfg)
 	server, err := api.New(cmd.Context(), injector)
 	if err != nil {
@@ -31,9 +40,11 @@ func runServe(cmd *cobra.Command, args []string) {
 }
 
 func NewServeCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start the HTTP server",
 		Run:   runServe,
 	}
+	cmd.Flags().Bool("automigrate", false, "run database migrations before starting the server")
+	return cmd
 }

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"log/slog"
 
@@ -10,8 +11,6 @@ import (
 )
 
 func runMigrate(cmd *cobra.Command, _ []string) error {
-	logger := slog.Default().With("source", "cli.migrate")
-
 	dbURL, err := cmd.Flags().GetString("database-url")
 	if err != nil {
 		return fmt.Errorf("failed to get database-url flag: %w", err)
@@ -24,6 +23,11 @@ func runMigrate(cmd *cobra.Command, _ []string) error {
 		dbURL = cfg.Database.URL
 	}
 
+	return runMigrateWithURL(cmd.Context(), dbURL)
+}
+
+func runMigrateWithURL(ctx context.Context, dbURL string) error {
+	logger := slog.Default().With("source", "cli.migrate")
 	db, err := migrations.Open(dbURL)
 	if err != nil {
 		return fmt.Errorf("failed to open database connection: %w", err)
@@ -31,7 +35,7 @@ func runMigrate(cmd *cobra.Command, _ []string) error {
 	defer db.Close() //nolint:errcheck
 
 	logger.Info("running database migrations")
-	if err := migrations.Up(cmd.Context(), db); err != nil {
+	if err := migrations.Up(ctx, db); err != nil {
 		return fmt.Errorf("failed to apply migrations: %w", err)
 	}
 	logger.Info("database migrations complete")
