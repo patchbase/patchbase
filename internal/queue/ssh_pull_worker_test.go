@@ -5,11 +5,13 @@ import (
 	"errors"
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/riverqueue/river"
 	"github.com/samber/do/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.patchbase.net/server/internal/config"
 	"go.patchbase.net/server/internal/queue"
 	"go.patchbase.net/server/internal/services"
 )
@@ -23,9 +25,19 @@ func (m *mockHosts) RunSSHPull(ctx context.Context, hostID string) error {
 	return m.RunSSHPullFunc(ctx, hostID)
 }
 
-func TestSSHPullWorker_Work_HostNotFound(t *testing.T) {
+func newSSHPullWorkerTestInjector() do.Injector {
 	injector := do.New()
 	do.ProvideValue[*slog.Logger](injector, slog.Default())
+	do.ProvideValue[config.Config](injector, config.Config{
+		SSH: config.SSH{
+			PullJobTimeout: 90 * time.Second,
+		},
+	})
+	return injector
+}
+
+func TestSSHPullWorker_Work_HostNotFound(t *testing.T) {
+	injector := newSSHPullWorkerTestInjector()
 
 	mock := &mockHosts{
 		RunSSHPullFunc: func(ctx context.Context, hostID string) error {
@@ -47,9 +59,20 @@ func TestSSHPullWorker_Work_HostNotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "JobCancel")
 }
 
+func TestSSHPullWorker_Timeout(t *testing.T) {
+	injector := newSSHPullWorkerTestInjector()
+	worker, err := queue.NewSSHPullWorker(injector)
+	require.NoError(t, err)
+
+	job := &river.Job[services.SSHPullArgs]{
+		Args: services.SSHPullArgs{HostID: "test-host-id"},
+	}
+
+	assert.Equal(t, 90*time.Second, worker.Timeout(job))
+}
+
 func TestSSHPullWorker_Work_CommandErrorCancel(t *testing.T) {
-	injector := do.New()
-	do.ProvideValue[*slog.Logger](injector, slog.Default())
+	injector := newSSHPullWorkerTestInjector()
 
 	sshErr := &services.SSHPullError{
 		ExitCode: 1,
@@ -78,8 +101,7 @@ func TestSSHPullWorker_Work_CommandErrorCancel(t *testing.T) {
 }
 
 func TestSSHPullWorker_Work_ConnectionErrorRetry(t *testing.T) {
-	injector := do.New()
-	do.ProvideValue[*slog.Logger](injector, slog.Default())
+	injector := newSSHPullWorkerTestInjector()
 
 	sshErr := &services.SSHPullError{
 		ExitCode: 255,

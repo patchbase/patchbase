@@ -8,6 +8,7 @@ import (
 
 	"github.com/riverqueue/river"
 	"github.com/samber/do/v2"
+	"go.patchbase.net/server/internal/config"
 	"go.patchbase.net/server/internal/services"
 )
 
@@ -15,6 +16,7 @@ type SSHPullWorker struct {
 	river.WorkerDefaults[services.SSHPullArgs]
 
 	injector do.Injector
+	config   config.Config
 	logger   *slog.Logger
 }
 
@@ -23,8 +25,13 @@ func NewSSHPullWorker(i do.Injector) (*SSHPullWorker, error) {
 	if err != nil {
 		return nil, err
 	}
+	cfg, err := do.Invoke[config.Config](i)
+	if err != nil {
+		return nil, err
+	}
 	return &SSHPullWorker{
 		injector: i,
+		config:   cfg,
 		logger:   logger.With("source", "queue.SSHPullWorker"),
 	}, nil
 }
@@ -36,6 +43,10 @@ func (w *SSHPullWorker) NextRetry(job *river.Job[services.SSHPullArgs]) time.Tim
 		backoff = 10 * time.Minute
 	}
 	return time.Now().Add(backoff)
+}
+
+func (w *SSHPullWorker) Timeout(_ *river.Job[services.SSHPullArgs]) time.Duration {
+	return w.config.SSH.PullJobTimeout
 }
 
 func (w *SSHPullWorker) Work(ctx context.Context, job *river.Job[services.SSHPullArgs]) error {

@@ -6,6 +6,7 @@ go_library(
         "api.go",
         "config.go",
         "database.go",
+        "ssh.go",
         "ssl.go",
         "viper.go",
     ],

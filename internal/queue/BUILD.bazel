@@ -30,6 +30,7 @@ go_test(
     srcs = ["ssh_pull_worker_test.go"],
     deps = [
         ":queue",
+        "//internal/config",
         "//internal/services",
         "@com_github_riverqueue_river//:river",
         "@com_github_samber_do_v2//:do",

@@ -40,6 +40,11 @@ database:
   # Query logging level. Supported: trace, debug, info, warn, error
   # log_level: "error"
 
+# SSH pull configuration
+ssh:
+  # Maximum runtime for one SSH pull job, including connection, collection, parsing, and DB updates.
+  # pull_job_timeout: 5m
+
 # Advisory Database Synchronizer configuration
 advisory_sync:
   # Base URL where advisory database manifests and database files are published.

@@ -83,6 +83,9 @@ func NewBackend(t *gotesting.T, opts ...Option) *Backend {
 			URL:      options.databaseURL,
 			LogLevel: config.DefaultDatabaseLogLevel,
 		},
+		SSH: config.SSH{
+			PullJobTimeout: config.DefaultSSHPullJobTimeout,
+		},
 		AdvisorySync: config.AdvisorySync{
 			RefreshInterval: 1 * time.Hour,
 		},

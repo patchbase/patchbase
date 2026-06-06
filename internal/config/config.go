@@ -10,16 +10,17 @@ type Config struct {
 	API            API          `mapstructure:"api" yaml:"api,omitempty"`
 	SSL            SSL          `mapstructure:"ssl" yaml:"ssl,omitempty"`
 	Database       Database     `mapstructure:"database" yaml:"database,omitempty"`
+	SSH            SSH          `mapstructure:"ssh" yaml:"ssh,omitempty"`
 	AdvisorySync   AdvisorySync `mapstructure:"advisory_sync" yaml:"advisory_sync,omitempty"`
 
 	EncryptionKey string `mapstructure:"encryption_key" yaml:"encryption_key,omitempty"`
 }
 
 type AdvisorySync struct {
-	BaseURL         string          `mapstructure:"base_url" yaml:"base_url,omitempty"`
-	RefreshInterval time.Duration   `mapstructure:"refresh_interval" yaml:"refresh_interval,omitempty"`
-	StorageDir      string          `mapstructure:"storage_dir" yaml:"storage_dir,omitempty"`
-	ScopeMappings   []ScopeMapping  `mapstructure:"scope_mappings" yaml:"scope_mappings,omitempty"`
+	BaseURL         string         `mapstructure:"base_url" yaml:"base_url,omitempty"`
+	RefreshInterval time.Duration  `mapstructure:"refresh_interval" yaml:"refresh_interval,omitempty"`
+	StorageDir      string         `mapstructure:"storage_dir" yaml:"storage_dir,omitempty"`
+	ScopeMappings   []ScopeMapping `mapstructure:"scope_mappings" yaml:"scope_mappings,omitempty"`
 }
 
 type ScopeMapping struct {
@@ -62,6 +63,9 @@ func (c *Config) Validate() error {
 	}
 	if err := c.Database.Validate(); err != nil {
 		return fmt.Errorf("invalid database config: %w", err)
+	}
+	if err := c.SSH.Validate(); err != nil {
+		return fmt.Errorf("invalid ssh config: %w", err)
 	}
 	if err := c.AdvisorySync.Validate(); err != nil {
 		return fmt.Errorf("invalid advisory_sync config: %w", err)

@@ -5,11 +5,11 @@ import (
 	"context"
 	"fmt"
 	"net"
-	"os"
-	"os/exec"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 
 	"github.com/samber/do/v2"
 	agentpb "go.patchbase.net/proto/agent"
@@ -143,31 +143,13 @@ fi
 `
 
 func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string, user string, host string) (SSHPullResult, error) {
-	tmpFile, err := os.CreateTemp("", "patchbase-ssh-key-*")
-	if err != nil {
-		return SSHPullResult{}, fmt.Errorf("create temporary private key file: %w", err)
-	}
-	defer os.Remove(tmpFile.Name()) // nolint:errcheck
-
-	if _, err := tmpFile.WriteString(privateKeyPEM); err != nil {
-		tmpFile.Close() // nolint:errcheck
-		return SSHPullResult{}, fmt.Errorf("write temporary private key file: %w", err)
-	}
-	if err := tmpFile.Close(); err != nil {
-		return SSHPullResult{}, fmt.Errorf("close temporary private key file: %w", err)
-	}
-	if err := os.Chmod(tmpFile.Name(), 0600); err != nil {
-		return SSHPullResult{}, fmt.Errorf("chmod temporary private key file: %w", err)
-	}
-
 	sshHost, sshPort, err := net.SplitHostPort(host)
 	if err != nil {
 		sshHost = host
 		sshPort = "22"
 	}
 
-	sshAddress := fmt.Sprintf("%s@%s", user, sshHost)
-	detectOutput, err := runSSHScript(ctx, tmpFile.Name(), sshPort, sshAddress, sshPullDetectOSScript)
+	detectOutput, err := runSSHScript(ctx, privateKeyPEM, user, sshHost, sshPort, sshPullDetectOSScript)
 	if err != nil {
 		return SSHPullResult{}, err
 	}
@@ -178,7 +160,7 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 		return SSHPullResult{}, fmt.Errorf("detect os family for ssh pull: %w", err)
 	}
 
-	output, err := runSSHScript(ctx, tmpFile.Name(), sshPort, sshAddress, script)
+	output, err := runSSHScript(ctx, privateKeyPEM, user, sshHost, sshPort, script)
 	if err != nil {
 		return SSHPullResult{}, err
 	}
@@ -187,21 +169,91 @@ func (r defaultSSHPullRunner) Collect(ctx context.Context, privateKeyPEM string,
 	return ParseSSHPullReport(output, collectedAt)
 }
 
-func runSSHScript(ctx context.Context, privateKeyPath string, port string, address string, script string) ([]byte, error) {
-	cmd := exec.CommandContext(
-		ctx,
-		"ssh",
-		"-p", port,
-		"-o", "BatchMode=yes",
-		"-o", "ConnectTimeout=20",
-		"-o", "StrictHostKeyChecking=no",
-		"-o", "UserKnownHostsFile=/dev/null",
-		"-i", privateKeyPath,
-		address,
-		"sh", "-lc",
-		script,
-	)
-	output, err := cmd.CombinedOutput()
+func runSSHScript(ctx context.Context, privateKeyPEM string, user string, host string, port string, script string) ([]byte, error) {
+	signer, err := ssh.ParsePrivateKey([]byte(privateKeyPEM))
+	if err != nil {
+		return nil, &SSHPullError{
+			ExitCode: -1,
+			Message:  fmt.Sprintf("parse private key: %v", err),
+			Err:      err,
+		}
+	}
+	config := &ssh.ClientConfig{
+		User: user,
+		Auth: []ssh.AuthMethod{
+			ssh.PublicKeys(signer),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         20 * time.Second,
+	}
+
+	address := net.JoinHostPort(host, port)
+
+	var d net.Dialer
+	d.Timeout = config.Timeout
+	conn, err := d.DialContext(ctx, "tcp", address)
+	if err != nil {
+		return nil, &SSHPullError{
+			ExitCode: -1,
+			Message:  err.Error(),
+			Err:      err,
+		}
+	}
+	if err := conn.SetDeadline(time.Now().Add(config.Timeout)); err != nil {
+		conn.Close() // nolint:errcheck
+		return nil, &SSHPullError{
+			ExitCode: -1,
+			Message:  err.Error(),
+			Err:      err,
+		}
+	}
+
+	done := make(chan struct{})
+	defer close(done)
+
+	// golang.org/x/crypto/ssh does not support context cancellation directly on Session.
+	// This goroutine listens for context cancellation and forces the connection to
+	// close, which interrupts any blocking SSH handshake or session.CombinedOutput() call.
+	go func() {
+		select {
+		case <-ctx.Done():
+			conn.Close() // nolint:errcheck
+		case <-done:
+			// Finished normally, let the goroutine exit cleanly
+		}
+	}()
+
+	c, chans, reqs, err := ssh.NewClientConn(conn, address, config)
+	if err != nil {
+		conn.Close() // nolint:errcheck
+		return nil, &SSHPullError{
+			ExitCode: -1,
+			Message:  err.Error(),
+			Err:      err,
+		}
+	}
+	client := ssh.NewClient(c, chans, reqs)
+	defer client.Close() // nolint:errcheck
+
+	session, err := client.NewSession()
+	if err != nil {
+		return nil, &SSHPullError{
+			ExitCode: -1,
+			Message:  err.Error(),
+			Err:      err,
+		}
+	}
+	defer session.Close() // nolint:errcheck
+	if err := conn.SetDeadline(time.Time{}); err != nil {
+		return nil, &SSHPullError{
+			ExitCode: -1,
+			Message:  err.Error(),
+			Err:      err,
+		}
+	}
+
+	cmdStr := "sh -lc '" + strings.ReplaceAll(script, "'", "'\"'\"'") + "'"
+	output, err := session.CombinedOutput(cmdStr)
 	if err == nil {
 		return output, nil
 	}
@@ -211,8 +263,8 @@ func runSSHScript(ctx context.Context, privateKeyPath string, port string, addre
 		message = err.Error()
 	}
 	exitCode := -1
-	if exitErr, ok := err.(*exec.ExitError); ok {
-		exitCode = exitErr.ExitCode()
+	if exitErr, ok := err.(*ssh.ExitError); ok {
+		exitCode = exitErr.ExitStatus()
 	}
 	return nil, &SSHPullError{
 		ExitCode: exitCode,
