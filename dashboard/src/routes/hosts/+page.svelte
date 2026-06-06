@@ -108,7 +108,7 @@
 		{ label: 'Pending Updates', value: totalUpdates, color: 'blue' },
 	]);
 
-	type SortField = 'host' | 'platform' | 'critical' | 'important' | 'updates' | 'last_check';
+	type SortField = 'host' | 'platform' | 'critical' | 'important' | 'moderate' | 'updates' | 'last_check';
 	type SortDirection = 'asc' | 'desc';
 
 	let sortField = $state<SortField | null>(null);
@@ -166,6 +166,12 @@
 			if (sortField === 'important') {
 				const valA = a.important_count || 0;
 				const valB = b.important_count || 0;
+				return sortDirection === 'asc' ? valA - valB : valB - valA;
+			}
+
+			if (sortField === 'moderate') {
+				const valA = a.moderate_count || 0;
+				const valB = b.moderate_count || 0;
 				return sortDirection === 'asc' ? valA - valB : valB - valA;
 			}
 
@@ -276,6 +282,9 @@
 						{#if host.important_count > 0}
 							<span class="badge badge-orange"><span class="badge-dot"></span>{host.important_count} important</span>
 						{/if}
+						{#if host.moderate_count > 0}
+							<span class="badge badge-yellow"><span class="badge-dot"></span>{host.moderate_count} moderate</span>
+						{/if}
 						{#if host.available_updates > 0}
 							<span class="badge badge-blue">{host.available_updates} updates</span>
 						{/if}
@@ -319,6 +328,12 @@
 							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
 						{/if}
 					</th>
+					<th onclick={() => handleSort('moderate')} class="sortable-header">
+						Moderate
+						{#if sortField === 'moderate'}
+							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+						{/if}
+					</th>
 					<th onclick={() => handleSort('updates')} class="sortable-header">
 						Updates
 						{#if sortField === 'updates'}
@@ -350,6 +365,7 @@
 						</td>
 						<td class="mono">{host.critical_count || '-'}</td>
 						<td class="mono">{host.important_count || '-'}</td>
+						<td class="mono">{host.moderate_count || '-'}</td>
 						<td class="mono">{host.available_updates || '-'}</td>
 						<td>{relativeTime(host.last_advisory_check_at || null)}</td>
 						<td class="host-actions-cell">
