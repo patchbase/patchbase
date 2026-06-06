@@ -105,7 +105,17 @@ func (p *PeriodicJobManager) AddAdvisorySyncJob(ctx context.Context, scopeKey st
 	job := river.NewPeriodicJob(
 		river.PeriodicInterval(p.config.AdvisorySync.RefreshInterval),
 		func() (river.JobArgs, *river.InsertOpts) {
-			return services.AdvisorySyncArgs{ScopeKey: scopeKey}, nil
+			return services.AdvisorySyncArgs{ScopeKey: scopeKey}, &river.InsertOpts{
+				UniqueOpts: river.UniqueOpts{
+					ByArgs: true,
+					ByState: []rivertype.JobState{
+						rivertype.JobStateAvailable,
+						rivertype.JobStatePending,
+						rivertype.JobStateRunning,
+						rivertype.JobStateScheduled,
+					},
+				},
+			}
 		},
 		&river.PeriodicJobOpts{
 			ID:         "advisory-sync-" + scopeKey,
@@ -164,7 +174,17 @@ func (p *PeriodicJobManager) AddSSHPullJob(ctx context.Context, hostID string, f
 	job := river.NewPeriodicJob(
 		river.PeriodicInterval(interval),
 		func() (river.JobArgs, *river.InsertOpts) {
-			return services.SSHPullArgs{HostID: hostID}, nil
+			return services.SSHPullArgs{HostID: hostID}, &river.InsertOpts{
+				UniqueOpts: river.UniqueOpts{
+					ByArgs: true,
+					ByState: []rivertype.JobState{
+						rivertype.JobStateAvailable,
+						rivertype.JobStatePending,
+						rivertype.JobStateRunning,
+						rivertype.JobStateScheduled,
+					},
+				},
+			}
 		},
 		&river.PeriodicJobOpts{
 			ID:         "ssh-pull-" + hostID,

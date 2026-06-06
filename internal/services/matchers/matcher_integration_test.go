@@ -2,6 +2,7 @@ package matchers_test
 
 import (
 	"context"
+	"sync"
 	"testing"
 	"time"
 
@@ -503,4 +504,97 @@ func TestMatcher_MatchSnapshot_APT_KernelReboot_Debian(t *testing.T) {
 	assert.Equal(t, snapshotID, res.SnapshotID)
 	assert.Equal(t, 2, res.DecisionCount)
 	assert.Equal(t, "reboot_host", res.OverallAction) // Expected action is reboot_host!
+}
+
+func TestMatcher_Concurrent_MatchSnapshot(t *testing.T) {
+	backend := apitesting.NewBackend(t)
+	ctx := context.Background()
+
+	// Seed host
+	hostID := "h_test_concurrent_matcher"
+	snapshotID := "snap_test_concurrent_matcher"
+
+	dbConn := backend.DB()
+	_, err := dbConn.Exec(ctx, `
+		INSERT INTO hosts (id, hostname, os_family, os_name, os_version, os_major, architecture, onboarding_mode, approval_status, status)
+		VALUES ($1, 'test-concurrent-host', 'rpm', 'Rocky Linux', '9.3', 9, 'x86_64', 'agent', 'approved', 'active')
+	`, hostID)
+	require.NoError(t, err)
+
+	// Build AgentSnapshot protobuf
+	snap := &agentpb.AgentSnapshot{
+		SchemaVersion: "1.0",
+		SentAt:        timestamppb.New(time.Now()),
+		Host: &agentpb.Host{
+			Hostname:     "test-concurrent-host",
+			OsName:       "Rocky Linux",
+			OsVersion:    "9.3",
+			Architecture: agentpb.Architecture_ARCHITECTURE_X86_64,
+		},
+		Packages: []*agentpb.Package{
+			{Name: "bash", Epoch: 0, Version: "5.1.8", Release: "7.el9_0", Arch: "x86_64", Nevra: "bash-0:5.1.8-7.el9_0.x86_64"},
+		},
+	}
+	payloadBytes, err := proto.Marshal(snap)
+	require.NoError(t, err)
+
+	_, err = dbConn.Exec(ctx, `
+		INSERT INTO host_snapshots (id, host_id, collected_at, payload, running_kernel_nevra, has_process_data)
+		VALUES ($1, $2, now(), $3, '', false)
+	`, snapshotID, hostID, payloadBytes)
+	require.NoError(t, err)
+
+	// Seed advisory
+	advisoryID := "adv_bash_concurrent"
+	_, err = dbConn.Exec(ctx, `
+		INSERT INTO advisories (id, source_system, raw_source_id, vendor, advisory_type, severity, evidence_tier)
+		VALUES ($1, 'rhsa', 'RHSA-2022:1234', 'Rocky', 'security', 'important', 'vendor_db')
+	`, advisoryID)
+	require.NoError(t, err)
+
+	_, err = dbConn.Exec(ctx, `
+		INSERT INTO advisory_product_streams (advisory_id, product_stream_id)
+		VALUES ($1, 'rocky:9-baseos')
+	`, advisoryID)
+	require.NoError(t, err)
+
+	_, err = dbConn.Exec(ctx, `
+		INSERT INTO fixed_packages (id, advisory_id, product_stream_id, package_name, epoch, version, release, arch, nevra, evidence_tier)
+		VALUES ('fix_bash_concurrent', $1, 'rocky:9-baseos', 'bash', 0, '5.1.8', '9.el9', 'x86_64', 'bash-0:5.1.8-9.el9.x86_64', 'vendor_db')
+	`, advisoryID)
+	require.NoError(t, err)
+
+	matcher := do.MustInvoke[matchers.Matcher](backend.Injector())
+
+	// Run concurrently
+	var wg sync.WaitGroup
+	errCh := make(chan error, 5)
+	for i := 0; i < 5; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, err := matcher.MatchSnapshot(ctx, hostID, snapshotID)
+			if err != nil {
+				errCh <- err
+			}
+		}()
+	}
+
+	wg.Wait()
+	close(errCh)
+
+	for err := range errCh {
+		require.NoError(t, err)
+	}
+
+	// Verify exact number of rows in DB
+	var count int
+	err = dbConn.QueryRow(ctx, `
+		SELECT COUNT(*) FROM decision_records WHERE snapshot_id = $1
+	`, snapshotID).Scan(&count)
+	require.NoError(t, err)
+
+	// It should leave EXACTLY ONE row because the others deleted what was there and overwrote,
+	// or the lock safely serialized them.
+	assert.Equal(t, 1, count, "should have exactly one decision record despite 5 concurrent matcher runs")
 }

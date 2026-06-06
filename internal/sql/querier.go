@@ -69,6 +69,7 @@ type Querier interface {
 	ListProductStreamIDsByVendorAndVersion(ctx context.Context, arg ListProductStreamIDsByVendorAndVersionParams) ([]string, error)
 	ListProductStreams(ctx context.Context) ([]ProductStream, error)
 	ListRegistrationTokens(ctx context.Context) ([]RegistrationToken, error)
+	LockHost(ctx context.Context, id string) error
 	RevokeRegistrationToken(ctx context.Context, id string) (RegistrationToken, error)
 	SetSSHPullOnboarded(ctx context.Context, arg SetSSHPullOnboardedParams) error
 	TouchHostAccessTokenLastUsed(ctx context.Context, id string) error

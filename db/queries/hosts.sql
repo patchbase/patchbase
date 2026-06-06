@@ -1,3 +1,6 @@
+-- name: LockHost :exec
+SELECT 1 FROM hosts WHERE id = $1 FOR UPDATE;
+
 -- name: InsertAgentHost :one
 INSERT INTO hosts (
     id,

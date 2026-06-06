@@ -768,6 +768,13 @@ CREATE INDEX decision_records_snapshot_id_idx ON public.decision_records USING b
 
 
 --
+-- Name: decision_records_unique_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX decision_records_unique_idx ON public.decision_records USING btree (snapshot_id, advisory_id, package_name, COALESCE(installed_nevra, ''::text));
+
+
+--
 -- Name: host_access_tokens_active_idx; Type: INDEX; Schema: public; Owner: -
 --
 

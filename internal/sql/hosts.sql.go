@@ -771,6 +771,15 @@ func (q *Queries) ListPendingHosts(ctx context.Context) ([]Host, error) {
 	return items, nil
 }
 
+const lockHost = `-- name: LockHost :exec
+SELECT 1 FROM hosts WHERE id = $1 FOR UPDATE
+`
+
+func (q *Queries) LockHost(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, lockHost, id)
+	return err
+}
+
 const setSSHPullOnboarded = `-- name: SetSSHPullOnboarded :exec
 UPDATE host_ssh_pull
 SET onboarded = $2

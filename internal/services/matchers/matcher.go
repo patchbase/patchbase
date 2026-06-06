@@ -128,6 +128,11 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
+
+	if err := queries.LockHost(ctx, hostID); err != nil {
+		return MatchResult{}, fmt.Errorf("lock host: %w", err)
+	}
+
 	if err := queries.DeleteDecisionRecordsBySnapshot(ctx, snapshotID); err != nil {
 		return MatchResult{}, fmt.Errorf("delete decision records by snapshot: %w", err)
 	}
