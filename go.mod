@@ -21,6 +21,7 @@ require (
 	go.patchbase.net/dashboard v0.0.0
 	go.patchbase.net/proto/agent v0.0.0-00010101000000-000000000000
 	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20260604135805-d37c95e27de6
 	google.golang.org/protobuf v1.36.11
 	gopkg.in/yaml.v3 v3.0.1
 	modernc.org/sqlite v1.50.1

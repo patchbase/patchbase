@@ -11,7 +11,10 @@ go_library(
     srcs = ["main.go"],
     importpath = "go.patchbase.net/server/cmd/patchbase-server",
     visibility = ["//visibility:private"],
-    deps = ["//internal/cli"],
+    deps = [
+        "//internal/cli",
+        "@org_golang_x_crypto_x509roots_fallback//:fallback",
+    ],
 )
 
 go_binary(
