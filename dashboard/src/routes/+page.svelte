@@ -12,7 +12,29 @@
 
 	$effect(() => {
 		getDashboardOverview().then((data) => (overview = data));
-		listHosts().then((data) => (recentHosts = data.slice(0, 5)));
+		listHosts().then((data) => {
+			recentHosts = data.sort((a, b) => {
+				if ((b.critical_count || 0) !== (a.critical_count || 0)) {
+					return (b.critical_count || 0) - (a.critical_count || 0);
+				}
+				if ((b.important_count || 0) !== (a.important_count || 0)) {
+					return (b.important_count || 0) - (a.important_count || 0);
+				}
+				if ((b.moderate_count || 0) !== (a.moderate_count || 0)) {
+					return (b.moderate_count || 0) - (a.moderate_count || 0);
+				}
+				const actionOrder: Record<string, number> = {
+					reboot_host: 0,
+					restart_service: 1,
+					update_package: 2,
+					investigate: 3,
+					none: 4,
+				};
+				const aOrder = actionOrder[a.overall_action] ?? 5;
+				const bOrder = actionOrder[b.overall_action] ?? 5;
+				return aOrder - bOrder;
+			}).slice(0, 5);
+		});
 	});
 
 	let stats = $derived(
