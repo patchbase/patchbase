@@ -2,6 +2,8 @@ package services
 
 import (
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"time"
@@ -10,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/do/v2"
+	"go.patchbase.net/server/internal/config"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/utils"
 )
@@ -51,11 +54,16 @@ type UpdateProfileResult struct {
 }
 
 type auth struct {
-	pool *pgxpool.Pool
-	sql  sql.Querier
+	pool         *pgxpool.Pool
+	sql          sql.Querier
+	jwtSecretKey string
 }
 
 func NewAuth(i do.Injector) (Auth, error) {
+	cfg, err := do.Invoke[config.Config](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get config.Config: %w", err)
+	}
 	pool, err := do.Invoke[*pgxpool.Pool](i)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get *pgxpool.Pool: %w", err)
@@ -66,8 +74,9 @@ func NewAuth(i do.Injector) (Auth, error) {
 	}
 
 	return &auth{
-		pool: pool,
-		sql:  queries,
+		pool:         pool,
+		sql:          queries,
+		jwtSecretKey: cfg.API.JWTSecretKey,
 	}, nil
 }
 
@@ -81,7 +90,7 @@ func (a *auth) Login(ctx context.Context, email string, password string) (LoginR
 		return LoginResult{}, ErrInvalidCredentials
 	}
 
-	token, err := signAccessToken(user)
+	token, err := signAccessToken(user, a.jwtSecretKey)
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("sign access token: %w", err)
 	}
@@ -103,7 +112,7 @@ func (a *auth) Authenticate(ctx context.Context, token string) (sql.User, error)
 		return sql.User{}, fmt.Errorf("get user by id: %w", err)
 	}
 
-	if !verifyAccessToken(token, user) {
+	if !verifyAccessToken(token, user, a.jwtSecretKey) {
 		return sql.User{}, ErrUnauthorized
 	}
 
@@ -116,7 +125,7 @@ func (a *auth) IssueAccessToken(ctx context.Context, userID string) (string, err
 		return "", fmt.Errorf("get user by id: %w", err)
 	}
 
-	token, err := signAccessToken(user)
+	token, err := signAccessToken(user, a.jwtSecretKey)
 	if err != nil {
 		return "", fmt.Errorf("sign access token: %w", err)
 	}
@@ -193,7 +202,7 @@ func (a *auth) UpdateProfile(ctx context.Context, userID string, input UpdatePro
 	}, nil
 }
 
-func signAccessToken(user sql.User) (string, error) {
+func signAccessToken(user sql.User, jwtSecretKey string) (string, error) {
 	now := time.Now()
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.RegisteredClaims{
 		Subject:   user.ID,
@@ -202,7 +211,7 @@ func signAccessToken(user sql.User) (string, error) {
 		ExpiresAt: jwt.NewNumericDate(now.Add(accessTokenTTL)),
 	})
 
-	signed, err := token.SignedString([]byte(user.PasswordHash))
+	signed, err := token.SignedString(jwtSigningKey(jwtSecretKey, user))
 	if err != nil {
 		return "", fmt.Errorf("sign jwt: %w", err)
 	}
@@ -210,19 +219,25 @@ func signAccessToken(user sql.User) (string, error) {
 	return signed, nil
 }
 
-func verifyAccessToken(token string, user sql.User) bool {
+func verifyAccessToken(token string, user sql.User, jwtSecretKey string) bool {
 	claims := &jwt.RegisteredClaims{}
 	parsed, err := jwt.ParseWithClaims(token, claims, func(parsed *jwt.Token) (any, error) {
 		if parsed.Method.Alg() != jwt.SigningMethodHS256.Alg() {
 			return nil, fmt.Errorf("unexpected signing method: %s", parsed.Method.Alg())
 		}
-		return []byte(user.PasswordHash), nil
+		return jwtSigningKey(jwtSecretKey, user), nil
 	}, jwt.WithValidMethods([]string{jwt.SigningMethodHS256.Alg()}))
 	if err != nil || !parsed.Valid {
 		return false
 	}
 
 	return claims.Subject == user.ID
+}
+
+func jwtSigningKey(jwtSecretKey string, user sql.User) []byte {
+	mac := hmac.New(sha256.New, []byte(jwtSecretKey))
+	_, _ = mac.Write([]byte(user.PasswordHash))
+	return mac.Sum(nil)
 }
 
 func parseAccessTokenSubject(token string) (string, error) {
