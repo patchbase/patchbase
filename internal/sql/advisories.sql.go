@@ -63,6 +63,46 @@ func (q *Queries) ListAdvisoriesByStreamIDs(ctx context.Context, dollar_1 []stri
 	return items, nil
 }
 
+const listRecentAdvisories = `-- name: ListRecentAdvisories :many
+SELECT id, source_system, raw_source_id, source_url, vendor, advisory_type, severity, summary, description, published_at, updated_at, evidence_tier, is_security FROM advisories
+ORDER BY published_at DESC
+LIMIT 5
+`
+
+func (q *Queries) ListRecentAdvisories(ctx context.Context) ([]Advisory, error) {
+	rows, err := q.db.Query(ctx, listRecentAdvisories)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Advisory
+	for rows.Next() {
+		var i Advisory
+		if err := rows.Scan(
+			&i.ID,
+			&i.SourceSystem,
+			&i.RawSourceID,
+			&i.SourceUrl,
+			&i.Vendor,
+			&i.AdvisoryType,
+			&i.Severity,
+			&i.Summary,
+			&i.Description,
+			&i.PublishedAt,
+			&i.UpdatedAt,
+			&i.EvidenceTier,
+			&i.IsSecurity,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const upsertAdvisory = `-- name: UpsertAdvisory :exec
 INSERT INTO advisories (
     id, source_system, raw_source_id, source_url, vendor, advisory_type, severity, summary, description, published_at, updated_at, evidence_tier, is_security

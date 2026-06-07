@@ -69,6 +69,7 @@ type Querier interface {
 	ListPendingHosts(ctx context.Context) ([]Host, error)
 	ListProductStreamIDsByVendorAndVersion(ctx context.Context, arg ListProductStreamIDsByVendorAndVersionParams) ([]string, error)
 	ListProductStreams(ctx context.Context) ([]ProductStream, error)
+	ListRecentAdvisories(ctx context.Context) ([]Advisory, error)
 	ListRegistrationTokens(ctx context.Context) ([]RegistrationToken, error)
 	LockHost(ctx context.Context, id string) error
 	RevokeRegistrationToken(ctx context.Context, id string) (RegistrationToken, error)

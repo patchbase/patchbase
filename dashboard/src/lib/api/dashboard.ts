@@ -6,7 +6,18 @@ export interface DashboardOverview {
   reboot_queue: number;
   unknown_investigate: number;
   total_advisories: number;
-  total_streams: number;
+  total_scopes: number;
+  recent_advisories: RecentAdvisory[];
+}
+
+export interface RecentAdvisory {
+  id: string;
+  source_system: string;
+  vendor: string;
+  advisory_type: string;
+  severity: string | null;
+  summary: string | null;
+  published_at: string | null;
 }
 
 export async function getDashboardOverview(): Promise<DashboardOverview> {

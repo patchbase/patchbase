@@ -245,7 +245,7 @@ SELECT
     (SELECT COUNT(*) FROM hosts h JOIN host_current_state hcs ON h.id = hcs.host_id WHERE hcs.needs_reboot > 0) AS reboot_queue,
     (SELECT COUNT(*) FROM hosts h JOIN host_current_state hcs ON h.id = hcs.host_id WHERE hcs.overall_action = 'investigate') AS unknown_investigate,
     (SELECT COUNT(*) FROM advisories) AS total_advisories,
-    (SELECT COUNT(*) FROM product_streams) AS total_streams;
+    (SELECT COUNT(*) FROM advisory_scopes) AS total_scopes;
 
 -- name: InsertManualHost :one
 INSERT INTO hosts (

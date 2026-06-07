@@ -103,7 +103,7 @@ SELECT
     (SELECT COUNT(*) FROM hosts h JOIN host_current_state hcs ON h.id = hcs.host_id WHERE hcs.needs_reboot > 0) AS reboot_queue,
     (SELECT COUNT(*) FROM hosts h JOIN host_current_state hcs ON h.id = hcs.host_id WHERE hcs.overall_action = 'investigate') AS unknown_investigate,
     (SELECT COUNT(*) FROM advisories) AS total_advisories,
-    (SELECT COUNT(*) FROM product_streams) AS total_streams
+    (SELECT COUNT(*) FROM advisory_scopes) AS total_scopes
 `
 
 type GetDashboardOverviewRow struct {
@@ -112,7 +112,7 @@ type GetDashboardOverviewRow struct {
 	RebootQueue        int64
 	UnknownInvestigate int64
 	TotalAdvisories    int64
-	TotalStreams       int64
+	TotalScopes        int64
 }
 
 func (q *Queries) GetDashboardOverview(ctx context.Context) (GetDashboardOverviewRow, error) {
@@ -124,7 +124,7 @@ func (q *Queries) GetDashboardOverview(ctx context.Context) (GetDashboardOvervie
 		&i.RebootQueue,
 		&i.UnknownInvestigate,
 		&i.TotalAdvisories,
-		&i.TotalStreams,
+		&i.TotalScopes,
 	)
 	return i, err
 }

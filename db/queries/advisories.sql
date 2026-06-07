@@ -28,3 +28,8 @@ DELETE FROM advisories
 WHERE id NOT IN (
     SELECT DISTINCT advisory_id FROM advisory_product_streams
 );
+
+-- name: ListRecentAdvisories :many
+SELECT * FROM advisories
+ORDER BY published_at DESC
+LIMIT 5;

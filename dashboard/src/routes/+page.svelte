@@ -88,9 +88,39 @@
 			<h2>Recent Advisories</h2>
 			<a href="/advisories" class="btn btn-secondary btn-sm">View all</a>
 		</div>
+		{#if overview && overview.recent_advisories?.length}
+			<table>
+				<thead>
+					<tr>
+						<th>ID</th>
+						<th>Severity</th>
+						<th>Summary</th>
+						<th>Published</th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each overview.recent_advisories as adv}
+						<tr>
+							<td class="mono">
+								<a href="/advisories/{adv.id}">{adv.id}</a>
+							</td>
+							<td>
+								{#if adv.severity}
+									<span class="badge badge-{adv.severity.toLowerCase()}">{adv.severity}</span>
+								{:else}
+									<span class="badge">Unknown</span>
+								{/if}
+							</td>
+							<td>{adv.summary || 'No summary'}</td>
+							<td>{adv.published_at ? new Date(adv.published_at).toLocaleDateString() : 'Unknown'}</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		{/if}
 		{#if overview}
 			<p style="padding:20px;color:var(--text-secondary)">
-				Tracking {overview.total_advisories} advisories across {overview.total_streams} product streams.
+				Tracking {overview.total_advisories} advisories across {overview.total_scopes} advisory scopes.
 			</p>
 		{/if}
 	</div>

@@ -67,12 +67,23 @@ type Hosts interface {
 }
 
 type DashboardOverview struct {
-	TotalHosts         int64 `json:"total_hosts"`
-	NeedAttention      int64 `json:"need_attention"`
-	RebootQueue        int64 `json:"reboot_queue"`
-	UnknownInvestigate int64 `json:"unknown_investigate"`
-	TotalAdvisories    int64 `json:"total_advisories"`
-	TotalStreams       int64 `json:"total_streams"`
+	TotalHosts         int64            `json:"total_hosts"`
+	NeedAttention      int64            `json:"need_attention"`
+	RebootQueue        int64            `json:"reboot_queue"`
+	UnknownInvestigate int64            `json:"unknown_investigate"`
+	TotalAdvisories    int64            `json:"total_advisories"`
+	TotalScopes        int64            `json:"total_scopes"`
+	RecentAdvisories   []RecentAdvisory `json:"recent_advisories"`
+}
+
+type RecentAdvisory struct {
+	ID           string  `json:"id"`
+	SourceSystem string  `json:"source_system"`
+	Vendor       string  `json:"vendor"`
+	AdvisoryType string  `json:"advisory_type"`
+	Severity     *string `json:"severity"`
+	Summary      *string `json:"summary"`
+	PublishedAt  *string `json:"published_at"`
 }
 
 type hosts struct {
@@ -1178,13 +1189,32 @@ func (s *hosts) GetDashboardOverview(ctx context.Context) (DashboardOverview, er
 	if err != nil {
 		return DashboardOverview{}, fmt.Errorf("get dashboard overview: %w", err)
 	}
+	recentRows, err := s.sql.ListRecentAdvisories(ctx)
+	if err != nil {
+		return DashboardOverview{}, fmt.Errorf("list recent advisories: %w", err)
+	}
+
+	recentAdvisories := make([]RecentAdvisory, len(recentRows))
+	for i, r := range recentRows {
+		recentAdvisories[i] = RecentAdvisory{
+			ID:           r.ID,
+			SourceSystem: r.SourceSystem,
+			Vendor:       r.Vendor,
+			AdvisoryType: r.AdvisoryType,
+			Severity:     r.Severity.Ptr(),
+			Summary:      r.Summary.Ptr(),
+			PublishedAt:  r.PublishedAt.Ptr(),
+		}
+	}
+
 	return DashboardOverview{
 		TotalHosts:         row.TotalHosts,
 		NeedAttention:      row.NeedAttention,
 		RebootQueue:        row.RebootQueue,
 		UnknownInvestigate: row.UnknownInvestigate,
 		TotalAdvisories:    row.TotalAdvisories,
-		TotalStreams:       row.TotalStreams,
+		TotalScopes:        row.TotalScopes,
+		RecentAdvisories:   recentAdvisories,
 	}, nil
 }
 
