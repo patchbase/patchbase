@@ -534,6 +534,9 @@ func TestMatcher_Concurrent_MatchSnapshot(t *testing.T) {
 		Packages: []*agentpb.Package{
 			{Name: "bash", Epoch: 0, Version: "5.1.8", Release: "7.el9_0", Arch: "x86_64", Nevra: "bash-0:5.1.8-7.el9_0.x86_64"},
 		},
+		Repos: []*agentpb.Repo{
+			{RepoId: "baseos", Enabled: true},
+		},
 	}
 	payloadBytes, err := proto.Marshal(snap)
 	require.NoError(t, err)
@@ -542,6 +545,12 @@ func TestMatcher_Concurrent_MatchSnapshot(t *testing.T) {
 		INSERT INTO host_snapshots (id, host_id, collected_at, payload, running_kernel_nevra, has_process_data)
 		VALUES ($1, $2, now(), $3, '', false)
 	`, snapshotID, hostID, payloadBytes)
+	require.NoError(t, err)
+
+	_, err = dbConn.Exec(ctx, `
+		INSERT INTO product_streams (id, vendor, distro_family, distro_name, major_version, repo_family, status)
+		VALUES ('rocky:9-baseos', 'rocky', 'rpm', 'Rocky Linux', 9, 'baseos', 'active')
+	`)
 	require.NoError(t, err)
 
 	// Seed advisory
@@ -561,6 +570,12 @@ func TestMatcher_Concurrent_MatchSnapshot(t *testing.T) {
 	_, err = dbConn.Exec(ctx, `
 		INSERT INTO fixed_packages (id, advisory_id, product_stream_id, package_name, epoch, version, release, arch, nevra, evidence_tier)
 		VALUES ('fix_bash_concurrent', $1, 'rocky:9-baseos', 'bash', 0, '5.1.8', '9.el9', 'x86_64', 'bash-0:5.1.8-9.el9.x86_64', 'vendor_db')
+	`, advisoryID)
+	require.NoError(t, err)
+
+	_, err = dbConn.Exec(ctx, `
+		INSERT INTO affected_package_rules (id, advisory_id, product_stream_id, package_name, rpm_evr_rule, evidence_tier)
+		VALUES ('rule_bash_concurrent', $1, 'rocky:9-baseos', 'bash', '< 0:5.1.8-9.el9', 'vendor_db')
 	`, advisoryID)
 	require.NoError(t, err)
 

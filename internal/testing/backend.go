@@ -105,7 +105,7 @@ func NewBackend(t *gotesting.T, opts ...Option) *Backend {
 
 	testDBURL, err := createEphemeralDatabase(t, cfg.Database.URL)
 	if err != nil {
-		t.Skipf("skipping integration test: test database unavailable: %v", err)
+		t.Fatalf("integration test failed: test database unavailable: %v", err)
 	}
 	cfg.Database.URL = testDBURL
 

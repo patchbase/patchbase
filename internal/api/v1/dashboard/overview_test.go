@@ -32,5 +32,5 @@ func TestDashboardOverviewEndpoint(t *testing.T) {
 	assert.Equal(t, float64(0), overview["reboot_queue"])
 	assert.Equal(t, float64(0), overview["unknown_investigate"])
 	assert.Equal(t, float64(0), overview["total_advisories"])
-	assert.Equal(t, float64(0), overview["total_streams"])
+	assert.Equal(t, float64(0), overview["total_scopes"])
 }
