@@ -49,3 +49,19 @@ SET
 WHERE id = $1
   AND archived_at IS NULL
 RETURNING *;
+
+-- name: UpdateUserEmail :one
+UPDATE users
+SET email = $2
+WHERE id = $1
+  AND archived_at IS NULL
+RETURNING *;
+
+-- name: UpdateUserPassword :one
+UPDATE users
+SET
+    password_hash = $2,
+    password_reset_required = FALSE
+WHERE id = $1
+  AND archived_at IS NULL
+RETURNING *;

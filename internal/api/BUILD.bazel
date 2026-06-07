@@ -19,6 +19,7 @@ go_library(
         "//internal/api/v1/dashboard",
         "//internal/api/v1/health",
         "//internal/api/v1/hosts",
+        "//internal/api/v1/profile",
         "//internal/api/v1/settings",
         "//internal/api/v1/setup",
         "//internal/api/webutil",

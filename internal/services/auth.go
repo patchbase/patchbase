@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/do/v2"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/utils"
@@ -19,12 +21,17 @@ var (
 	ErrUnauthorized                = errors.New("unauthorized")
 	ErrInitialSetupAlreadyComplete = errors.New("initial setup already complete")
 	ErrEmailAlreadyInUse           = errors.New("email already in use")
+	ErrEmailRequired               = errors.New("email is required")
+	ErrCurrentPasswordRequired     = errors.New("current password is required")
+	ErrCurrentPasswordInvalid      = errors.New("current password is invalid")
+	ErrPasswordTooShort            = errors.New("password must be at least 12 characters")
 )
 
 type Auth interface {
 	Login(ctx context.Context, email string, password string) (LoginResult, error)
 	Authenticate(ctx context.Context, token string) (sql.User, error)
 	IssueAccessToken(ctx context.Context, userID string) (string, error)
+	UpdateProfile(ctx context.Context, userID string, input UpdateProfileInput) (UpdateProfileResult, error)
 }
 
 type LoginResult struct {
@@ -32,17 +39,36 @@ type LoginResult struct {
 	User        sql.User
 }
 
+type UpdateProfileInput struct {
+	Email           utils.Option[string]
+	CurrentPassword utils.Option[string]
+	NewPassword     utils.Option[string]
+}
+
+type UpdateProfileResult struct {
+	User            sql.User
+	PasswordChanged bool
+}
+
 type auth struct {
-	sql sql.Querier
+	pool *pgxpool.Pool
+	sql  sql.Querier
 }
 
 func NewAuth(i do.Injector) (Auth, error) {
+	pool, err := do.Invoke[*pgxpool.Pool](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get *pgxpool.Pool: %w", err)
+	}
 	queries, err := do.Invoke[sql.Querier](i)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sql.Querier: %w", err)
 	}
 
-	return &auth{sql: queries}, nil
+	return &auth{
+		pool: pool,
+		sql:  queries,
+	}, nil
 }
 
 func (a *auth) Login(ctx context.Context, email string, password string) (LoginResult, error) {
@@ -96,6 +122,75 @@ func (a *auth) IssueAccessToken(ctx context.Context, userID string) (string, err
 	}
 
 	return token, nil
+}
+
+func (a *auth) UpdateProfile(ctx context.Context, userID string, input UpdateProfileInput) (UpdateProfileResult, error) {
+	tx, err := a.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return UpdateProfileResult{}, fmt.Errorf("begin profile update transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) // nolint:errcheck
+
+	queries := sql.New(tx)
+	user, err := sql.Required(queries.GetUserByID(ctx, userID))(ErrUnauthorized)
+	if err != nil {
+		return UpdateProfileResult{}, fmt.Errorf("get user by id: %w", err)
+	}
+
+	if input.Email.IsPresent() {
+		email := normalizeEmail(input.Email.Unwrap())
+		if email == "" {
+			return UpdateProfileResult{}, ErrEmailRequired
+		}
+
+		user, err = queries.UpdateUserEmail(ctx, sql.UpdateUserEmailParams{
+			ID:    user.ID,
+			Email: email,
+		})
+		if err != nil {
+			if sql.IsUniqueViolation(err, "users_email_active_unique_idx") {
+				return UpdateProfileResult{}, ErrEmailAlreadyInUse
+			}
+			return UpdateProfileResult{}, fmt.Errorf("update user email: %w", err)
+		}
+	}
+
+	passwordChanged := false
+	if input.NewPassword.IsPresent() {
+		newPassword := input.NewPassword.Unwrap()
+		currentPassword, ok := input.CurrentPassword.Get()
+		if !ok || currentPassword == "" {
+			return UpdateProfileResult{}, ErrCurrentPasswordRequired
+		}
+		if !utils.CheckPasswordHash(currentPassword, user.PasswordHash) {
+			return UpdateProfileResult{}, ErrCurrentPasswordInvalid
+		}
+		if len(newPassword) < 12 {
+			return UpdateProfileResult{}, ErrPasswordTooShort
+		}
+
+		passwordHash, err := utils.HashPassword(newPassword)
+		if err != nil {
+			return UpdateProfileResult{}, fmt.Errorf("hash password: %w", err)
+		}
+		user, err = queries.UpdateUserPassword(ctx, sql.UpdateUserPasswordParams{
+			ID:           user.ID,
+			PasswordHash: passwordHash,
+		})
+		if err != nil {
+			return UpdateProfileResult{}, fmt.Errorf("update user password: %w", err)
+		}
+		passwordChanged = true
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return UpdateProfileResult{}, fmt.Errorf("commit profile update transaction: %w", err)
+	}
+
+	return UpdateProfileResult{
+		User:            user,
+		PasswordChanged: passwordChanged,
+	}, nil
 }
 
 func signAccessToken(user sql.User) (string, error) {

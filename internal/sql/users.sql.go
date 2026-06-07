@@ -179,3 +179,67 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
 	)
 	return i, err
 }
+
+const updateUserEmail = `-- name: UpdateUserEmail :one
+UPDATE users
+SET email = $2
+WHERE id = $1
+  AND archived_at IS NULL
+RETURNING id, email, name, password_hash, is_admin, password_reset_required, last_login_at, archived_at, created_at, updated_at
+`
+
+type UpdateUserEmailParams struct {
+	ID    string
+	Email string
+}
+
+func (q *Queries) UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserEmail, arg.ID, arg.Email)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.PasswordHash,
+		&i.IsAdmin,
+		&i.PasswordResetRequired,
+		&i.LastLoginAt,
+		&i.ArchivedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateUserPassword = `-- name: UpdateUserPassword :one
+UPDATE users
+SET
+    password_hash = $2,
+    password_reset_required = FALSE
+WHERE id = $1
+  AND archived_at IS NULL
+RETURNING id, email, name, password_hash, is_admin, password_reset_required, last_login_at, archived_at, created_at, updated_at
+`
+
+type UpdateUserPasswordParams struct {
+	ID           string
+	PasswordHash string
+}
+
+func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserPassword, arg.ID, arg.PasswordHash)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.Name,
+		&i.PasswordHash,
+		&i.IsAdmin,
+		&i.PasswordResetRequired,
+		&i.LastLoginAt,
+		&i.ArchivedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}

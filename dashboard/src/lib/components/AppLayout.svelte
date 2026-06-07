@@ -65,6 +65,12 @@
 			section: 'System',
 			items: [
 				{
+					page: 'profile',
+					label: 'Profile',
+					href: '/profile',
+					icon: '<circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+				},
+				{
 					page: 'settings',
 					label: 'Settings',
 					href: '/settings',

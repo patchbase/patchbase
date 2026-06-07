@@ -4,3 +4,9 @@
   password_hash: $2a$12$AcMrJEraN.je7kBs/5ErgeLgup23P6jp7hcnzvDDlVLx7TgLnkuFO
   is_admin: true
   password_reset_required: false
+- id: u_user
+  email: user@patchbase.local
+  name: User
+  password_hash: $2a$12$AcMrJEraN.je7kBs/5ErgeLgup23P6jp7hcnzvDDlVLx7TgLnkuFO
+  is_admin: false
+  password_reset_required: false

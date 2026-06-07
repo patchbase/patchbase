@@ -82,6 +82,8 @@ type Querier interface {
 	UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFromSnapshotParams) (Host, error)
 	UpdateHostSSHPullJob(ctx context.Context, arg UpdateHostSSHPullJobParams) (HostSshPullJob, error)
 	UpdateSSHPullRun(ctx context.Context, arg UpdateSSHPullRunParams) error
+	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (User, error)
+	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (User, error)
 	UpsertAdvisory(ctx context.Context, arg UpsertAdvisoryParams) error
 	UpsertAdvisoryScope(ctx context.Context, arg UpsertAdvisoryScopeParams) (AdvisoryScope, error)
 	UpsertAdvisoryScopeStatus(ctx context.Context, arg UpsertAdvisoryScopeStatusParams) (AdvisoryScope, error)

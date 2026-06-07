@@ -12,6 +12,7 @@ import (
 	dashboardv1 "go.patchbase.net/server/internal/api/v1/dashboard"
 	"go.patchbase.net/server/internal/api/v1/health"
 	hostsv1 "go.patchbase.net/server/internal/api/v1/hosts"
+	profilev1 "go.patchbase.net/server/internal/api/v1/profile"
 	settingsv1 "go.patchbase.net/server/internal/api/v1/settings"
 	setupv1 "go.patchbase.net/server/internal/api/v1/setup"
 )
@@ -31,6 +32,8 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 	mux.HandleFunc("POST /api/v1/auth/login", authv1.Login(i))
 	mux.HandleFunc("GET /api/v1/setup/status", setupv1.Status(i))
 	mux.HandleFunc("POST /api/v1/setup/complete", auth.Required(setupv1.Complete(i)))
+	mux.HandleFunc("GET /api/v1/profile", auth.Required(profilev1.GetProfile(i)))
+	mux.HandleFunc("PATCH /api/v1/profile", auth.Required(profilev1.UpdateProfile(i)))
 	mux.HandleFunc("GET /api/v1/settings", auth.Required(settingsv1.GetSettings(i)))
 	mux.HandleFunc("PATCH /api/v1/settings", auth.Required(settingsv1.UpdateSettings(i)))
 	mux.HandleFunc("POST /api/v1/agent/register", agentv1.Register(i))
