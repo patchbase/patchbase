@@ -14,6 +14,7 @@
 		ingestManualReport,
 		type RegistrationTokenInfo,
 	} from '$lib/api/hosts.js';
+	import { getSettings } from '$lib/api/settings.js';
 	import type { Host } from '$lib/types';
 	import { getSession } from '$lib/auth/session.js';
 
@@ -31,6 +32,7 @@
 	let sshDisplayName = $state('');
 	let sshHostname = $state('');
 	let sshUser = $state('root');
+	let sshUserTouched = $state(false);
 	let sshFrequencyMinutes = $state(360);
 	let sshUniqueKeyPair = $state(false);
 	let sshPublicKey = $state('');
@@ -154,8 +156,20 @@
 		}
 	}
 
+	async function loadSettings(): Promise<void> {
+		try {
+			const settings = await getSettings();
+			if (settings.default_ssh_pull_user && !sshUserTouched) {
+				sshUser = settings.default_ssh_pull_user;
+			}
+		} catch (err) {
+			console.error('Failed to load settings', err);
+		}
+	}
+
 	$effect(() => {
 		void refreshTokens();
+		void loadSettings();
 	});
 
 	async function createToken(): Promise<void> {
@@ -332,7 +346,7 @@
 			</div>
 			<div class="form-group">
 				<label>SSH User</label>
-				<input class="form-input" bind:value={sshUser} placeholder="root" required />
+				<input class="form-input" bind:value={sshUser} oninput={() => { sshUserTouched = true; }} placeholder="root" required />
 			</div>
 			<div class="form-group">
 				<label>Frequency Minutes</label>

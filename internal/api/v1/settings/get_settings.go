@@ -11,6 +11,7 @@ import (
 
 type getSettingsResponse struct {
 	GlobalSSHPublicKey string `json:"global_ssh_public_key"`
+	DefaultSSHPullUser string `json:"default_ssh_pull_user"`
 }
 
 func GetSettings(i do.Injector) apiauth.AuthenticatedHandler {
@@ -29,8 +30,16 @@ func GetSettings(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
+		defaultUser, err := settingsService.GetDefaultSSHPullUser(r.Context())
+		if err != nil {
+			webutil.LogError(r, "get default ssh pull user failed", err)
+			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to retrieve default SSH pull user", nil)
+			return
+		}
+
 		webutil.WriteJSON(w, http.StatusOK, getSettingsResponse{
 			GlobalSSHPublicKey: globalKey.PublicKey,
+			DefaultSSHPullUser: defaultUser,
 		})
 	}
 }

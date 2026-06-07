@@ -1,13 +1,16 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import AppLayout from '$lib/components/AppLayout.svelte';
-	import { getSettings } from '$lib/api/settings.js';
+	import { getSettings, updateSettings } from '$lib/api/settings.js';
 
 	let globalPublicKey = $state('');
+	let defaultSshUser = $state('');
 	let loading = $state(true);
 	let error = $state('');
 	let activeTab = $state<'general' | 'integrations' | 'security'>('general');
 	let copied = $state(false);
+	let saving = $state(false);
+	let saved = $state(false);
 
 	async function loadSettings(): Promise<void> {
 		loading = true;
@@ -15,10 +18,28 @@
 		try {
 			const data = await getSettings();
 			globalPublicKey = data.global_ssh_public_key;
+			defaultSshUser = data.default_ssh_pull_user || 'root';
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to load settings';
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function saveSettings(): Promise<void> {
+		saving = true;
+		error = '';
+		saved = false;
+		try {
+			await updateSettings({ default_ssh_pull_user: defaultSshUser });
+			saved = true;
+			setTimeout(() => {
+				saved = false;
+			}, 3000);
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'Failed to save settings';
+		} finally {
+			saving = false;
 		}
 	}
 
@@ -188,6 +209,31 @@
 		</div>
 	{:else}
 		{#if activeTab === 'general'}
+			<div class="settings-card" style="margin-bottom: 24px;">
+				<h2 class="settings-title">Default SSH Pull User</h2>
+				<p class="settings-description">
+					This user will be pre-filled as the default when registering new SSH pull hosts.
+				</p>
+				<form onsubmit={(e) => { e.preventDefault(); void saveSettings(); }}>
+					<div style="display: flex; gap: 12px; align-items: center;">
+						<input
+							type="text"
+							class="form-input"
+							style="max-width: 300px;"
+							bind:value={defaultSshUser}
+							placeholder="root"
+							required
+						/>
+						<button type="submit" class="btn btn-primary" disabled={saving}>
+							{saving ? 'Saving...' : 'Save'}
+						</button>
+						{#if saved}
+							<span style="color: var(--green); font-size: 14px;">Saved!</span>
+						{/if}
+					</div>
+				</form>
+			</div>
+
 			<div class="settings-card">
 				<h2 class="settings-title">Global SSH Key</h2>
 				<p class="settings-description">

@@ -39,6 +39,8 @@ type Settings interface {
 	Status(ctx context.Context) (InitialSetupDone, error)
 	CompleteInitialSetup(ctx context.Context, userID string, input CompleteInitialSetupInput) (sql.User, error)
 	GetGlobalSSHKeyPair(ctx context.Context) (GlobalSSHKeyPair, error)
+	GetDefaultSSHPullUser(ctx context.Context) (string, error)
+	SetDefaultSSHPullUser(ctx context.Context, user string) error
 }
 
 type settings struct {
@@ -375,4 +377,28 @@ func (s *settings) GetGlobalSSHKeyPair(ctx context.Context) (GlobalSSHKeyPair, e
 		PublicKey:  finalVal.PublicKey,
 		PrivateKey: decrypted,
 	}, nil
+}
+
+func (s *settings) GetDefaultSSHPullUser(ctx context.Context) (string, error) {
+	manager := NewSettingManager[string]("default_ssh_pull_user", s.sql)
+	val, err := manager.Get(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get default ssh pull user: %w", err)
+	}
+	if val == "" {
+		return "root", nil
+	}
+	return val, nil
+}
+
+func (s *settings) SetDefaultSSHPullUser(ctx context.Context, user string) error {
+	user = strings.TrimSpace(user)
+	if user == "" {
+		return fmt.Errorf("default ssh pull user cannot be empty")
+	}
+	manager := NewSettingManager[string]("default_ssh_pull_user", s.sql)
+	if err := manager.Set(ctx, user); err != nil {
+		return fmt.Errorf("failed to set default ssh pull user: %w", err)
+	}
+	return nil
 }
