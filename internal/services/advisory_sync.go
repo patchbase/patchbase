@@ -45,6 +45,7 @@ type AdvisorySyncService interface {
 	GetOverview(ctx context.Context) (AdvisoryOverview, error)
 	ResolveScopeKey(ctx context.Context, osFamily, osName, osVersion string, osMajor int32, arch string) (string, error)
 	RegisterScopeDemand(ctx context.Context, scopeKey string) error
+	GetAdvisory(ctx context.Context, id string) (db.Advisory, error)
 }
 
 type AdvisoryScopeStatus struct {
@@ -524,6 +525,10 @@ func (s *advisorySyncService) GetOverview(ctx context.Context) (AdvisoryOverview
 		TotalScopes:     int32(len(rows)), // nolint: gosec
 		SyncedScopes:    syncedCount,
 	}, nil
+}
+
+func (s *advisorySyncService) GetAdvisory(ctx context.Context, id string) (db.Advisory, error) {
+	return s.queries.GetAdvisory(ctx, id)
 }
 
 func optTime(o pgtype.Timestamptz) *time.Time {

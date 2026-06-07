@@ -23,6 +23,32 @@ func (q *Queries) DeleteAdvisoriesWithoutStreams(ctx context.Context) error {
 	return err
 }
 
+const getAdvisory = `-- name: GetAdvisory :one
+SELECT id, source_system, raw_source_id, source_url, vendor, advisory_type, severity, summary, description, published_at, updated_at, evidence_tier, is_security FROM advisories
+WHERE id = $1
+`
+
+func (q *Queries) GetAdvisory(ctx context.Context, id string) (Advisory, error) {
+	row := q.db.QueryRow(ctx, getAdvisory, id)
+	var i Advisory
+	err := row.Scan(
+		&i.ID,
+		&i.SourceSystem,
+		&i.RawSourceID,
+		&i.SourceUrl,
+		&i.Vendor,
+		&i.AdvisoryType,
+		&i.Severity,
+		&i.Summary,
+		&i.Description,
+		&i.PublishedAt,
+		&i.UpdatedAt,
+		&i.EvidenceTier,
+		&i.IsSecurity,
+	)
+	return i, err
+}
+
 const listAdvisoriesByStreamIDs = `-- name: ListAdvisoriesByStreamIDs :many
 SELECT DISTINCT a.id, a.source_system, a.raw_source_id, a.source_url, a.vendor, a.advisory_type, a.severity, a.summary, a.description, a.published_at, a.updated_at, a.evidence_tier, a.is_security FROM advisories a
 JOIN advisory_product_streams aps ON aps.advisory_id = a.id

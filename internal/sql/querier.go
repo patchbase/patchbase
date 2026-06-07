@@ -31,6 +31,7 @@ type Querier interface {
 	GetActiveHostAccessTokenByHash(ctx context.Context, tokenHash string) (HostAccessToken, error)
 	GetActiveRegistrationTokenByHash(ctx context.Context, tokenHash string) (RegistrationToken, error)
 	GetAdminUser(ctx context.Context) (User, error)
+	GetAdvisory(ctx context.Context, id string) (Advisory, error)
 	GetAdvisoryScope(ctx context.Context, scopeKey string) (AdvisoryScope, error)
 	GetDashboardOverview(ctx context.Context) (GetDashboardOverviewRow, error)
 	GetHostByID(ctx context.Context, id string) (Host, error)

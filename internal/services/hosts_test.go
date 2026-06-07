@@ -49,6 +49,10 @@ func (f *failingAdvisorySyncService) RegisterScopeDemand(ctx context.Context, sc
 	return fmt.Errorf("mock error")
 }
 
+func (f *failingAdvisorySyncService) GetAdvisory(ctx context.Context, id string) (db.Advisory, error) {
+	return db.Advisory{}, fmt.Errorf("mock error")
+}
+
 var _ services.AdvisorySyncService = (*failingAdvisorySyncService)(nil)
 
 func TestHostIngestion_ResilientToAdvisorySyncFailure(t *testing.T) {

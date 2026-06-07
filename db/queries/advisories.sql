@@ -33,3 +33,7 @@ WHERE id NOT IN (
 SELECT * FROM advisories
 ORDER BY published_at DESC
 LIMIT 5;
+
+-- name: GetAdvisory :one
+SELECT * FROM advisories
+WHERE id = $1;

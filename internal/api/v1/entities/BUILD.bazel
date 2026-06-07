@@ -3,6 +3,7 @@ load("//third_party/bazel:go_rules.bzl", "go_api_library", "integration_test")
 go_api_library(
     name = "entities",
     srcs = [
+        "advisory.go",
         "hosts.go",
         "kernel.go",
         "matcher.go",

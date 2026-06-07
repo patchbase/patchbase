@@ -4,6 +4,7 @@ go_api_library(
     name = "advisories",
     srcs = [
         "advisories.go",
+        "get.go",
         "overview.go",
         "scopes.go",
         "sync.go",
@@ -12,8 +13,10 @@ go_api_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/api/auth",
+        "//internal/api/v1/entities",
         "//internal/api/webutil",
         "//internal/services",
+        "@com_github_jackc_pgx_v5//:pgx",
         "@com_github_samber_do_v2//:do",
     ],
 )
