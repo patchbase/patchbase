@@ -19,3 +19,8 @@ WHERE advisory_id IN (
     SELECT DISTINCT advisory_id FROM advisory_product_streams
     WHERE product_stream_id = ANY($1::text[])
 );
+
+-- name: ListAdvisoryReferencesByStreamIDs :many
+SELECT ar.* FROM advisory_references ar
+JOIN advisory_product_streams aps ON aps.advisory_id = ar.advisory_id
+WHERE aps.product_stream_id = ANY($1::text[]);

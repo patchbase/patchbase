@@ -56,6 +56,7 @@ type Querier interface {
 	InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (InsertSSHHostRow, error)
 	ListAdvisoriesByStreamIDs(ctx context.Context, dollar_1 []string) ([]Advisory, error)
 	ListAdvisoryProductStreamsByStreamIDs(ctx context.Context, dollar_1 []string) ([]AdvisoryProductStream, error)
+	ListAdvisoryReferencesByStreamIDs(ctx context.Context, dollar_1 []string) ([]AdvisoryReference, error)
 	ListAdvisoryScopeStats(ctx context.Context) ([]ListAdvisoryScopeStatsRow, error)
 	ListAdvisoryScopes(ctx context.Context) ([]AdvisoryScope, error)
 	ListAffectedPackageRulesByStreamIDs(ctx context.Context, dollar_1 []string) ([]AffectedPackageRule, error)

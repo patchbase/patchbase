@@ -2,6 +2,7 @@ package matchers
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -684,4 +685,65 @@ func TestLatestInstalledKernel(t *testing.T) {
 		assert.Equal(t, "5.14.0", latest.version)
 		assert.Equal(t, "362.24.1.el9", latest.release)
 	})
+}
+
+func TestNormalizeSeverity(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"high", "important"},
+		{"medium", "moderate"},
+		{"critical", "critical"},
+		{"low", "low"},
+		{"  HIGH  ", "important"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.input, func(t *testing.T) {
+			assert.Equal(t, tc.expected, normalizeSeverity(tc.input))
+		})
+	}
+}
+
+func TestSeverityPriority(t *testing.T) {
+	assert.Equal(t, 4, severityPriority("critical"))
+	assert.Equal(t, 3, severityPriority("important"))
+	assert.Equal(t, 3, severityPriority("high"))
+	assert.Equal(t, 2, severityPriority("moderate"))
+	assert.Equal(t, 2, severityPriority("medium"))
+	assert.Equal(t, 1, severityPriority("low"))
+	assert.Equal(t, 0, severityPriority("unknown"))
+}
+
+func TestAggregateHostCurrentState(t *testing.T) {
+	m := &matcher{}
+	snapshot := sql.HostSnapshot{HostID: "h1", ID: "s1"}
+	decisions := []decision{
+		{
+			record:   sql.InsertDecisionRecordParams{Status: "affected_fix_available", Action: "update_package"},
+			severity: "high",
+		},
+		{
+			record:   sql.InsertDecisionRecordParams{Status: "affected_fix_available", Action: "update_package"},
+			severity: "medium",
+		},
+		{
+			record:   sql.InsertDecisionRecordParams{Status: "affected_no_fix", Action: "investigate"},
+			severity: "critical",
+		},
+		{
+			record:   sql.InsertDecisionRecordParams{Status: "resolved", Action: "none"},
+			severity: "critical",
+		},
+	}
+
+	state := m.aggregateHostCurrentState(snapshot, decisions, time.Now(), 2)
+
+	assert.Equal(t, int32(1), state.CriticalCount)
+	assert.Equal(t, int32(1), state.ImportantCount)
+	assert.Equal(t, int32(1), state.ModerateCount)
+	assert.Equal(t, int32(2), state.ActionableCount)
+	assert.Equal(t, int32(1), state.NoFix)
+	assert.Equal(t, int32(2), state.AvailableUpdates)
 }

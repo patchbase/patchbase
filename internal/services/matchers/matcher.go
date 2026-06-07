@@ -61,6 +61,7 @@ type advisoryData struct {
 	advisoryStreamLinks []sql.AdvisoryProductStream
 	rules               []sql.AffectedPackageRule
 	fixes               []sql.FixedPackage
+	references          []sql.AdvisoryReference
 }
 
 func (m *matcher) loadAdvisoryDataForStreams(ctx context.Context, ids []string) (advisoryData, error) {
@@ -84,11 +85,17 @@ func (m *matcher) loadAdvisoryDataForStreams(ctx context.Context, ids []string) 
 		return advisoryData{}, fmt.Errorf("list fixed packages by stream ids: %w", err)
 	}
 
+	references, err := m.queries.ListAdvisoryReferencesByStreamIDs(ctx, ids)
+	if err != nil {
+		return advisoryData{}, fmt.Errorf("list advisory references by stream ids: %w", err)
+	}
+
 	return advisoryData{
 		advisories:          advisories,
 		advisoryStreamLinks: links,
 		rules:               rules,
 		fixes:               fixes,
+		references:          references,
 	}, nil
 }
 
@@ -171,8 +178,9 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 	advisoryStreams := indexAdvisoryStreams(data.advisoryStreamLinks)
 	rulesByAdvisory := indexRulesByAdvisory(data.rules)
 	fixesByAdvisory := indexFixesByAdvisory(data.fixes)
+	referencesByAdvisory := indexReferencesByAdvisory(data.references)
 
-	decisions, err := buildDecisions(host.ID, host.OsFamily, snapshot, packages, resolvedStreams, data.advisories, advisoryStreams, rulesByAdvisory, fixesByAdvisory, computedAt)
+	decisions, err := buildDecisions(host.ID, host.OsFamily, snapshot, packages, resolvedStreams, data.advisories, advisoryStreams, rulesByAdvisory, fixesByAdvisory, referencesByAdvisory, computedAt)
 	if err != nil {
 		return MatchResult{}, fmt.Errorf("build decisions: %w", err)
 	}
@@ -281,7 +289,7 @@ func (m *matcher) aggregateHostCurrentState(
 			continue
 		}
 
-		severity := strings.ToLower(dec.severity)
+		severity := normalizeSeverity(dec.severity)
 		switch severity {
 		case "critical":
 			state.CriticalCount++
@@ -334,6 +342,7 @@ func buildDecisions(
 	advisoryStreams map[string][]string,
 	rulesByAdvisory map[string][]sql.AffectedPackageRule,
 	fixesByAdvisory map[string][]sql.FixedPackage,
+	referencesByAdvisory map[string][]sql.AdvisoryReference,
 	computedAt string,
 ) ([]decision, error) {
 	resolvedStreamIDs := streamIDSet(streams)
@@ -345,13 +354,14 @@ func buildDecisions(
 			continue
 		}
 
+		effectiveSev := effectiveSeverity(advisory, referencesByAdvisory[advisory.ID])
 		filteredRulesByPackage := filterRulesByPackage(rulesByAdvisory[advisory.ID], resolvedStreamIDs)
 		filteredFixesByPackage := filterFixesByPackage(fixesByAdvisory[advisory.ID], resolvedStreamIDs)
 		for _, pkg := range candidatePackages(packagesByName, filteredRulesByPackage, filteredFixesByPackage) {
 			if !isRelevantKernelPackage(pkg, osFamily, snapshot, packages) {
 				continue
 			}
-			
+
 			fixesForPackage := matchingFixesForPackageKeys(pkg, filteredFixesByPackage)
 			rulesForPackage := matchingRulesForPackageKeys(pkg, filteredRulesByPackage)
 
@@ -367,12 +377,12 @@ func buildDecisions(
 					return nil, fmt.Errorf("select best fix for package %s: %w", pkg.GetNevra(), err)
 				}
 
-				record, shouldEmit, err := decisionFromFixedPackageOnly(hostID, osFamily, snapshot, packages, advisory, pkg, bestFix, computedAt)
+				record, shouldEmit, err := decisionFromFixedPackageOnly(hostID, osFamily, snapshot, packages, advisory, pkg, bestFix, effectiveSev, computedAt)
 				if err != nil {
 					return nil, err
 				}
 				if shouldEmit {
-					decisions = append(decisions, decision{record: record, severity: advisorySeverity(advisory)})
+					decisions = append(decisions, decision{record: record, severity: effectiveSev})
 				}
 				continue
 			}
@@ -429,27 +439,27 @@ func buildDecisions(
 					return nil, fmt.Errorf("select best fix for package %s: %w", pkg.GetNevra(), err)
 				}
 
-				record, shouldEmit, err := decisionFromFixedPackageOnly(hostID, osFamily, snapshot, packages, advisory, pkg, bestFix, computedAt)
+				record, shouldEmit, err := decisionFromFixedPackageOnly(hostID, osFamily, snapshot, packages, advisory, pkg, bestFix, effectiveSev, computedAt)
 				if err != nil {
 					return nil, err
 				}
 				if shouldEmit {
-					decisions = append(decisions, decision{record: record, severity: advisorySeverity(advisory)})
+					decisions = append(decisions, decision{record: record, severity: effectiveSev})
 				}
 				continue
 			}
 
 			if len(matchedRules) > 1 {
-				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.None[string](), "unknown", "investigate", "unknown", "package_mapping_incomplete", "multiple affected package rules matched", computedAt)
-				decisions = append(decisions, decision{record: record, severity: advisorySeverity(advisory)})
+				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.None[string](), "unknown", "investigate", effectiveSev, "unknown", "package_mapping_incomplete", "multiple affected package rules matched", computedAt)
+				decisions = append(decisions, decision{record: record, severity: effectiveSev})
 				continue
 			}
 
 			rule := matchedRules[0]
 			fixedPackages := matchingFixedPackagesForStream(pkg, rule.ProductStreamID, fixesForPackage, osFamily)
 			if len(fixedPackages) == 0 {
-				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), "affected_no_fix", "investigate", rule.EvidenceTier, "vendor_fix_not_available", "vendor advisory marks package affected but no fixed package is available", computedAt)
-				decisions = append(decisions, decision{record: record, severity: advisorySeverity(advisory)})
+				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), "affected_no_fix", "investigate", effectiveSev, rule.EvidenceTier, "vendor_fix_not_available", "vendor advisory marks package affected but no fixed package is available", computedAt)
+				decisions = append(decisions, decision{record: record, severity: effectiveSev})
 				continue
 			}
 
@@ -503,9 +513,9 @@ func buildDecisions(
 					}
 				}
 
-				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), status, action, evidenceTier, reasonCode, reasonText, computedAt)
+				record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), status, action, effectiveSev, evidenceTier, reasonCode, reasonText, computedAt)
 				record.FixedNevra = utils.Some(bestFix.Nevra)
-				decisions = append(decisions, decision{record: record, severity: advisorySeverity(advisory)})
+				decisions = append(decisions, decision{record: record, severity: effectiveSev})
 				continue
 			}
 
@@ -523,9 +533,9 @@ func buildDecisions(
 				}
 			}
 
-			record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), status, action, evidenceTier, reasonCode, reasonText, computedAt)
+			record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(rule.ProductStreamID), status, action, effectiveSev, evidenceTier, reasonCode, reasonText, computedAt)
 			record.FixedNevra = utils.Some(bestFix.Nevra)
-			decisions = append(decisions, decision{record: record, severity: advisorySeverity(advisory)})
+			decisions = append(decisions, decision{record: record, severity: effectiveSev})
 		}
 	}
 
@@ -540,6 +550,7 @@ func decisionFromFixedPackageOnly(
 	advisory sql.Advisory,
 	pkg *agentpb.Package,
 	bestFix sql.FixedPackage,
+	severity string,
 	computedAt string,
 ) (sql.InsertDecisionRecordParams, bool, error) {
 	installed := evr{epoch: int64(pkg.GetEpoch()), version: pkg.GetVersion(), release: pkg.GetRelease()}
@@ -586,7 +597,7 @@ func decisionFromFixedPackageOnly(
 			}
 		}
 
-		record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(bestFix.ProductStreamID), status, action, evidenceTier, reasonCode, reasonText, computedAt)
+		record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(bestFix.ProductStreamID), status, action, severity, evidenceTier, reasonCode, reasonText, computedAt)
 		record.FixedNevra = utils.Some(bestFix.Nevra)
 		return record, true, nil
 	}
@@ -605,7 +616,7 @@ func decisionFromFixedPackageOnly(
 		}
 	}
 
-	record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(bestFix.ProductStreamID), status, action, evidenceTier, reasonCode, reasonText, computedAt)
+	record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(bestFix.ProductStreamID), status, action, severity, evidenceTier, reasonCode, reasonText, computedAt)
 	record.FixedNevra = utils.Some(bestFix.Nevra)
 	return record, true, nil
 }
@@ -618,6 +629,7 @@ func newDecisionRecord(
 	productStreamID utils.Option[string],
 	status string,
 	action string,
+	severity string,
 	evidenceTier string,
 	reasonCode string,
 	reasonText string,
@@ -635,7 +647,7 @@ func newDecisionRecord(
 		FixedNevra:         utils.None[string](),
 		Status:             status,
 		Action:             action,
-		Severity:           advisory.Severity,
+		Severity:           utils.Some(severity),
 		EvidenceTier:       evidenceTier,
 		ReasonCode:         reasonCode,
 		ReasonText:         utils.Some(reasonText),
@@ -796,14 +808,6 @@ func decisionEvidenceTier(tiers ...string) string {
 	}
 
 	return "authoritative"
-}
-
-func advisorySeverity(advisory sql.Advisory) string {
-	if advisory.Severity.IsPresent() {
-		return strings.ToLower(strings.TrimSpace(advisory.Severity.UnwrapOr("")))
-	}
-
-	return ""
 }
 
 func streamIDs(streams []sql.ProductStream) []string {
@@ -1169,6 +1173,35 @@ func indexFixesByAdvisory(fixes []sql.FixedPackage) map[string][]sql.FixedPackag
 	return grouped
 }
 
+func indexReferencesByAdvisory(refs []sql.AdvisoryReference) map[string][]sql.AdvisoryReference {
+	grouped := make(map[string][]sql.AdvisoryReference)
+	for _, ref := range refs {
+		grouped[ref.AdvisoryID] = append(grouped[ref.AdvisoryID], ref)
+	}
+	return grouped
+}
+
+func effectiveSeverity(advisory sql.Advisory, references []sql.AdvisoryReference) string {
+	if advisory.Severity.IsPresent() && strings.TrimSpace(advisory.Severity.UnwrapOr("")) != "" {
+		return strings.ToLower(strings.TrimSpace(advisory.Severity.UnwrapOr("")))
+	}
+
+	var highest string
+	highestPriority := -1
+	for _, ref := range references {
+		if ref.SeverityVendor.IsPresent() && strings.TrimSpace(ref.SeverityVendor.UnwrapOr("")) != "" {
+			sv := strings.ToLower(strings.TrimSpace(ref.SeverityVendor.UnwrapOr("")))
+			prio := severityPriority(sv)
+			if prio > highestPriority {
+				highestPriority = prio
+				highest = sv
+			}
+		}
+	}
+
+	return highest
+}
+
 func collapseSupersededDecisions(decisions []decision, osFamily string) []decision {
 	if len(decisions) <= 1 {
 		return decisions
@@ -1260,7 +1293,7 @@ func decisionPriority(record sql.InsertDecisionRecordParams) int {
 }
 
 func severityPriority(severity string) int {
-	switch strings.ToLower(strings.TrimSpace(severity)) {
+	switch normalizeSeverity(severity) {
 	case "critical":
 		return 4
 	case "important":
@@ -1271,6 +1304,18 @@ func severityPriority(severity string) int {
 		return 1
 	default:
 		return 0
+	}
+}
+
+func normalizeSeverity(severity string) string {
+	normalized := strings.ToLower(strings.TrimSpace(severity))
+	switch normalized {
+	case "high":
+		return "important"
+	case "medium":
+		return "moderate"
+	default:
+		return normalized
 	}
 }
 

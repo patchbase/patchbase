@@ -64,3 +64,38 @@ func (q *Queries) InsertAdvisoryReference(ctx context.Context, arg InsertAdvisor
 	)
 	return err
 }
+
+const listAdvisoryReferencesByStreamIDs = `-- name: ListAdvisoryReferencesByStreamIDs :many
+SELECT ar.id, ar.advisory_id, ar.ref_type, ar.ref_value, ar.severity_vendor, ar.severity_cvss, ar.title, ar.url FROM advisory_references ar
+JOIN advisory_product_streams aps ON aps.advisory_id = ar.advisory_id
+WHERE aps.product_stream_id = ANY($1::text[])
+`
+
+func (q *Queries) ListAdvisoryReferencesByStreamIDs(ctx context.Context, dollar_1 []string) ([]AdvisoryReference, error) {
+	rows, err := q.db.Query(ctx, listAdvisoryReferencesByStreamIDs, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []AdvisoryReference
+	for rows.Next() {
+		var i AdvisoryReference
+		if err := rows.Scan(
+			&i.ID,
+			&i.AdvisoryID,
+			&i.RefType,
+			&i.RefValue,
+			&i.SeverityVendor,
+			&i.SeverityCvss,
+			&i.Title,
+			&i.Url,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
