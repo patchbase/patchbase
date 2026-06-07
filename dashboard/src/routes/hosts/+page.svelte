@@ -138,7 +138,18 @@
 	let sortedHosts = $derived(
 		[...hosts].sort((a, b) => {
 			if (!sortField) {
-				return (actionOrder[a.overall_action] ?? 5) - (actionOrder[b.overall_action] ?? 5);
+				if ((b.critical_count || 0) !== (a.critical_count || 0)) {
+					return (b.critical_count || 0) - (a.critical_count || 0);
+				}
+				if ((b.important_count || 0) !== (a.important_count || 0)) {
+					return (b.important_count || 0) - (a.important_count || 0);
+				}
+				if ((b.moderate_count || 0) !== (a.moderate_count || 0)) {
+					return (b.moderate_count || 0) - (a.moderate_count || 0);
+				}
+				const aOrder = actionOrder[a.overall_action] ?? 5;
+				const bOrder = actionOrder[b.overall_action] ?? 5;
+				return aOrder - bOrder;
 			}
 
 			if (sortField === 'host') {
