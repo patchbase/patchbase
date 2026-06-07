@@ -42,8 +42,11 @@ func GetKernelPosture(i do.Injector) apiauth.AuthenticatedHandler {
 		if err != nil {
 			if errors.Is(err, services.ErrSnapshotNotFound) {
 				webutil.WriteJSON(w, http.StatusOK, entities.HostKernelPosture{
-					ActiveKernel:    entities.BuildKernelRiskView(nil),
-					LatestInstalled: entities.BuildKernelRiskView(nil),
+					ActiveKernel:              entities.BuildKernelRiskView(nil),
+					LatestInstalled:           entities.BuildKernelRiskView(nil),
+					RunningKernel:             "",
+					LatestInstalledKernel:     "",
+					RebootWouldReduceCVECount: false,
 				})
 				return
 			}

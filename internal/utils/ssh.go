@@ -27,7 +27,7 @@ func GenerateSSHKeyPair() (string, string, error) {
 	if err != nil {
 		return "", "", fmt.Errorf("marshal private key: %w", err)
 	}
-	privatePEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der})
+	privatePEM := pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}) // nolint: exhaustruct
 	if privatePEM == nil {
 		return "", "", fmt.Errorf("encode private key pem")
 	}

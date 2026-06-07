@@ -2,7 +2,6 @@ package matchers
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -738,7 +737,7 @@ func TestAggregateHostCurrentState(t *testing.T) {
 		},
 	}
 
-	state := m.aggregateHostCurrentState(snapshot, decisions, time.Now(), 2)
+	state := m.aggregateHostCurrentState(snapshot, decisions, 2)
 
 	assert.Equal(t, int32(1), state.CriticalCount)
 	assert.Equal(t, int32(1), state.ImportantCount)

@@ -30,15 +30,16 @@ func NewSSHPullWorker(i do.Injector) (*SSHPullWorker, error) {
 		return nil, err
 	}
 	return &SSHPullWorker{
-		injector: i,
-		config:   cfg,
-		logger:   logger.With("source", "queue.SSHPullWorker"),
+		injector:       i,
+		config:         cfg,
+		logger:         logger.With("source", "queue.SSHPullWorker"),
+		WorkerDefaults: river.WorkerDefaults[services.SSHPullArgs]{},
 	}, nil
 }
 
 func (w *SSHPullWorker) NextRetry(job *river.Job[services.SSHPullArgs]) time.Time {
 	// Base backoff of 10 seconds, doubling with each attempt, capped at 10 minutes.
-	backoff := 10 * time.Second * (1 << uint(job.Attempt-1))
+	backoff := 10 * time.Second * (1 << uint(job.Attempt-1)) // nolint: gosec
 	if backoff > 10*time.Minute || backoff <= 0 {
 		backoff = 10 * time.Minute
 	}

@@ -124,16 +124,16 @@ type ScopeDetail struct {
 }
 
 var defaultScopeMappings = []config.ScopeMapping{
-	{Match: config.MatchRules{OSName: "Ubuntu", OSVersion: "22.04"}, Scope: "ubuntu:jammy"},
-	{Match: config.MatchRules{OSName: "Ubuntu", OSVersion: "24.04"}, Scope: "ubuntu:noble"},
-	{Match: config.MatchRules{OSName: "Debian GNU/Linux", OSMajor: 12}, Scope: "debian:bookworm-dsa"},
-	{Match: config.MatchRules{OSName: "Debian GNU/Linux", OSMajor: 13}, Scope: "debian:trixie-dsa"},
-	{Match: config.MatchRules{OSName: "Rocky Linux", OSMajor: 9}, Scope: "rocky:9"},
-	{Match: config.MatchRules{OSName: "Rocky Linux", OSMajor: 10}, Scope: "rocky:10"},
-	{Match: config.MatchRules{OSName: "AlmaLinux", OSMajor: 9}, Scope: "alma:9"},
-	{Match: config.MatchRules{OSName: "AlmaLinux", OSMajor: 10}, Scope: "alma:10"},
-	{Match: config.MatchRules{OSName: "Red Hat Enterprise Linux", OSMajor: 9}, Scope: "rhel:9"},
-	{Match: config.MatchRules{OSName: "Red Hat Enterprise Linux", OSMajor: 10}, Scope: "rhel:10"},
+	{Match: config.MatchRules{OSName: "Ubuntu", OSVersion: "22.04"}, Scope: "ubuntu:jammy"},           // nolint: exhaustruct
+	{Match: config.MatchRules{OSName: "Ubuntu", OSVersion: "24.04"}, Scope: "ubuntu:noble"},           // nolint: exhaustruct
+	{Match: config.MatchRules{OSName: "Debian GNU/Linux", OSMajor: 12}, Scope: "debian:bookworm-dsa"}, // nolint: exhaustruct
+	{Match: config.MatchRules{OSName: "Debian GNU/Linux", OSMajor: 13}, Scope: "debian:trixie-dsa"},   // nolint: exhaustruct
+	{Match: config.MatchRules{OSName: "Rocky Linux", OSMajor: 9}, Scope: "rocky:9"},                   // nolint: exhaustruct
+	{Match: config.MatchRules{OSName: "Rocky Linux", OSMajor: 10}, Scope: "rocky:10"},                 // nolint: exhaustruct
+	{Match: config.MatchRules{OSName: "AlmaLinux", OSMajor: 9}, Scope: "alma:9"},                      // nolint: exhaustruct
+	{Match: config.MatchRules{OSName: "AlmaLinux", OSMajor: 10}, Scope: "alma:10"},                    // nolint: exhaustruct
+	{Match: config.MatchRules{OSName: "Red Hat Enterprise Linux", OSMajor: 9}, Scope: "rhel:9"},       // nolint: exhaustruct
+	{Match: config.MatchRules{OSName: "Red Hat Enterprise Linux", OSMajor: 10}, Scope: "rhel:10"},     // nolint: exhaustruct
 }
 
 func (s *advisorySyncService) ResolveScopeKey(ctx context.Context, osFamily, osName, osVersion string, osMajor int32, arch string) (string, error) {
@@ -212,7 +212,7 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 
 	// 2. Fetch manifest.json
 	manifestURL := strings.TrimSuffix(s.config.AdvisorySync.BaseURL, "/") + "/manifest.json"
-	req, err := http.NewRequestWithContext(ctx, "GET", manifestURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, manifestURL, nil)
 	if err != nil {
 		return handleFailure(fmt.Errorf("failed to create manifest request: %w", err))
 	}
@@ -278,18 +278,18 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 		}
 
 		now := time.Now().UTC()
-		nextRefresh := now.Add(s.config.AdvisorySync.RefreshInterval)
+		ttznow := db.TimestamptzFromTime(now)
 		_, err = s.queries.UpsertAdvisoryScope(ctx, db.UpsertAdvisoryScopeParams{
 			ScopeKey:      scopeKey,
 			Status:        "synced",
-			LastSyncAt:    pgtype.Timestamptz{Time: now, Valid: true},
-			LastSuccessAt: pgtype.Timestamptz{Time: now, Valid: true},
+			LastSyncAt:    ttznow,
+			LastSuccessAt: ttznow,
 			LastError:     utils.None[string](),
 			AdvisoryCount: current.AdvisoryCount,
 			Sha256:        utils.Some(detail.Sha256),
 			SizeBytes:     detail.SizeBytes,
 			LocalPath:     utils.Some(destPath),
-			NextRefreshAt: pgtype.Timestamptz{Time: nextRefresh, Valid: true},
+			NextRefreshAt: db.TimestamptzFromTime(now.Add(s.config.AdvisorySync.RefreshInterval)),
 		})
 		if err != nil {
 			return handleFailure(fmt.Errorf("failed to save synced scope metadata: %w", err))
@@ -303,7 +303,7 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 			downloadURL = strings.TrimSuffix(s.config.AdvisorySync.BaseURL, "/") + "/" + detail.Path
 		}
 
-		dlReq, err := http.NewRequestWithContext(ctx, "GET", downloadURL, nil)
+		dlReq, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
 		if err != nil {
 			return handleFailure(fmt.Errorf("failed to create download request: %w", err))
 		}
@@ -410,18 +410,17 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 
 	// 7. Update status to synced
 	now := time.Now().UTC()
-	nextRefresh := now.Add(s.config.AdvisorySync.RefreshInterval)
 	_, err = s.queries.UpsertAdvisoryScope(ctx, db.UpsertAdvisoryScopeParams{
 		ScopeKey:      scopeKey,
 		Status:        "synced",
-		LastSyncAt:    pgtype.Timestamptz{Time: now, Valid: true},
-		LastSuccessAt: pgtype.Timestamptz{Time: now, Valid: true},
+		LastSyncAt:    db.TimestamptzFromTime(now),
+		LastSuccessAt: db.TimestamptzFromTime(now),
 		LastError:     utils.None[string](),
 		AdvisoryCount: rowCount,
 		Sha256:        utils.Some(detail.Sha256),
 		SizeBytes:     detail.SizeBytes,
 		LocalPath:     utils.Some(destPath),
-		NextRefreshAt: pgtype.Timestamptz{Time: nextRefresh, Valid: true},
+		NextRefreshAt: db.TimestamptzFromTime(now.Add(s.config.AdvisorySync.RefreshInterval)),
 	})
 	if err != nil {
 		return handleFailure(fmt.Errorf("failed to save synced scope metadata: %w", err))
@@ -522,7 +521,7 @@ func (s *advisorySyncService) GetOverview(ctx context.Context) (AdvisoryOverview
 
 	return AdvisoryOverview{
 		TotalAdvisories: totalAdvisories,
-		TotalScopes:     int32(len(rows)),
+		TotalScopes:     int32(len(rows)), // nolint: gosec
 		SyncedScopes:    syncedCount,
 	}, nil
 }
@@ -556,7 +555,7 @@ func getMajorVersionFromScopeKey(scopeKey string, mappings []config.ScopeMapping
 				parts := strings.Split(m.Match.OSVersion, ".")
 				if len(parts) > 0 {
 					if major, err := strconv.Atoi(parts[0]); err == nil {
-						return int32(major)
+						return int32(major) // nolint: gosec
 					}
 				}
 			}
@@ -565,7 +564,7 @@ func getMajorVersionFromScopeKey(scopeKey string, mappings []config.ScopeMapping
 	parts := strings.Split(scopeKey, ":")
 	if len(parts) == 2 {
 		if major, err := strconv.Atoi(parts[1]); err == nil {
-			return int32(major)
+			return int32(major) // nolint: gosec
 		}
 	}
 	return 0

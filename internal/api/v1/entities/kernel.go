@@ -30,7 +30,12 @@ type HostKernelPosture struct {
 func BuildKernelRiskView(decisions []DecisionItem) KernelRiskView {
 	if len(decisions) == 0 {
 		return KernelRiskView{
-			Advisories: []DecisionAdvisoryGroup{},
+			Advisories:      []DecisionAdvisoryGroup{},
+			AdvisoryCount:   0,
+			PackageCount:    0,
+			CVECount:        0,
+			SeverityCounts:  KernelSeverityCounts{}, // nolint: exhaustruct
+			LatestUpdatedAt: "",
 		}
 	}
 
@@ -43,7 +48,7 @@ func BuildKernelRiskView(decisions []DecisionItem) KernelRiskView {
 	latestUpdatedAt := ""
 	totalPackages := 0
 	cves := make(map[string]struct{})
-	counts := KernelSeverityCounts{}
+	counts := KernelSeverityCounts{} // nolint: exhaustruct
 
 	for _, advisory := range advisories {
 		totalPackages += advisory.PackageCount

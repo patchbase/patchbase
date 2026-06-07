@@ -22,7 +22,8 @@ type NoopWorker struct {
 
 func NewNoopWorker(_ sql.Querier, logger *slog.Logger) *NoopWorker {
 	return &NoopWorker{
-		logger: logger.With("source", "queue.NoopWorker"),
+		logger:         logger.With("source", "queue.NoopWorker"),
+		WorkerDefaults: river.WorkerDefaults[NoopArgs]{},
 	}
 }
 

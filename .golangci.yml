@@ -1,0 +1,84 @@
+version: "2"
+run:
+  tests: false
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - canonicalheader
+    - copyloopvar
+    - dogsled
+    - errcheck
+    - errname
+    - exhaustive
+    - exhaustruct
+    - forbidigo
+    - goconst
+    - goprintffuncname
+    - gosec
+    - govet
+    - inamedparam
+    - ineffassign
+    - mirror
+    - misspell
+    - musttag
+    - nakedret
+    - nilerr
+    - revive
+    - staticcheck
+    - testifylint
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - whitespace
+  settings:
+    exhaustruct:
+      exclude:
+        - net/http\.Client$
+        - .+/cobra\.Command$
+        - .+/river\.InsertOpts$
+        - .+/river\.UniqueOpts$
+        - .+/river\.QueueConfig$
+        - .+/river\.Config$
+        - .+/ssh\.ClientConfig$
+        - .+/pgx(/v5)?\.TxOptions$
+        - .+/jwt(/v5)?\.RegisteredClaims$
+    forbidigo:
+      forbid:
+        - pattern: pgx\.ErrNoRows
+          msg: use sql.Required or sql.ToOption instead of comparing pgx.ErrNoRows directly
+        - pattern: pgconn\.PgError
+          msg: use helpers in internal/sql/extra.go instead of inspecting pgconn.PgError outside SQL packages
+        - pattern: pgerrcode\.
+          msg: use helpers in internal/sql/extra.go instead of matching pgerrcode outside SQL packages
+    revive:
+      rules:
+        - name: var-naming
+          disabled: true
+          exclude: [""]
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      - linters: [forbidigo]
+        path: (^|/)internal/sql/
+      - linters: [goconst]
+        path: (^|/)internal/
+    paths:
+      - builtin$
+formatters:
+  enable:
+    - gofmt
+    - goimports
+  settings:
+    gofmt:
+      simplify: false
+  exclusions:
+    generated: lax
+    paths:
+      - builtin$

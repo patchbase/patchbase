@@ -31,6 +31,6 @@ func GetCollectorScript(i do.Injector) apiauth.AuthenticatedHandler {
 		w.Header().Set("Content-Disposition", `attachment; filename="patchbase-collector.sh"`)
 		w.Header().Set("Content-Length", strconv.Itoa(len(scriptBytes)))
 		w.WriteHeader(http.StatusOK)
-		w.Write(scriptBytes) // nolint: errcheck
+		w.Write(scriptBytes) // nolint: errcheck, gosec
 	}
 }

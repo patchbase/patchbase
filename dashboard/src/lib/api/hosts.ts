@@ -26,7 +26,6 @@ export interface CreatedRegistrationToken {
 export interface CreateSSHHostPayload {
   display_name: string;
   hostname: string;
-  ip_address?: string;
   ssh_user: string;
   frequency_minutes: number;
   unique_key_pair?: boolean;

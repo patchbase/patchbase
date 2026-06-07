@@ -53,6 +53,7 @@ func NewPeriodicJobManager(i do.Injector) (services.PeriodicJobManager, error) {
 		logger:   logger.With("source", "queue.PeriodicJobManager"),
 		syncJobs: make(map[string]rivertype.PeriodicJobHandle),
 		sshJobs:  make(map[string]sshJobInfo),
+		mu:       sync.Mutex{},
 	}, nil
 }
 

@@ -72,6 +72,7 @@ func MapObservedUpgradablePackages(
 			AdvisorySourceSystem: "Host package manager",
 			AdvisoryURL:          "",
 			AdvisoryUpdatedAt:    computedAt,
+			CVEs:                 []CVEInfo{},
 		})
 	}
 

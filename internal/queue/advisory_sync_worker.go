@@ -25,13 +25,14 @@ func NewAdvisorySyncWorker(i do.Injector) (*AdvisorySyncWorker, error) {
 		return nil, err
 	}
 	return &AdvisorySyncWorker{
-		injector: i,
-		logger:   logger.With("source", "queue.AdvisorySyncWorker"),
+		injector:       i,
+		logger:         logger.With("source", "queue.AdvisorySyncWorker"),
+		WorkerDefaults: river.WorkerDefaults[services.AdvisorySyncArgs]{},
 	}, nil
 }
 
 func (w *AdvisorySyncWorker) NextRetry(job *river.Job[services.AdvisorySyncArgs]) time.Time {
-	backoff := 10 * time.Second * (1 << uint(job.Attempt-1))
+	backoff := 10 * time.Second * (1 << uint(job.Attempt-1)) // nolint: gosec
 	if backoff > 10*time.Minute || backoff <= 0 {
 		backoff = 10 * time.Minute
 	}

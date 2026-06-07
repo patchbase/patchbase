@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	agentpb "go.patchbase.net/proto/agent"
+	"go.patchbase.net/server/internal/utils"
 )
 
 // compareDebianEVR compares two evr structs using Debian rules.
@@ -275,9 +276,10 @@ func parseDebianEVRFromNEVR(value string) (evr, error) {
 }
 
 func parseRunningKernelDebianEVR(value string) (evr, error) {
+	var none evr
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
-		return evr{}, fmt.Errorf("empty running kernel version")
+		return none, fmt.Errorf("empty running kernel version")
 	}
 
 	idx := strings.Index(trimmed, "-")
@@ -327,16 +329,16 @@ func evaluateDebianEVRRule(installed evr, rule string) (bool, error) {
 
 // getRunningKernelPackageEVR attempts to find the package named "linux-image-<runningKernelNevra>"
 // in the installed packages list, returning its version as an evr.
-func getRunningKernelPackageEVR(packages []*agentpb.Package, runningKernelNevra string) (evr, bool) {
+func getRunningKernelPackageEVR(packages []*agentpb.Package, runningKernelNevra string) utils.Option[evr] {
 	targetPkgName := "linux-image-" + strings.TrimSpace(runningKernelNevra)
 	for _, pkg := range packages {
 		if pkg.GetName() == targetPkgName {
-			return evr{
+			return utils.Some(evr{
 				epoch:   int64(pkg.GetEpoch()),
 				version: pkg.GetVersion(),
 				release: pkg.GetRelease(),
-			}, true
+			})
 		}
 	}
-	return evr{}, false
+	return utils.None[evr]()
 }

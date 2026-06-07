@@ -2,10 +2,12 @@ package sql
 
 import (
 	"errors"
+	"time"
 
 	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 	"go.patchbase.net/server/internal/utils"
 )
 
@@ -48,5 +50,29 @@ func Required[T any](v T, err error) func(fallback error) (T, error) {
 			return v, err
 		}
 		return v, nil
+	}
+}
+
+func TimestamptzNow() pgtype.Timestamptz {
+	return pgtype.Timestamptz{
+		Time:             time.Now().UTC(),
+		Valid:            true,
+		InfinityModifier: pgtype.Finite,
+	}
+}
+
+func TimestamptzFromTime(t time.Time) pgtype.Timestamptz {
+	if t.IsZero() {
+		return pgtype.Timestamptz{
+			Time:             time.Time{},
+			Valid:            false,
+			InfinityModifier: pgtype.Finite,
+		}
+	}
+
+	return pgtype.Timestamptz{
+		Time:             t.UTC(),
+		Valid:            true,
+		InfinityModifier: pgtype.Finite,
 	}
 }

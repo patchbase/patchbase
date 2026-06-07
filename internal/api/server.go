@@ -45,7 +45,7 @@ func New(ctx context.Context, injector do.Injector) (*Server, error) {
 	return &Server{
 		config: cfg,
 		logger: logger,
-		server: &http.Server{
+		server: &http.Server{ // nolint: exhaustruct
 			Addr:              addr,
 			Handler:           SecurityHeadersMiddleware(RequestContextMiddleware(logger, ids, LoggingMiddleware(logLevel, mux))),
 			ReadTimeout:       cfg.API.ReadTimeout,

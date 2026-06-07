@@ -3,7 +3,6 @@ package services
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -97,13 +96,13 @@ func (s *settings) TryInitialSetup(ctx context.Context) (bool, error) {
 	}
 
 	logger := utils.GetLogger(ctx).With("source", "settings.TryInitialSetup")
-	admin, err := queries.GetAdminUser(ctx)
-	if err == nil {
+	adminOpt, err := sql.ToOption(queries.GetAdminUser(ctx))
+	if err != nil {
+		return false, fmt.Errorf("failed to get bootstrap admin user: %w", err)
+	}
+	if admin, ok := adminOpt.Get(); ok {
 		logger.Info("initial setup pending, bootstrap admin already exists", "email", admin.Email)
 		return false, nil
-	}
-	if !errors.Is(err, pgx.ErrNoRows) {
-		return false, fmt.Errorf("failed to get bootstrap admin user: %w", err)
 	}
 
 	password := s.random.Hex(16)
@@ -112,7 +111,7 @@ func (s *settings) TryInitialSetup(ctx context.Context) (bool, error) {
 		return false, fmt.Errorf("failed to hash bootstrap admin password: %w", err)
 	}
 
-	admin, err = queries.CreateAdminUser(ctx, sql.CreateAdminUserParams{
+	admin, err := queries.CreateAdminUser(ctx, sql.CreateAdminUserParams{
 		ID:           id.New("u"),
 		Email:        bootstrapAdminEmail,
 		Name:         bootstrapAdminName,
@@ -226,12 +225,13 @@ func NewSettingManager[T any](key string, sql sql.Querier) SettingManager[T] {
 
 func (m *settingManager[T]) Get(ctx context.Context) (T, error) {
 	var zero T
-	data, err := m.sql.GetSetting(ctx, m.key)
+	dataOpt, err := sql.ToOption(m.sql.GetSetting(ctx, m.key))
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return zero, nil
-		}
 		return zero, fmt.Errorf("failed to get setting: %w", err)
+	}
+	data, ok := dataOpt.Get()
+	if !ok {
+		return zero, nil
 	}
 	var value T
 	err = json.Unmarshal(data.Value, &value)

@@ -13,6 +13,7 @@ import (
 
 	"github.com/samber/do/v2"
 	agentpb "go.patchbase.net/proto/agent"
+	"go.patchbase.net/server/internal/utils"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -28,7 +29,7 @@ type SSHPullResult struct {
 	Architecture     string
 	RunningKernel    string
 	CollectedAt      time.Time
-	BootTime         *time.Time
+	BootTime         utils.Option[time.Time]
 	AvailableUpdates int32
 	HasProcessData   bool
 	Payload          []byte
@@ -183,7 +184,7 @@ func runSSHScript(ctx context.Context, privateKeyPEM string, user string, host s
 		Auth: []ssh.AuthMethod{
 			ssh.PublicKeys(signer),
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(), // nolint: gosec
 		Timeout:         20 * time.Second,
 	}
 
@@ -345,11 +346,11 @@ func ParseSSHPullReport(output []byte, collectedAt time.Time) (SSHPullResult, er
 		fields[key] = CleanQuote(value)
 	}
 
-	bootPtr := (*time.Time)(nil)
+	bootPtr := utils.None[time.Time]()
 	if rawBoot := strings.TrimSpace(fields["BOOT_TIME"]); rawBoot != "" {
 		if unixSeconds, err := strconv.ParseInt(rawBoot, 10, 64); err == nil && unixSeconds > 0 {
 			boot := time.Unix(unixSeconds, 0).UTC()
-			bootPtr = &boot
+			bootPtr = utils.Some(boot)
 		}
 	}
 
@@ -488,17 +489,21 @@ func ParseSSHPullReport(output []byte, collectedAt time.Time) (SSHPullResult, er
 			OsMajor:                     osMajor,
 			Architecture:                pbArch,
 			AvailablePackageUpdateCount: availableUpdates,
+			AgentVersion:                "",
+			BootTime:                    nil, // FIXME: fetch
+			UptimeSeconds:               0,   // FIXME: fetch
+			VirtualizationRole:          agentpb.VirtualizationRole_VIRTUALIZATION_ROLE_UNSPECIFIED,
+			EnvironmentTags:             []string{},
 		},
 		Packages:           packages,
 		Repos:              repos,
 		UpgradablePackages: upgradablePackages,
 		Runtime: &agentpb.Runtime{
 			KernelRunning: fallback(fields["KERNEL"], "unknown"),
+			Processes:     nil,
 		},
 	}
-	if bootPtr != nil {
-		agentSnap.Host.BootTime = timestamppb.New(*bootPtr)
-	}
+	agentSnap.Host.BootTime = utils.MapOpt(bootPtr, timestamppb.New).UnwrapOr(nil)
 
 	payload, err := proto.Marshal(agentSnap)
 	if err != nil {
@@ -653,11 +658,16 @@ func parseAptUpgradableLine(line string) *agentpb.Package {
 	}
 
 	return &agentpb.Package{
-		Name:       name,
-		Version:    version,
-		Arch:       arch,
-		RepoOrigin: repoOrigin,
-		Nevra:      nevra,
+		Name:        name,
+		Version:     version,
+		Arch:        arch,
+		RepoOrigin:  repoOrigin,
+		Nevra:       nevra,
+		Epoch:       0,
+		Release:     "",
+		SourceRpm:   "",
+		Vendor:      "",
+		InstallTime: nil,
 	}
 }
 
@@ -707,13 +717,16 @@ func parseRpmUpgradableLine(line string) *agentpb.Package {
 	}
 
 	return &agentpb.Package{
-		Name:       name,
-		Epoch:      epoch,
-		Version:    version,
-		Release:    release,
-		Arch:       arch,
-		RepoOrigin: repoOrigin,
-		Nevra:      nevra,
+		Name:        name,
+		Epoch:       epoch,
+		Version:     version,
+		Release:     release,
+		Arch:        arch,
+		RepoOrigin:  repoOrigin,
+		Nevra:       nevra,
+		SourceRpm:   "",
+		Vendor:      "",
+		InstallTime: nil,
 	}
 }
 
@@ -750,14 +763,16 @@ func parseRPMPackageLine(line string) (*agentpb.Package, error) {
 	nevra := fmt.Sprintf("%s-%d:%s-%s.%s", name, epoch, version, release, arch)
 
 	return &agentpb.Package{
-		Name:      name,
-		Epoch:     epoch,
-		Version:   version,
-		Release:   release,
-		Arch:      arch,
-		Nevra:     nevra,
-		SourceRpm: optionalStr(fields[5]),
-		Vendor:    optionalStr(fields[6]),
+		Name:        name,
+		Epoch:       epoch,
+		Version:     version,
+		Release:     release,
+		Arch:        arch,
+		Nevra:       nevra,
+		SourceRpm:   optionalStr(fields[5]),
+		Vendor:      optionalStr(fields[6]),
+		RepoOrigin:  "",
+		InstallTime: nil,
 	}, nil
 }
 
@@ -783,14 +798,16 @@ func parseAPTPackageLine(line string) (*agentpb.Package, error) {
 
 	nevra := formatPackageIdentifier(name, epoch, version, release, arch)
 	return &agentpb.Package{
-		Name:      name,
-		Epoch:     epoch,
-		Version:   version,
-		Release:   release,
-		Arch:      arch,
-		Vendor:    vendor,
-		Nevra:     nevra,
-		SourceRpm: sourcePackage,
+		Name:        name,
+		Epoch:       epoch,
+		Version:     version,
+		Release:     release,
+		Arch:        arch,
+		Vendor:      vendor,
+		Nevra:       nevra,
+		SourceRpm:   sourcePackage,
+		RepoOrigin:  "",
+		InstallTime: nil,
 	}, nil
 }
 
@@ -876,9 +893,12 @@ func parseRPMRepoLine(line string) *agentpb.Repo {
 	repoID := fields[0]
 	repoLabel := strings.TrimSpace(strings.TrimPrefix(line, repoID))
 	return &agentpb.Repo{
-		RepoId:    repoID,
-		Enabled:   true,
-		RepoLabel: repoLabel,
+		RepoId:     repoID,
+		Enabled:    true,
+		RepoLabel:  repoLabel,
+		Metalink:   "",
+		Mirrorlist: "",
+		Baseurl:    "", // FIXME: fetch
 	}
 }
 
@@ -910,9 +930,11 @@ func parseAPTRepoLine(line string, lineNo int) *agentpb.Repo {
 		repoLabel = suite + " " + strings.Join(components, " ")
 	}
 	return &agentpb.Repo{
-		RepoId:    repoID,
-		Enabled:   true,
-		RepoLabel: repoLabel,
-		Baseurl:   uri,
+		RepoId:     repoID,
+		Enabled:    true,
+		RepoLabel:  repoLabel,
+		Baseurl:    uri,
+		Metalink:   "",
+		Mirrorlist: "",
 	}
 }

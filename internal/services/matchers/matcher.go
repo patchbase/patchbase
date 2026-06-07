@@ -152,7 +152,7 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 	}
 
 	if len(resolvedStreams) == 0 {
-		state := m.aggregateHostCurrentState(snapshot, nil, time.Now().UTC(), availablePackageUpdateCount)
+		state := m.aggregateHostCurrentState(snapshot, nil, availablePackageUpdateCount)
 		state.OverallAction = "investigate"
 		if err := queries.UpsertHostCurrentState(ctx, state); err != nil {
 			return MatchResult{}, fmt.Errorf("upsert host current state: %w", err)
@@ -215,7 +215,7 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 		}
 	}
 
-	state := m.aggregateHostCurrentState(snapshot, decisions, time.Now().UTC(), availablePackageUpdateCount)
+	state := m.aggregateHostCurrentState(snapshot, decisions, availablePackageUpdateCount)
 	if err := queries.UpsertHostCurrentState(ctx, state); err != nil {
 		return MatchResult{}, fmt.Errorf("upsert host current state: %w", err)
 	}
@@ -266,7 +266,6 @@ func (m *matcher) MatchHostsForScope(ctx context.Context, scopeKey string) error
 func (m *matcher) aggregateHostCurrentState(
 	snapshot sql.HostSnapshot,
 	decisions []decision,
-	updatedAt time.Time,
 	availableUpdates int32,
 ) sql.UpsertHostCurrentStateParams {
 	state := sql.UpsertHostCurrentStateParams{
@@ -377,12 +376,9 @@ func buildDecisions(
 					return nil, fmt.Errorf("select best fix for package %s: %w", pkg.GetNevra(), err)
 				}
 
-				record, shouldEmit, err := decisionFromFixedPackageOnly(hostID, osFamily, snapshot, packages, advisory, pkg, bestFix, effectiveSev, computedAt)
-				if err != nil {
-					return nil, err
-				}
-				if shouldEmit {
-					decisions = append(decisions, decision{record: record, severity: effectiveSev})
+				record := decisionFromFixedPackageOnly(hostID, osFamily, snapshot, packages, advisory, pkg, bestFix, effectiveSev, computedAt)
+				if record.IsPresent() {
+					decisions = append(decisions, decision{record: record.Unwrap(), severity: effectiveSev})
 				}
 				continue
 			}
@@ -439,12 +435,9 @@ func buildDecisions(
 					return nil, fmt.Errorf("select best fix for package %s: %w", pkg.GetNevra(), err)
 				}
 
-				record, shouldEmit, err := decisionFromFixedPackageOnly(hostID, osFamily, snapshot, packages, advisory, pkg, bestFix, effectiveSev, computedAt)
-				if err != nil {
-					return nil, err
-				}
-				if shouldEmit {
-					decisions = append(decisions, decision{record: record, severity: effectiveSev})
+				record := decisionFromFixedPackageOnly(hostID, osFamily, snapshot, packages, advisory, pkg, bestFix, effectiveSev, computedAt)
+				if record.IsPresent() {
+					decisions = append(decisions, decision{record: record.Unwrap(), severity: effectiveSev})
 				}
 				continue
 			}
@@ -552,13 +545,13 @@ func decisionFromFixedPackageOnly(
 	bestFix sql.FixedPackage,
 	severity string,
 	computedAt string,
-) (sql.InsertDecisionRecordParams, bool, error) {
+) utils.Option[sql.InsertDecisionRecordParams] {
 	installed := evr{epoch: int64(pkg.GetEpoch()), version: pkg.GetVersion(), release: pkg.GetRelease()}
 	fixed := evr{epoch: int64(bestFix.Epoch), version: bestFix.Version, release: bestFix.Release}
 	evidenceTier := decisionEvidenceTier(advisory.EvidenceTier, bestFix.EvidenceTier)
 
 	if kernelRunningSatisfiesFixedBuild(snapshot, packages, pkg.GetName(), fixed, osFamily) {
-		return sql.InsertDecisionRecordParams{}, false, nil
+		return utils.None[sql.InsertDecisionRecordParams]()
 	}
 
 	var compared int
@@ -599,7 +592,7 @@ func decisionFromFixedPackageOnly(
 
 		record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(bestFix.ProductStreamID), status, action, severity, evidenceTier, reasonCode, reasonText, computedAt)
 		record.FixedNevra = utils.Some(bestFix.Nevra)
-		return record, true, nil
+		return utils.Some(record)
 	}
 
 	status := "resolved"
@@ -618,7 +611,7 @@ func decisionFromFixedPackageOnly(
 
 	record := newDecisionRecord(hostID, snapshot.ID, advisory, pkg, utils.Some(bestFix.ProductStreamID), status, action, severity, evidenceTier, reasonCode, reasonText, computedAt)
 	record.FixedNevra = utils.Some(bestFix.Nevra)
-	return record, true, nil
+	return utils.Some(record)
 }
 
 func newDecisionRecord(
@@ -672,24 +665,24 @@ func kernelRunningSatisfiesFixedBuild(snapshot sql.HostSnapshot, packages []*age
 				if abiCompared != 0 {
 					return abiCompared > 0
 				}
-				runningKernel, found := getRunningKernelPackageEVR(packages, runningAbi)
-				if found {
-					return compareDebianEVR(runningKernel, fixed) >= 0
+				runningKernel := getRunningKernelPackageEVR(packages, runningAbi)
+				if runningKernel.IsPresent() {
+					return compareDebianEVR(runningKernel.Unwrap(), fixed) >= 0
 				}
 				return false
 			}
 		}
 
-		runningKernel, found := getRunningKernelPackageEVR(packages, runningAbi)
-		if found {
-			return compareDebianEVR(runningKernel, fixed) >= 0
+		runningKernel := getRunningKernelPackageEVR(packages, runningAbi)
+		if runningKernel.IsPresent() {
+			return compareDebianEVR(runningKernel.Unwrap(), fixed) >= 0
 		}
 
-		runningKernel, err := parseRunningKernelDebianEVR(runningAbi)
+		runningKernelDebian, err := parseRunningKernelDebianEVR(runningAbi)
 		if err != nil {
 			return false
 		}
-		return compareDebianEVR(runningKernel, fixed) >= 0
+		return compareDebianEVR(runningKernelDebian, fixed) >= 0
 	}
 
 	runningKernel, err := parseRunningKernelEVR(snapshot.RunningKernelNevra)

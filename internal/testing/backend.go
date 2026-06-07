@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	DefaultTestDatabaseURL = "postgres://postgres:postgres@localhost:5433/patchbase_test?sslmode=disable"
+	DefaultTestDatabaseURL = "postgres://postgres:postgres@localhost:5433/patchbase_test?sslmode=disable" // nolint: gosec
 	defaultJWTSecretKey    = "test-secret"
 )
 
@@ -60,6 +60,8 @@ func NewBackend(t *gotesting.T, opts ...Option) *Backend {
 
 	options := options{
 		databaseURL: os.Getenv("PATCHBASE_TEST_DATABASE_URL"),
+		overrides:   []InjectorOverride{},
+		fixtures:    []Fixture{},
 	}
 	if options.databaseURL == "" {
 		options.databaseURL = DefaultTestDatabaseURL
@@ -78,16 +80,25 @@ func NewBackend(t *gotesting.T, opts ...Option) *Backend {
 			ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
 			WriteTimeout:      config.DefaultWriteTimeout,
 			ShutdownTimeout:   config.DefaultShutdownTimeout,
+			RequestLogLevel:   "debug",
 		},
 		Database: config.Database{
 			URL:      options.databaseURL,
 			LogLevel: config.DefaultDatabaseLogLevel,
+		},
+		SSL: config.SSL{
+			Enabled:         false,
+			CertificateFile: "",
+			KeyFile:         "",
 		},
 		SSH: config.SSH{
 			PullJobTimeout: config.DefaultSSHPullJobTimeout,
 		},
 		AdvisorySync: config.AdvisorySync{
 			RefreshInterval: 1 * time.Hour,
+			BaseURL:         config.DefaultAdvisorySyncBaseURL,
+			StorageDir:      config.DefaultAdvisorySyncStorageDir,
+			ScopeMappings:   []config.ScopeMapping{},
 		},
 		EncryptionKey: "test-encryption-key-for-unit-tests",
 	}

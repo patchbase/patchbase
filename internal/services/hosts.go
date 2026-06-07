@@ -160,7 +160,6 @@ type HostSSHPullJobInfo struct {
 type CreateSSHHostInput struct {
 	DisplayName      string
 	Hostname         string
-	IPAddress        string
 	SSHUser          string
 	FrequencyMinutes int32
 	UniqueKeyPair    bool
@@ -391,9 +390,9 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 		collectedAt = snapshot.GetSentAt().AsTime().UTC()
 	}
 
-	bootTime := pgtype.Timestamptz{}
+	bootTime := pgtype.Timestamptz{} // nolint: exhaustruct
 	if snapshot.GetHost() != nil && snapshot.GetHost().GetBootTime() != nil {
-		bootTime = pgTime(snapshot.GetHost().GetBootTime().AsTime().UTC())
+		bootTime = sql.TimestamptzFromTime(snapshot.GetHost().GetBootTime().AsTime().UTC())
 	}
 
 	runningKernel := ""
@@ -407,7 +406,7 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 	snapshotRow, err := queries.InsertHostSnapshot(ctx, sql.InsertHostSnapshotParams{
 		ID:                 id.New("snap"),
 		HostID:             host.ID,
-		CollectedAt:        pgTime(collectedAt),
+		CollectedAt:        sql.TimestamptzFromTime(collectedAt),
 		Payload:            payload,
 		RunningKernelNevra: runningKernel,
 		BootTime:           bootTime,
@@ -455,7 +454,7 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 		OsMajor:        osMajor,
 		OsVersion:      osVersion,
 		Architecture:   architecture,
-		LastSeenAt:     pgTime(collectedAt),
+		LastSeenAt:     sql.TimestamptzFromTime(collectedAt),
 		LastSnapshotID: optionString(snapshotRow.ID),
 	})
 	if err != nil {
@@ -600,7 +599,7 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 		ID:                   id.New("h"),
 		DisplayName:          optionString(strings.TrimSpace(input.DisplayName)),
 		Hostname:             optionString(hostname),
-		IpAddress:            optionString(strings.TrimSpace(input.IPAddress)),
+		IpAddress:            utils.None[string](),
 		PullSshUser:          optionString(sshUser),
 		PullFrequencyMinutes: &frequency,
 		PullPublicKey:        dbPublicKey,
@@ -615,11 +614,12 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 	}
 
 	return CreateSSHHostResult{
-		HostID:         host.Host.ID,
-		PublicKey:      publicKey,
-		ApprovalStatus: host.Host.ApprovalStatus,
-		LastRunStatus:  "",
-		LastRunError:   "",
+		HostID:          host.Host.ID,
+		PublicKey:       publicKey,
+		ApprovalStatus:  host.Host.ApprovalStatus,
+		LastRunStatus:   "",
+		LastRunError:    "",
+		HostAccessToken: "",
 	}, nil
 }
 
@@ -747,6 +747,8 @@ func normalizeOSFamily(value agentpb.OsFamily) string {
 		return "rpm"
 	case agentpb.OsFamily_OS_FAMILY_APT:
 		return "apt"
+	case agentpb.OsFamily_OS_FAMILY_UNSPECIFIED:
+		return "unknown"
 	default:
 		return "unknown"
 	}
@@ -760,6 +762,8 @@ func normalizeArchitecture(value agentpb.Architecture) string {
 		return "aarch64"
 	case agentpb.Architecture_ARCHITECTURE_RISCV64:
 		return "riscv64"
+	case agentpb.Architecture_ARCHITECTURE_UNSPECIFIED:
+		return "unknown"
 	default:
 		return "unknown"
 	}
@@ -782,13 +786,6 @@ func normalizeRegistrationArchitecture(value string) string {
 	default:
 		return value
 	}
-}
-
-func pgTime(t time.Time) pgtype.Timestamptz {
-	if t.IsZero() {
-		return pgtype.Timestamptz{}
-	}
-	return pgtype.Timestamptz{Time: t.UTC(), Valid: true}
 }
 
 func toTimePtr(ts pgtype.Timestamptz) *time.Time {
@@ -951,7 +948,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 		ID:        jobID,
 		HostID:    hostID,
 		Status:    "running",
-		StartedAt: pgTime(time.Now()),
+		StartedAt: sql.TimestamptzFromTime(time.Now()),
 	})
 	if err != nil {
 		return fmt.Errorf("insert host ssh pull job: %w", err)
@@ -974,7 +971,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 		if _, updateJobErr := queries.UpdateHostSSHPullJob(ctx, sql.UpdateHostSSHPullJobParams{
 			ID:          jobID,
 			Status:      status,
-			CompletedAt: pgTime(time.Now()),
+			CompletedAt: sql.TimestamptzFromTime(time.Now()),
 			Error:       optErr,
 		}); updateJobErr != nil {
 			return fmt.Errorf("update host ssh pull job: %w", updateJobErr)
@@ -984,17 +981,13 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 		errOpt := optErr
 
 		if status == "success" && res != nil {
-			bootTime := pgtype.Timestamptz{}
-			if res.BootTime != nil {
-				bootTime = pgTime(*res.BootTime)
-			}
 			snapshotRow, insertSnapshotErr := queries.InsertHostSnapshot(ctx, sql.InsertHostSnapshotParams{
 				ID:                 id.New("snap"),
 				HostID:             hostID,
-				CollectedAt:        pgTime(res.CollectedAt),
+				CollectedAt:        sql.TimestamptzFromTime(res.CollectedAt),
 				Payload:            res.Payload,
 				RunningKernelNevra: res.RunningKernel,
-				BootTime:           bootTime,
+				BootTime:           utils.MapOpt(res.BootTime, sql.TimestamptzFromTime).UnwrapOrZero(),
 				HasProcessData:     res.HasProcessData,
 			})
 			if insertSnapshotErr != nil {
@@ -1004,7 +997,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 
 			if updateRunErr := queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
 				ID:                hostID,
-				PullLastRunAt:     pgTime(res.CollectedAt),
+				PullLastRunAt:     sql.TimestamptzFromTime(res.CollectedAt),
 				LastSnapshotID:    utils.Some(snapshotID),
 				PullLastRunStatus: statusOpt,
 				PullLastRunError:  errOpt,
@@ -1036,11 +1029,10 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 			}); upsertStateErr != nil {
 				return fmt.Errorf("upsert host current state: %w", upsertStateErr)
 			}
-
 		} else {
 			if updateRunErr := queries.UpdateSSHPullRun(ctx, sql.UpdateSSHPullRunParams{
 				ID:                hostID,
-				PullLastRunAt:     pgTime(time.Now()),
+				PullLastRunAt:     sql.TimestamptzFromTime(time.Now()),
 				LastSnapshotID:    utils.None[string](),
 				PullLastRunStatus: statusOpt,
 				PullLastRunError:  errOpt,
@@ -1255,15 +1247,12 @@ func (s *hosts) IngestManualReport(ctx context.Context, hostID string, reportCon
 
 	queries := sql.New(tx)
 
-	bootTime := pgtype.Timestamptz{}
-	if res.BootTime != nil {
-		bootTime = pgTime(*res.BootTime)
-	}
+	bootTime := utils.MapOpt(res.BootTime, sql.TimestamptzFromTime).UnwrapOrZero()
 
 	snapshotRow, err := queries.InsertHostSnapshot(ctx, sql.InsertHostSnapshotParams{
 		ID:                 id.New("snap"),
 		HostID:             hostID,
-		CollectedAt:        pgTime(collectedAt),
+		CollectedAt:        sql.TimestamptzFromTime(collectedAt),
 		Payload:            res.Payload,
 		RunningKernelNevra: res.RunningKernel,
 		BootTime:           bootTime,
@@ -1284,7 +1273,7 @@ func (s *hosts) IngestManualReport(ctx context.Context, hostID string, reportCon
 		OsMajor:        res.OSMajor,
 		OsVersion:      res.OSVersion,
 		Architecture:   res.Architecture,
-		LastSeenAt:     pgTime(collectedAt),
+		LastSeenAt:     sql.TimestamptzFromTime(collectedAt),
 		LastSnapshotID: optionString(snapshotID),
 	})
 	if err != nil {
