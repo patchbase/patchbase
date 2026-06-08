@@ -1,9 +1,12 @@
 package hosts
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
@@ -42,6 +45,17 @@ func CreateSSHHost(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
+		settingsService := do.MustInvoke[services.Settings](i)
+		if status, err := req.validate(r.Context(), settingsService); err != nil {
+			if status == http.StatusInternalServerError {
+				webutil.LogError(r, "validate create ssh host request failed", err)
+				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "internal server error", nil)
+			} else {
+				webutil.WriteAPIError(w, r, status, err.Error(), nil)
+			}
+			return
+		}
+
 		result, err := hostsService.CreateSSHHost(r.Context(), services.CreateSSHHostInput{
 			DisplayName:      req.DisplayName,
 			Hostname:         req.Hostname,
@@ -70,4 +84,35 @@ func CreateSSHHost(i do.Injector) apiauth.AuthenticatedHandler {
 			LastRunError:   result.LastRunError,
 		})
 	}
+}
+
+func (req *createSSHHostRequest) validate(ctx context.Context, settingsService services.Settings) (int, error) {
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	if req.DisplayName == "" {
+		return http.StatusBadRequest, errors.New("display name is required")
+	}
+
+	req.Hostname = strings.TrimSpace(req.Hostname)
+	if req.Hostname == "" {
+		return http.StatusBadRequest, errors.New("hostname is required")
+	}
+
+	req.SSHUser = strings.TrimSpace(req.SSHUser)
+	if req.SSHUser == "" {
+		defaultUser, err := settingsService.GetDefaultSSHPullUser(ctx)
+		if err != nil {
+			return http.StatusInternalServerError, fmt.Errorf("failed to get default ssh user: %w", err)
+		}
+		if defaultUser != "" {
+			req.SSHUser = defaultUser
+		} else {
+			return http.StatusBadRequest, errors.New("ssh user is required")
+		}
+	}
+
+	if req.FrequencyMinutes < 0 {
+		return http.StatusBadRequest, errors.New("invalid frequency")
+	}
+
+	return 0, nil
 }

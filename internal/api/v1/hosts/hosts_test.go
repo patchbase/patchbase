@@ -402,6 +402,142 @@ func TestCreateSSHHost(t *testing.T) {
 	require.Equal(t, http.StatusNoContent, onboardRecorder.Code)
 }
 
+func TestCreateSSHHostValidation(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	userToken, err := backend.IssueAccessToken(context.Background(), "u_user")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		body           string
+		token          string
+		expectedStatus int
+		expectedError  string
+	}{
+		{
+			name:           "missing display name",
+			body:           `{"hostname":"203.0.113.10","ssh_user":"root","frequency_minutes":60}`,
+			token:          adminToken,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "display name is required",
+		},
+		{
+			name:           "missing hostname",
+			body:           `{"display_name":"test","ssh_user":"root","frequency_minutes":60}`,
+			token:          adminToken,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "hostname is required",
+		},
+		{
+			name:           "invalid frequency",
+			body:           `{"display_name":"test","hostname":"203.0.113.10","ssh_user":"root","frequency_minutes":-5}`,
+			token:          adminToken,
+			expectedStatus: http.StatusBadRequest,
+			expectedError:  "invalid frequency",
+		},
+		{
+			name:           "non-admin access",
+			body:           `{"display_name":"test","hostname":"203.0.113.10","ssh_user":"root","frequency_minutes":60}`,
+			token:          userToken,
+			expectedStatus: http.StatusForbidden,
+			expectedError:  "only admins can create ssh hosts",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := backend.HTTPPost(
+				"/api/v1/hosts/ssh",
+				tt.body,
+				apitesting.WithBearerToken(tt.token),
+			)
+			require.Equal(t, tt.expectedStatus, recorder.Code)
+			if tt.expectedError != "" {
+				assert.Contains(t, recorder.Body.String(), tt.expectedError)
+			}
+		})
+	}
+
+	// Test global-default SSH user behavior
+	settingsService := do.MustInvoke[services.Settings](backend.Injector())
+	err = settingsService.SetDefaultSSHPullUser(context.Background(), "default-admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPPost(
+		"/api/v1/hosts/ssh",
+		`{"display_name":"test-default-user","hostname":"203.0.113.15","frequency_minutes":60}`,
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusCreated, recorder.Code)
+}
+
+type mockSettingsNoDefault struct {
+	services.Settings
+}
+
+func (m *mockSettingsNoDefault) GetDefaultSSHPullUser(ctx context.Context) (string, error) {
+	return "", nil
+}
+
+func TestCreateSSHHostValidation_NoDefaultUser(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+		apitesting.WithInjectorOverride(func(i do.Injector) {
+			originalSettings := do.MustInvoke[services.Settings](i)
+			do.Override[services.Settings](i, func(i do.Injector) (services.Settings, error) {
+				return &mockSettingsNoDefault{Settings: originalSettings}, nil
+			})
+		}),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPPost(
+		"/api/v1/hosts/ssh",
+		`{"display_name":"test","hostname":"203.0.113.10","frequency_minutes":60}`,
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "ssh user is required")
+}
+
+type mockSettingsInternalError struct {
+	services.Settings
+}
+
+func (m *mockSettingsInternalError) GetDefaultSSHPullUser(ctx context.Context) (string, error) {
+	return "", fmt.Errorf("database down")
+}
+
+func TestCreateSSHHostValidation_InternalError(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+		apitesting.WithInjectorOverride(func(i do.Injector) {
+			originalSettings := do.MustInvoke[services.Settings](i)
+			do.Override[services.Settings](i, func(i do.Injector) (services.Settings, error) {
+				return &mockSettingsInternalError{Settings: originalSettings}, nil
+			})
+		}),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPPost(
+		"/api/v1/hosts/ssh",
+		`{"display_name":"test","hostname":"203.0.113.10","frequency_minutes":60}`,
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusInternalServerError, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), "internal server error")
+}
 func TestRunPullNow(t *testing.T) {
 	mockRunner := &mockAPISSHPullRunner{
 		result: services.SSHPullResult{
