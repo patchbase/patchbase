@@ -33,6 +33,7 @@ var (
 	ErrHostNotFound             = errors.New("host not found")
 	ErrTokenAlreadyRevoked      = errors.New("registration token already revoked")
 	ErrInvalidSnapshotPayload   = errors.New("invalid snapshot payload")
+	ErrHostIdentityMismatch     = errors.New("snapshot host identity mismatch")
 	ErrSnapshotNotFound         = errors.New("snapshot not found")
 	ErrDuplicateHostDisplayName = errors.New("a host with this display name already exists")
 	ErrDuplicateSSHPullHostname = errors.New("an SSH host with this pull hostname already exists")
@@ -401,6 +402,11 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 		return nil, ErrHostNotApproved
 	}
 
+	hostPayload := snapshot.GetHost()
+	if hostPayload != nil && host.MachineID.IsPresent() && hostPayload.GetMachineId() != "" && host.MachineID.Unwrap() != hostPayload.GetMachineId() {
+		return nil, ErrHostIdentityMismatch
+	}
+
 	collectedAt := time.Now().UTC()
 	if snapshot.GetSentAt() != nil {
 		collectedAt = snapshot.GetSentAt().AsTime().UTC()
@@ -432,7 +438,6 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 		return nil, fmt.Errorf("insert host snapshot: %w", err)
 	}
 
-	hostPayload := snapshot.GetHost()
 	machineID := ""
 	hostname := ""
 	ipAddress := ""

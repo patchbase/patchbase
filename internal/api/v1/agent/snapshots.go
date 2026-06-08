@@ -25,13 +25,13 @@ func Snapshots(i do.Injector) http.HandlerFunc {
 		result, err := hosts.IngestAgentSnapshot(r.Context(), token, req)
 		if err != nil {
 			switch {
-			case errors.Is(err, services.ErrInvalidHostAccessToken):
+			case errors.Is(err, services.ErrInvalidHostAccessToken), errors.Is(err, services.ErrHostNotFound):
 				w.Header().Set("WWW-Authenticate", `Bearer realm="patchbase-agent"`)
-				webutil.WriteAPIError(w, r, http.StatusUnauthorized, "invalid host access token", nil)
+				webutil.WriteAPIError(w, r, http.StatusUnauthorized, "invalid or missing host", nil)
 			case errors.Is(err, services.ErrHostNotApproved):
 				webutil.WriteAPIError(w, r, http.StatusForbidden, "host pending approval", nil)
-			case errors.Is(err, services.ErrInvalidSnapshotPayload):
-				webutil.WriteAPIError(w, r, http.StatusBadRequest, "invalid snapshot payload", nil)
+			case errors.Is(err, services.ErrInvalidSnapshotPayload), errors.Is(err, services.ErrHostIdentityMismatch):
+				webutil.WriteAPIError(w, r, http.StatusBadRequest, "invalid snapshot payload or identity mismatch", nil)
 			default:
 				webutil.LogError(r, "ingest agent snapshot failed", err)
 				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "snapshot ingest failed", nil)
