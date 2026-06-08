@@ -39,6 +39,7 @@
 	let sshHostID = $state('');
 	let showSSHModal = $state(false);
 	let sshCopied = $state(false);
+	let askToCopyPublicKey = $state(true);
 
 	let manualDisplayName = $state('');
 	let manualHostID = $state('');
@@ -162,6 +163,7 @@
 			if (settings.default_ssh_pull_user && !sshUserTouched) {
 				sshUser = settings.default_ssh_pull_user;
 			}
+			askToCopyPublicKey = settings.ask_to_copy_public_key !== undefined ? settings.ask_to_copy_public_key : true;
 		} catch (err) {
 			console.error('Failed to load settings', err);
 		}
@@ -211,7 +213,11 @@
 			});
 			sshHostID = result.host_id;
 			sshPublicKey = result.public_key;
-			showSSHModal = true;
+			if (askToCopyPublicKey || sshUniqueKeyPair) {
+				showSSHModal = true;
+			} else {
+				await finishSSHRegistration();
+			}
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to create SSH host.';
 		}

@@ -14,6 +14,7 @@ import (
 
 type updateSettingsRequest struct {
 	DefaultSSHPullUser utils.Option[string] `json:"default_ssh_pull_user"`
+	AskToCopyPublicKey utils.Option[bool]   `json:"ask_to_copy_public_key"`
 }
 
 func UpdateSettings(i do.Injector) apiauth.AuthenticatedHandler {
@@ -40,6 +41,14 @@ func UpdateSettings(i do.Injector) apiauth.AuthenticatedHandler {
 			if err := settingsService.SetDefaultSSHPullUser(r.Context(), user); err != nil {
 				webutil.LogError(r, "set default ssh pull user failed", err)
 				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to update default ssh pull user", err)
+				return
+			}
+		}
+
+		if req.AskToCopyPublicKey.IsPresent() {
+			if err := settingsService.SetAskToCopyPublicKey(r.Context(), req.AskToCopyPublicKey.Unwrap()); err != nil {
+				webutil.LogError(r, "set ask to copy public key failed", err)
+				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to update ask to copy public key", err)
 				return
 			}
 		}

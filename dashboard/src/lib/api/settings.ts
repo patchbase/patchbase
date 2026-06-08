@@ -3,6 +3,7 @@ import { authenticatedRequest } from "$lib/api/request.js";
 export interface SettingsData {
   global_ssh_public_key: string;
   default_ssh_pull_user: string;
+  ask_to_copy_public_key: boolean;
 }
 
 export async function getSettings(): Promise<SettingsData> {
@@ -11,6 +12,7 @@ export async function getSettings(): Promise<SettingsData> {
 
 export interface UpdateSettingsRequest {
   default_ssh_pull_user?: string;
+  ask_to_copy_public_key?: boolean;
 }
 
 export async function updateSettings(req: UpdateSettingsRequest): Promise<void> {

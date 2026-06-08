@@ -40,6 +40,8 @@ type Settings interface {
 	GetGlobalSSHKeyPair(ctx context.Context) (GlobalSSHKeyPair, error)
 	GetDefaultSSHPullUser(ctx context.Context) (string, error)
 	SetDefaultSSHPullUser(ctx context.Context, user string) error
+	GetAskToCopyPublicKey(ctx context.Context) (bool, error)
+	SetAskToCopyPublicKey(ctx context.Context, ask bool) error
 }
 
 type settings struct {
@@ -399,6 +401,26 @@ func (s *settings) SetDefaultSSHPullUser(ctx context.Context, user string) error
 	manager := NewSettingManager[string]("default_ssh_pull_user", s.sql)
 	if err := manager.Set(ctx, user); err != nil {
 		return fmt.Errorf("failed to set default ssh pull user: %w", err)
+	}
+	return nil
+}
+
+func (s *settings) GetAskToCopyPublicKey(ctx context.Context) (bool, error) {
+	manager := NewSettingManager[*bool]("ask_to_copy_public_key", s.sql)
+	val, err := manager.Get(ctx)
+	if err != nil {
+		return true, fmt.Errorf("failed to get ask to copy public key setting: %w", err)
+	}
+	if val == nil {
+		return true, nil // default to true if missing
+	}
+	return *val, nil
+}
+
+func (s *settings) SetAskToCopyPublicKey(ctx context.Context, ask bool) error {
+	manager := NewSettingManager[bool]("ask_to_copy_public_key", s.sql)
+	if err := manager.Set(ctx, ask); err != nil {
+		return fmt.Errorf("failed to set ask to copy public key setting: %w", err)
 	}
 	return nil
 }

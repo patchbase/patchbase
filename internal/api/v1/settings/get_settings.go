@@ -12,6 +12,7 @@ import (
 type getSettingsResponse struct {
 	GlobalSSHPublicKey string `json:"global_ssh_public_key"`
 	DefaultSSHPullUser string `json:"default_ssh_pull_user"`
+	AskToCopyPublicKey bool   `json:"ask_to_copy_public_key"`
 }
 
 func GetSettings(i do.Injector) apiauth.AuthenticatedHandler {
@@ -37,9 +38,17 @@ func GetSettings(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
+		askToCopyPublicKey, err := settingsService.GetAskToCopyPublicKey(r.Context())
+		if err != nil {
+			webutil.LogError(r, "get ask to copy public key failed", err)
+			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to retrieve ask to copy public key", nil)
+			return
+		}
+
 		webutil.WriteJSON(w, http.StatusOK, getSettingsResponse{
 			GlobalSSHPublicKey: globalKey.PublicKey,
 			DefaultSSHPullUser: defaultUser,
+			AskToCopyPublicKey: askToCopyPublicKey,
 		})
 	}
 }
