@@ -923,3 +923,57 @@ func TestHostVulnerablePackages_SeverityFallbackFromAdvisory(t *testing.T) {
 	require.NotEmpty(t, groups)
 	assert.Equal(t, "Important", groups[0]["severity_label"])
 }
+
+func TestHosts_UniqueConstraints_API(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	// Test unique SSH hosts
+	// 1. Create first SSH host
+	rec1 := backend.HTTPPost(
+		"/api/v1/hosts/ssh",
+		`{"display_name":"api-ssh-host-1","hostname":"api-ssh-1.example.com","ssh_user":"root","frequency_minutes":60}`,
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusCreated, rec1.Code)
+
+	// 2. Try to create second SSH host with same display name
+	rec2 := backend.HTTPPost(
+		"/api/v1/hosts/ssh",
+		`{"display_name":"api-ssh-host-1","hostname":"api-ssh-2.example.com","ssh_user":"root","frequency_minutes":60}`,
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusBadRequest, rec2.Code)
+	assert.Contains(t, rec2.Body.String(), "a host with this display name already exists")
+
+	// 3. Try to create second SSH host with same pull hostname
+	rec3 := backend.HTTPPost(
+		"/api/v1/hosts/ssh",
+		`{"display_name":"api-ssh-host-2","hostname":"api-ssh-1.example.com","ssh_user":"root","frequency_minutes":60}`,
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusBadRequest, rec3.Code)
+	assert.Contains(t, rec3.Body.String(), "an SSH host with this pull hostname already exists")
+
+	// Test unique manual hosts
+	// 1. Create first manual host
+	rec4 := backend.HTTPPost(
+		"/api/v1/hosts/manual",
+		`{"display_name":"api-manual-host-1","hostname":"api-manual-1.example.com"}`,
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusCreated, rec4.Code)
+
+	// 2. Try to create second manual host with same display name
+	rec5 := backend.HTTPPost(
+		"/api/v1/hosts/manual",
+		`{"display_name":"api-manual-host-1","hostname":"api-manual-2.example.com"}`,
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusBadRequest, rec5.Code)
+	assert.Contains(t, rec5.Body.String(), "a host with this display name already exists")
+}

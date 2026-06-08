@@ -721,3 +721,47 @@ func TestHosts_SSHUniqueKeyPairFlagAndGlobalFallback(t *testing.T) {
 	assert.NotEqual(t, globalKey.PrivateKey, mockRunner.calledPrivateKey)
 	assert.NotEmpty(t, mockRunner.calledPrivateKey)
 }
+
+func TestHosts_UniqueConstraints(t *testing.T) {
+	backend := apitesting.NewBackend(t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+
+	hostsService := do.MustInvoke[services.Hosts](backend.Injector())
+	ctx := context.Background()
+
+	// Create first host
+	_, err := hostsService.CreateManualHost(ctx, "unique-name-1", "unique-host-1")
+	require.NoError(t, err)
+
+	// Try to create second host with same display name
+	_, err = hostsService.CreateManualHost(ctx, "unique-name-1", "unique-host-2")
+	assert.ErrorIs(t, err, services.ErrDuplicateHostDisplayName)
+
+	// Create first SSH host
+	_, err = hostsService.CreateSSHHost(ctx, services.CreateSSHHostInput{
+		DisplayName:      "ssh-host-1",
+		Hostname:         "ssh-pull-1.example.com",
+		SSHUser:          "root",
+		FrequencyMinutes: 60,
+	})
+	require.NoError(t, err)
+
+	// Try to create second SSH host with same display name
+	_, err = hostsService.CreateSSHHost(ctx, services.CreateSSHHostInput{
+		DisplayName:      "ssh-host-1",
+		Hostname:         "ssh-pull-2.example.com",
+		SSHUser:          "root",
+		FrequencyMinutes: 60,
+	})
+	assert.ErrorIs(t, err, services.ErrDuplicateHostDisplayName)
+
+	// Try to create second SSH host with same pull hostname
+	_, err = hostsService.CreateSSHHost(ctx, services.CreateSSHHostInput{
+		DisplayName:      "ssh-host-2",
+		Hostname:         "ssh-pull-1.example.com",
+		SSHUser:          "root",
+		FrequencyMinutes: 60,
+	})
+	assert.ErrorIs(t, err, services.ErrDuplicateSSHPullHostname)
+}

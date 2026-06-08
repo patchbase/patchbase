@@ -34,6 +34,8 @@ var (
 	ErrTokenAlreadyRevoked      = errors.New("registration token already revoked")
 	ErrInvalidSnapshotPayload   = errors.New("invalid snapshot payload")
 	ErrSnapshotNotFound         = errors.New("snapshot not found")
+	ErrDuplicateHostDisplayName = errors.New("a host with this display name already exists")
+	ErrDuplicateSSHPullHostname = errors.New("an SSH host with this pull hostname already exists")
 )
 
 type SSHPullArgs struct {
@@ -342,6 +344,9 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 		Architecture: architecture,
 	})
 	if err != nil {
+		if sql.IsUniqueViolation(err, "hosts_display_name_unique_idx") {
+			return nil, ErrDuplicateHostDisplayName
+		}
 		return nil, fmt.Errorf("insert agent host: %w", err)
 	}
 
@@ -617,6 +622,12 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 		PullPrivateKey:       dbPrivateKey,
 	})
 	if err != nil {
+		if sql.IsUniqueViolation(err, "hosts_display_name_unique_idx") {
+			return CreateSSHHostResult{}, ErrDuplicateHostDisplayName
+		}
+		if sql.IsUniqueViolation(err, "host_ssh_pull_pull_hostname_unique_idx") {
+			return CreateSSHHostResult{}, ErrDuplicateSSHPullHostname
+		}
 		return CreateSSHHostResult{}, fmt.Errorf("insert ssh host: %w", err)
 	}
 
@@ -1243,6 +1254,9 @@ func (s *hosts) CreateManualHost(ctx context.Context, displayName string, hostna
 		Hostname:    optionString(hostname),
 	})
 	if err != nil {
+		if sql.IsUniqueViolation(err, "hosts_display_name_unique_idx") {
+			return HostInfo{}, ErrDuplicateHostDisplayName
+		}
 		return HostInfo{}, fmt.Errorf("insert manual host: %w", err)
 	}
 

@@ -803,6 +803,13 @@ CREATE INDEX host_snapshots_host_collected_idx ON public.host_snapshots USING bt
 
 
 --
+-- Name: host_ssh_pull_pull_hostname_unique_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX host_ssh_pull_pull_hostname_unique_idx ON public.host_ssh_pull USING btree (pull_hostname);
+
+
+--
 -- Name: hosts_advisory_scope_key_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -814,6 +821,13 @@ CREATE INDEX hosts_advisory_scope_key_idx ON public.hosts USING btree (advisory_
 --
 
 CREATE INDEX hosts_approval_status_idx ON public.hosts USING btree (approval_status);
+
+
+--
+-- Name: hosts_display_name_unique_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX hosts_display_name_unique_idx ON public.hosts USING btree (display_name);
 
 
 --

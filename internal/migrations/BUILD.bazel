@@ -19,6 +19,7 @@ go_library(
         "files/013_add_default_ssh_pull_user_setting.sql",
         "files/014_backfill_ubuntu_severities.sql",
         "files/015_add_ask_to_copy_public_key_setting.sql",
+        "files/016_add_host_unique_constraints.sql",
     ],
     importpath = "go.patchbase.net/server/internal/migrations",
     visibility = ["//:__subpackages__"],
