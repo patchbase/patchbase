@@ -166,6 +166,137 @@ func TestAdvisoryEndpoints_ManualSync_Repeated(t *testing.T) {
 	assert.Equal(t, 1, count)
 }
 
+func TestAdvisoryEndpoints_Unauthorized(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+
+	// Overview without token
+	rec := backend.HTTPGet("/api/v1/advisories/overview")
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+
+	// Scopes without token
+	rec = backend.HTTPGet("/api/v1/advisories/scopes")
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+
+	// Sync without token
+	rec = backend.HTTPPost("/api/v1/advisories/scopes/ubuntu-22.04-x86_64/sync", "{}")
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+
+	// Sync with invalid token
+	rec = backend.HTTPPost("/api/v1/advisories/scopes/ubuntu-22.04-x86_64/sync", "{}",
+		apitesting.WithBearerToken("invalid-token"),
+	)
+	require.Equal(t, http.StatusUnauthorized, rec.Code)
+}
+
+func TestAdvisoryEndpoints_SyncURLEncodedScopeKey(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	// Scope key with colon: debian:bookworm-dsa
+	// URL-encoded: debian%3Abookworm-dsa
+	scopeKey := "debian:bookworm-dsa"
+	encodedKey := "debian%3Abookworm-dsa"
+
+	// Trigger sync with URL-encoded scope key
+	syncRecorder := backend.HTTPPost(
+		fmt.Sprintf("/api/v1/advisories/scopes/%s/sync", encodedKey),
+		"{}",
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusOK, syncRecorder.Code)
+
+	var syncResp map[string]any
+	require.NoError(t, json.Unmarshal(syncRecorder.Body.Bytes(), &syncResp))
+	assert.Equal(t, "pending", syncResp["status"])
+
+	// Verify scope was created with the decoded key
+	scopesRecorder := backend.HTTPGet("/api/v1/advisories/scopes", apitesting.WithBearerToken(adminToken))
+	require.Equal(t, http.StatusOK, scopesRecorder.Code)
+
+	var scopes []map[string]any
+	require.NoError(t, json.Unmarshal(scopesRecorder.Body.Bytes(), &scopes))
+	require.Len(t, scopes, 1)
+	assert.Equal(t, scopeKey, scopes[0]["scope_key"])
+}
+
+func TestAdvisoryEndpoints_ScopeStatusTransitions(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	advisorySyncService := do.MustInvoke[services.AdvisorySyncService](backend.Injector())
+	pool := do.MustInvoke[*pgxpool.Pool](backend.Injector())
+	ctx := context.Background()
+
+	scopeKey := "ubuntu-22.04-x86_64"
+
+	// 1. Register scope demand -> status should be "pending"
+	err = advisorySyncService.RegisterScopeDemand(ctx, scopeKey)
+	require.NoError(t, err)
+
+	scopesRecorder := backend.HTTPGet("/api/v1/advisories/scopes", apitesting.WithBearerToken(adminToken))
+	require.Equal(t, http.StatusOK, scopesRecorder.Code)
+	var scopes []map[string]any
+	require.NoError(t, json.Unmarshal(scopesRecorder.Body.Bytes(), &scopes))
+	require.Len(t, scopes, 1)
+	assert.Equal(t, "pending", scopes[0]["status"])
+
+	// 2. Trigger manual sync via API -> status should remain "pending"
+	syncRecorder := backend.HTTPPost(
+		fmt.Sprintf("/api/v1/advisories/scopes/%s/sync", scopeKey),
+		"{}",
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusOK, syncRecorder.Code)
+
+	scopesRecorder = backend.HTTPGet("/api/v1/advisories/scopes", apitesting.WithBearerToken(adminToken))
+	require.Equal(t, http.StatusOK, scopesRecorder.Code)
+	require.NoError(t, json.Unmarshal(scopesRecorder.Body.Bytes(), &scopes))
+	assert.Equal(t, "pending", scopes[0]["status"])
+
+	// 3. Simulate successful worker execution by setting status to "synced" in DB
+	_, err = pool.Exec(ctx, "UPDATE advisory_scopes SET status = 'synced' WHERE scope_key = $1", scopeKey)
+	require.NoError(t, err)
+
+	scopesRecorder = backend.HTTPGet("/api/v1/advisories/scopes", apitesting.WithBearerToken(adminToken))
+	require.Equal(t, http.StatusOK, scopesRecorder.Code)
+	require.NoError(t, json.Unmarshal(scopesRecorder.Body.Bytes(), &scopes))
+	assert.Equal(t, "synced", scopes[0]["status"])
+
+	// 4. Trigger manual sync again -> status should go back to "pending"
+	syncRecorder = backend.HTTPPost(
+		fmt.Sprintf("/api/v1/advisories/scopes/%s/sync", scopeKey),
+		"{}",
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusOK, syncRecorder.Code)
+
+	scopesRecorder = backend.HTTPGet("/api/v1/advisories/scopes", apitesting.WithBearerToken(adminToken))
+	require.Equal(t, http.StatusOK, scopesRecorder.Code)
+	require.NoError(t, json.Unmarshal(scopesRecorder.Body.Bytes(), &scopes))
+	assert.Equal(t, "pending", scopes[0]["status"])
+
+	// 5. Simulate failed worker execution by setting status to "failed" in DB
+	_, err = pool.Exec(ctx, "UPDATE advisory_scopes SET status = 'failed', last_error = 'mock failure' WHERE scope_key = $1", scopeKey)
+	require.NoError(t, err)
+
+	scopesRecorder = backend.HTTPGet("/api/v1/advisories/scopes", apitesting.WithBearerToken(adminToken))
+	require.Equal(t, http.StatusOK, scopesRecorder.Code)
+	require.NoError(t, json.Unmarshal(scopesRecorder.Body.Bytes(), &scopes))
+	assert.Equal(t, "failed", scopes[0]["status"])
+	assert.NotNil(t, scopes[0]["last_error"])
+}
+
 func TestGetAdvisory(t *testing.T) {
 	backend := apitesting.NewBackend(
 		t,
