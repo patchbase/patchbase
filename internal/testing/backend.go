@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	gotesting "testing"
 	"time"
@@ -58,13 +59,18 @@ type Backend struct {
 func NewBackend(t *gotesting.T, opts ...Option) *Backend {
 	t.Helper()
 
+	databaseURL := os.Getenv("PATCHBASE_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		databaseURL = DefaultTestDatabaseURL
+		if port := os.Getenv("TEST_DATABASE_PORT"); port != "" {
+			databaseURL = changeURIPort(databaseURL, port)
+		}
+	}
+
 	options := options{
-		databaseURL: os.Getenv("PATCHBASE_TEST_DATABASE_URL"),
+		databaseURL: databaseURL,
 		overrides:   []InjectorOverride{},
 		fixtures:    []Fixture{},
-	}
-	if options.databaseURL == "" {
-		options.databaseURL = DefaultTestDatabaseURL
 	}
 	for _, opt := range opts {
 		opt(&options)
@@ -160,4 +166,13 @@ func (b *Backend) IssueAccessToken(ctx context.Context, userID string) (string, 
 		return "", fmt.Errorf("issue access token: %w", err)
 	}
 	return token, nil
+}
+
+func changeURIPort(databaseURL string, newPort string) string {
+	uri, err := url.Parse(databaseURL)
+	if err != nil {
+		panic(fmt.Sprintf("invalid database URL: %v", err))
+	}
+	uri.Host = fmt.Sprintf("%s:%s", uri.Hostname(), newPort)
+	return uri.String()
 }

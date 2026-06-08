@@ -4,3 +4,6 @@ common --enable_platform_specific_config
 
 build --@rules_go//go/config:pure
 build --@rules_go//go/config:static
+
+test --test_env=TEST_DATABASE_PORT
+test --test_env=PATCHBASE_TEST_DATABASE_URL
