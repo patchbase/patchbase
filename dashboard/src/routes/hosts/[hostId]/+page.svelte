@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import AppLayout from '$lib/components/AppLayout.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
+	import Modal from '$lib/components/Modal.svelte';
 	import ApproveHostButton from '$lib/components/ApproveHostButton.svelte';
 	import DeleteHostButton from '$lib/components/DeleteHostButton.svelte';
 	import {
@@ -44,6 +45,7 @@
 	let uploadSuccess = $state(false);
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let runningPullNow = $state(false);
+	let selectedPullError = $state<{jobId: string; hostname: string; error: string} | null>(null);
 
 	function handleFileChange(event: Event) {
 		const input = event.target as HTMLInputElement;
@@ -98,6 +100,23 @@
 			error = err instanceof Error ? err.message : 'Failed to run SSH pull now.';
 		} finally {
 			runningPullNow = false;
+		}
+	}
+
+	function showPullError(job: HostPullJob) {
+		if (job.error && host) {
+			selectedPullError = {
+				jobId: job.id,
+				hostname: host.display_name || host.hostname,
+				error: job.error
+			};
+		}
+	}
+
+	function handlePullErrorKeydown(e: KeyboardEvent, job: HostPullJob) {
+		if ((e.key === 'Enter' || e.key === ' ') && job.error) {
+			e.preventDefault();
+			showPullError(job);
 		}
 	}
 
@@ -709,7 +728,13 @@
 										<td><StatusBadge status={job.status} /></td>
 										<td>{formatTime(job.started_at)}</td>
 										<td>{formatDuration(job.started_at, job.completed_at)}</td>
-										<td style="max-width:300px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap" title={job.error || ''}>
+										<td
+											class="error-cell"
+											role="button"
+											tabindex="0"
+											onclick={() => showPullError(job)}
+											onkeydown={(e) => handlePullErrorKeydown(e, job)}
+										>
 											{job.error || '-'}
 										</td>
 									</tr>
@@ -721,6 +746,29 @@
 			</div>
 		{/if}
 	</AppLayout>
+
+	<Modal
+		open={selectedPullError !== null}
+		title="Pull Error"
+		onclose={() => { selectedPullError = null; }}
+	>
+		<div style="display:flex; flex-direction:column; gap:12px;">
+			{#if selectedPullError}
+				<div>
+					<div style="font-weight:600; margin-bottom:4px; color:var(--text-secondary);">Job ID</div>
+					<div class="mono">{selectedPullError.jobId}</div>
+				</div>
+				<div>
+					<div style="font-weight:600; margin-bottom:4px; color:var(--text-secondary);">Host</div>
+					<div>{selectedPullError.hostname}</div>
+				</div>
+				<div>
+					<div style="font-weight:600; margin-bottom:4px; color:var(--text-secondary);">Error</div>
+					<pre class="error-block">{selectedPullError.error}</pre>
+				</div>
+			{/if}
+		</div>
+	</Modal>
 {:else}
 	<AppLayout page="hosts" title="Host">
 		<div class="empty-state"><p>Host not found.</p></div>
@@ -909,6 +957,40 @@
 
 	.font-semibold {
 		font-weight: 600;
+	}
+
+	.error-cell {
+		max-width: 300px;
+		text-overflow: ellipsis;
+		overflow: hidden;
+		white-space: nowrap;
+		cursor: pointer;
+		color: var(--red);
+	}
+
+	.error-cell:hover {
+		text-decoration: underline;
+	}
+
+	.error-cell:focus {
+		outline: 2px solid var(--accent);
+		outline-offset: 1px;
+	}
+
+	.error-block {
+		margin: 0;
+		padding: 12px 16px;
+		background: rgba(248, 113, 113, 0.08);
+		border: 1px solid var(--red);
+		border-radius: 6px;
+		font-family: var(--font-mono);
+		font-size: 13px;
+		line-height: 1.5;
+		color: var(--text-primary);
+		white-space: pre-wrap;
+		word-break: break-word;
+		max-height: 400px;
+		overflow-y: auto;
 	}
 
 	.packages-error-banner {
