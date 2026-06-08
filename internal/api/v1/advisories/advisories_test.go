@@ -165,3 +165,40 @@ func TestAdvisoryEndpoints_ManualSync_Repeated(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 1, count)
 }
+
+func TestGetAdvisory(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	pool := do.MustInvoke[*pgxpool.Pool](backend.Injector())
+	ctx := context.Background()
+
+	// Insert test advisory
+	_, err = pool.Exec(ctx, `
+		INSERT INTO advisories (id, source_system, raw_source_id, vendor, advisory_type, severity, summary, evidence_tier, is_security, updated_at)
+		VALUES ('USN-1234-1', 'ubuntu_usn_api', '1234-1', 'ubuntu', 'security', 'high', 'Test advisory', 'vendor_db', true, now())
+	`)
+	require.NoError(t, err)
+
+	// Test GET success
+	rec1 := backend.HTTPGet("/api/v1/advisories/USN-1234-1", apitesting.WithBearerToken(adminToken))
+	require.Equal(t, http.StatusOK, rec1.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(rec1.Body.Bytes(), &payload))
+	assert.Equal(t, "USN-1234-1", payload["id"])
+	assert.Equal(t, "Test advisory", payload["summary"])
+	assert.Equal(t, "high", payload["severity"])
+
+	// Test GET missing
+	rec2 := backend.HTTPGet("/api/v1/advisories/MISSING-9999", apitesting.WithBearerToken(adminToken))
+	require.Equal(t, http.StatusNotFound, rec2.Code)
+
+	// Test GET unauthorized
+	rec3 := backend.HTTPGet("/api/v1/advisories/USN-1234-1")
+	require.Equal(t, http.StatusUnauthorized, rec3.Code)
+}

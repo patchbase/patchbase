@@ -1,4 +1,4 @@
-load("//third_party/bazel:go_rules.bzl", "go_api_library")
+load("//third_party/bazel:go_rules.bzl", "go_api_library", "integration_test")
 
 go_api_library(
     name = "health",
@@ -8,5 +8,16 @@ go_api_library(
     deps = [
         "//internal/api/webutil",
         "//internal/buildinfo",
+    ],
+)
+
+integration_test(
+    name = "health_test",
+    srcs = ["health_test.go"],
+    deps = [
+        ":health",
+        "//internal/buildinfo",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
     ],
 )
