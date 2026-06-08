@@ -38,19 +38,151 @@ go_api_library(
 )
 
 integration_test(
-    name = "hosts_test",
-    srcs = ["hosts_test.go"],
+    name = "approve_host_test",
+    srcs = ["approve_host_test.go"],
     deps = [
-        "//internal/services",
         "//internal/sql",
         "//internal/sql/id",
         "//internal/testing",
         "//internal/utils",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+integration_test(
+    name = "create_manual_host_test",
+    srcs = ["create_manual_host_test.go"],
+    deps = [
+        "//internal/testing",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+integration_test(
+    name = "create_ssh_host_test",
+    srcs = ["create_ssh_host_test.go"],
+    deps = [
+        "//internal/services",
+        "//internal/testing",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+integration_test(
+    name = "delete_host_test",
+    srcs = ["delete_host_test.go"],
+    deps = [
+        "//internal/sql",
+        "//internal/sql/id",
+        "//internal/testing",
+        "//internal/utils",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+integration_test(
+    name = "fleet_test",
+    srcs = ["fleet_test.go"],
+    deps = [
+        "//internal/testing",
+        "//proto/agent",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)
+
+integration_test(
+    name = "get_collector_script_test",
+    srcs = ["get_collector_script_test.go"],
+    deps = [
+        "//internal/testing",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+integration_test(
+    name = "kernel_posture_test",
+    srcs = ["kernel_posture_test.go"],
+    deps = [
+        "//internal/sql",
+        "//internal/sql/id",
+        "//internal/testing",
+        "//internal/utils",
+        "//proto/agent",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)
+
+integration_test(
+    name = "list_pull_jobs_test",
+    srcs = ["list_pull_jobs_test.go"],
+    deps = [
+        "//internal/testing",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+integration_test(
+    name = "onboard_ssh_host_test",
+    srcs = ["onboard_ssh_host_test.go"],
+    deps = [
+        "//internal/sql",
+        "//internal/sql/id",
+        "//internal/testing",
+        "//internal/utils",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+integration_test(
+    name = "packages_test",
+    srcs = ["packages_test.go"],
+    deps = [
+        "//internal/sql",
+        "//internal/sql/id",
+        "//internal/testing",
+        "//internal/utils",
+        "//proto/agent",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)
+
+integration_test(
+    name = "run_pull_now_test",
+    srcs = ["run_pull_now_test.go"],
+    deps = [
+        "//internal/services",
+        "//internal/testing",
         "//proto/agent",
         "@com_github_samber_do_v2//:do",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
         "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)
+
+integration_test(
+    name = "token_test",
+    srcs = ["token_test.go"],
+    deps = [
+        "//internal/testing",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
     ],
 )
