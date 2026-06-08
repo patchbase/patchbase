@@ -30,7 +30,7 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
     volumes:
-      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/schema.sql:z
     environment:
       POSTGRES_DB: "${DATABASE_NAME:-patchbase_test}"
       POSTGRES_PASSWORD: "${DATABASE_PASSWORD:-postgres}"
