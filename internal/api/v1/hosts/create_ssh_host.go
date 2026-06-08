@@ -2,6 +2,7 @@ package hosts
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/samber/do/v2"
@@ -49,8 +50,15 @@ func CreateSSHHost(i do.Injector) apiauth.AuthenticatedHandler {
 			UniqueKeyPair:    req.UniqueKeyPair,
 		})
 		if err != nil {
-			webutil.LogError(r, "create ssh host failed", err)
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, err.Error(), nil)
+			switch {
+			case errors.Is(err, services.ErrDuplicateHostDisplayName):
+				webutil.WriteAPIError(w, r, http.StatusBadRequest, err.Error(), nil)
+			case errors.Is(err, services.ErrDuplicateSSHPullHostname):
+				webutil.WriteAPIError(w, r, http.StatusBadRequest, err.Error(), nil)
+			default:
+				webutil.LogError(r, "create ssh host failed", err)
+				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to create ssh host", nil)
+			}
 			return
 		}
 

@@ -136,7 +136,7 @@ func TestAuthMiddleware_InternalError(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
-	assert.JSONEq(t, `{"error":"authentication failed"}`, rec.Body.String())
+	assert.JSONEq(t, `{"error":"internal server error"}`, rec.Body.String())
 	assert.False(t, nextCalled)
 }
 

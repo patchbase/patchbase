@@ -24,6 +24,12 @@ func WriteJSON(w http.ResponseWriter, status int, payload any) {
 }
 
 func WriteAPIError(w http.ResponseWriter, r *http.Request, status int, message string, details any) {
+	if status >= http.StatusInternalServerError {
+		reqLogger := utils.GetLogger(r.Context())
+		reqLogger.ErrorContext(r.Context(), "internal server error", "public_message", message, "details", details)
+		message = "internal server error"
+		details = nil
+	}
 	if r.Header.Get("Content-Type") == "application/x-protobuf" || r.Header.Get("Accept") == "application/x-protobuf" {
 		if details != nil {
 			message = fmt.Sprintf("%s: %v", message, details)

@@ -125,7 +125,7 @@ func TestAdvisoryEndpoints_ErrorPathInternalError(t *testing.T) {
 
 	var errBody map[string]any
 	require.NoError(t, json.Unmarshal(syncRecorder.Body.Bytes(), &errBody))
-	assert.Equal(t, "failed to trigger manual sync", errBody["error"])
+	assert.Equal(t, "internal server error", errBody["error"])
 }
 
 func TestAdvisoryEndpoints_ManualSync_Repeated(t *testing.T) {

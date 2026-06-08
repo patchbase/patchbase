@@ -32,7 +32,7 @@ func OnboardSSH(i do.Injector) apiauth.AuthenticatedHandler {
 				webutil.WriteAPIError(w, r, http.StatusNotFound, "host not found", nil)
 			default:
 				webutil.LogError(r, "onboard ssh host failed", err)
-				webutil.WriteAPIError(w, r, http.StatusInternalServerError, err.Error(), nil)
+				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to onboard ssh host", nil)
 			}
 			return
 		}

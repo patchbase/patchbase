@@ -2,7 +2,9 @@ package hosts
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
@@ -35,10 +37,22 @@ func CreateManualHost(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
+		req.DisplayName = strings.TrimSpace(req.DisplayName)
+		req.Hostname = strings.TrimSpace(req.Hostname)
+		if req.DisplayName == "" && req.Hostname == "" {
+			webutil.WriteAPIError(w, r, http.StatusBadRequest, "display name or hostname is required", nil)
+			return
+		}
+
 		result, err := hostsService.CreateManualHost(r.Context(), req.DisplayName, req.Hostname)
 		if err != nil {
-			webutil.LogError(r, "create manual host failed", err)
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, err.Error(), nil)
+			switch {
+			case errors.Is(err, services.ErrDuplicateHostDisplayName):
+				webutil.WriteAPIError(w, r, http.StatusBadRequest, err.Error(), nil)
+			default:
+				webutil.LogError(r, "create manual host failed", err)
+				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to create manual host", nil)
+			}
 			return
 		}
 
