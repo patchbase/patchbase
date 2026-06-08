@@ -79,6 +79,15 @@ func TestHostVulnerableAndUpgradablePackages(t *testing.T) {
 	require.NoError(t, json.Unmarshal(vulnEmptyRecorder.Body.Bytes(), &vulnEmpty))
 	assert.Empty(t, vulnEmpty)
 
+	upgEmptyRecorder := backend.HTTPGet(
+		fmt.Sprintf("/api/v1/hosts/%s/packages/upgradable", hostID),
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusOK, upgEmptyRecorder.Code)
+	var upgEmpty []any
+	require.NoError(t, json.Unmarshal(upgEmptyRecorder.Body.Bytes(), &upgEmpty))
+	assert.Empty(t, upgEmpty)
+
 	snapshot := &agentpb.AgentSnapshot{
 		SchemaVersion: "v0",
 		SentAt:        timestamppb.New(time.Now().UTC()),
@@ -272,6 +281,12 @@ func TestHostVulnerableAndUpgradablePackages_NonEmptyAndValidation(t *testing.T)
 		apitesting.WithBearerToken(adminToken),
 	)
 	assert.Equal(t, http.StatusNotFound, errRecorder.Code)
+
+	errUpgRecorder := backend.HTTPGet(
+		"/api/v1/hosts/non-existent-host-id/packages/upgradable",
+		apitesting.WithBearerToken(adminToken),
+	)
+	assert.Equal(t, http.StatusNotFound, errUpgRecorder.Code)
 }
 
 func TestHostVulnerablePackages_SeverityFallbackFromAdvisory(t *testing.T) {

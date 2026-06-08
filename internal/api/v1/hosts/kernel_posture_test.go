@@ -46,6 +46,16 @@ func TestHostKernelPosture(t *testing.T) {
 	_, err = queries.ApproveHostByID(ctx, hostID)
 	require.NoError(t, err)
 
+	emptyPostureRecorder := backend.HTTPGet(
+		fmt.Sprintf("/api/v1/hosts/%s/kernel-posture", hostID),
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusOK, emptyPostureRecorder.Code)
+	var emptyPayload map[string]any
+	require.NoError(t, json.Unmarshal(emptyPostureRecorder.Body.Bytes(), &emptyPayload))
+	assert.Equal(t, "", emptyPayload["running_kernel"])
+	assert.Equal(t, "", emptyPayload["latest_installed_kernel"])
+
 	snapshot := &agentpb.AgentSnapshot{
 		SchemaVersion: "v0",
 		SentAt:        timestamppb.New(time.Now().UTC()),
@@ -161,4 +171,10 @@ func TestHostKernelPosture(t *testing.T) {
 	latestInstalled := payload["latest_installed"].(map[string]any)
 	assert.Equal(t, float64(1), latestInstalled["advisory_count"])
 	assert.Equal(t, float64(1), latestInstalled["cve_count"])
+
+	notFoundPostureRecorder := backend.HTTPGet(
+		"/api/v1/hosts/non-existent-host-id/kernel-posture",
+		apitesting.WithBearerToken(adminToken),
+	)
+	assert.Equal(t, http.StatusNotFound, notFoundPostureRecorder.Code)
 }

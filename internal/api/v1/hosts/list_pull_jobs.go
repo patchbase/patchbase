@@ -21,6 +21,17 @@ func ListPullJobs(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
+		_, err := hostsService.GetHost(r.Context(), hostID)
+		if err != nil {
+			if errors.Is(err, services.ErrHostNotFound) {
+				webutil.WriteAPIError(w, r, http.StatusNotFound, "host not found", nil)
+			} else {
+				webutil.LogError(r, "get host failed", err)
+				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to get host", nil)
+			}
+			return
+		}
+
 		jobs, err := hostsService.ListSSHPullJobs(r.Context(), hostID)
 		if err != nil {
 			switch {

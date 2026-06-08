@@ -32,6 +32,15 @@ func TestListPullJobsReturnsLastTenEntries(t *testing.T) {
 	require.NoError(t, json.Unmarshal(createRecorder.Body.Bytes(), &payload))
 	hostID := payload["host_id"].(string)
 
+	emptyJobsRecorder := backend.HTTPGet(
+		fmt.Sprintf("/api/v1/hosts/%s/pull-jobs", hostID),
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusOK, emptyJobsRecorder.Code)
+	var emptyJobs []map[string]any
+	require.NoError(t, json.Unmarshal(emptyJobsRecorder.Body.Bytes(), &emptyJobs))
+	assert.Empty(t, emptyJobs)
+
 	baseStartedAt := time.Now().UTC().Add(-12 * time.Minute)
 	for i := 0; i < 12; i++ {
 		_, err := backend.DB().Exec(context.Background(), `
@@ -55,4 +64,10 @@ func TestListPullJobsReturnsLastTenEntries(t *testing.T) {
 		assert.NotEqual(t, "j_00", job["id"])
 		assert.NotEqual(t, "j_01", job["id"])
 	}
+
+	notFoundJobsRecorder := backend.HTTPGet(
+		"/api/v1/hosts/non-existent-host-id/pull-jobs",
+		apitesting.WithBearerToken(adminToken),
+	)
+	assert.Equal(t, http.StatusNotFound, notFoundJobsRecorder.Code)
 }

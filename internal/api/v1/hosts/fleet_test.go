@@ -77,6 +77,9 @@ func TestHostFleetEndpoints(t *testing.T) {
 	)
 	require.Equal(t, http.StatusOK, approveRecorder.Code)
 
+	emptySnapshotRecorder := backend.HTTPGet(fmt.Sprintf("/api/v1/hosts/%s/snapshot", hostID), apitesting.WithBearerToken(adminToken))
+	require.Equal(t, http.StatusNotFound, emptySnapshotRecorder.Code)
+
 	snapshot := &agentpb.AgentSnapshot{
 		SchemaVersion: "v0",
 		SentAt:        timestamppb.New(time.Now().UTC()),
@@ -141,4 +144,7 @@ func TestHostFleetEndpoints(t *testing.T) {
 	for _, hostItem := range hostsAfterDeletePayload {
 		assert.NotEqual(t, hostID, hostItem["id"])
 	}
+
+	notFoundSnapshotRecorder := backend.HTTPGet("/api/v1/hosts/non-existent-host-id/snapshot", apitesting.WithBearerToken(adminToken))
+	require.Equal(t, http.StatusNotFound, notFoundSnapshotRecorder.Code)
 }
