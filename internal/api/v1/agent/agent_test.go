@@ -210,16 +210,12 @@ func TestRegisterNegativePaths(t *testing.T) {
 		assert.Equal(t, http.StatusCreated, recorder.Code)
 
 		// Register again with the same machine ID and hostname
-		// TODO: The server currently returns 500 Internal Server Error when registering with an existing
-		// hostname due to a unique constraint violation on display_name. This should ideally be fixed
-		// to return a 409 Conflict or 200 OK (idempotent registration). We assert 500 here to document
-		// the current behavior until it is fixed.
 		recorderDup := backend.HTTPPostBytes(
 			"/api/v1/agent/register",
 			reqBytes,
 			apitesting.WithHeader("Content-Type", "application/x-protobuf"),
 		)
-		assert.Equal(t, http.StatusInternalServerError, recorderDup.Code)
+		assert.Equal(t, http.StatusConflict, recorderDup.Code)
 
 		// Registering with an existing machine ID but a new hostname should succeed.
 		reqDiffHostname := proto.Clone(baseReq).(*agentpb.RegisterHostRequest)

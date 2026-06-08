@@ -19,6 +19,8 @@ func Register(i do.Injector) http.HandlerFunc {
 			switch {
 			case errors.Is(err, services.ErrInvalidRegistrationToken):
 				webutil.WriteAPIError(w, r, http.StatusUnauthorized, "invalid registration token", nil)
+			case errors.Is(err, services.ErrDuplicateHostDisplayName):
+				webutil.WriteAPIError(w, r, http.StatusConflict, "host with this name already exists", nil)
 			default:
 				webutil.LogError(r, "register agent host failed", err)
 				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "registration failed", nil)
