@@ -131,3 +131,76 @@ func TestUpdateProfilePasswordReturnsFreshToken(t *testing.T) {
 	}`)
 	assert.Equal(t, http.StatusOK, loginRecorder.Code)
 }
+
+func TestUpdateProfileMalformedJSON(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	token, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPPatch("/api/v1/profile", `{broken`, apitesting.WithBearerToken(token))
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.JSONEq(t, `{"error":"invalid request body"}`, recorder.Body.String())
+}
+
+func TestUpdateProfileEmailValidation(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	token, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	t.Run("empty email", func(t *testing.T) {
+		recorder := backend.HTTPPatch("/api/v1/profile", `{"email":""}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+		assert.JSONEq(t, `{"error":"email is required"}`, recorder.Body.String())
+	})
+
+	t.Run("whitespace only email", func(t *testing.T) {
+		recorder := backend.HTTPPatch("/api/v1/profile", `{"email":"   "}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+		assert.JSONEq(t, `{"error":"email is required"}`, recorder.Body.String())
+	})
+}
+
+func TestUpdateProfilePasswordValidation(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	token, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	t.Run("new password too short", func(t *testing.T) {
+		recorder := backend.HTTPPatch("/api/v1/profile", `{
+			"current_password":"password",
+			"new_password":"short"
+		}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+		assert.JSONEq(t, `{"error":"password must be at least 12 characters"}`, recorder.Body.String())
+	})
+
+	t.Run("empty current password", func(t *testing.T) {
+		recorder := backend.HTTPPatch("/api/v1/profile", `{
+			"current_password":"",
+			"new_password":"new-secure-password"
+		}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+		assert.JSONEq(t, `{"error":"current password is required"}`, recorder.Body.String())
+	})
+}
+
+func TestUpdateProfileEmptyBody(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	token, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPPatch("/api/v1/profile", `{}`, apitesting.WithBearerToken(token))
+	assert.Equal(t, http.StatusOK, recorder.Code)
+}

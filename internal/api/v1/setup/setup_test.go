@@ -55,3 +55,162 @@ func TestCompleteSuccess(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, loginRecorder.Code)
 }
+
+func TestCompleteMalformedJSON(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	token, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPPost("/api/v1/setup/complete", `{invalid}`, apitesting.WithBearerToken(token))
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.JSONEq(t, `{"error":"invalid request body"}`, recorder.Body.String())
+}
+
+func TestCompleteValidationErrors(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	token, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	t.Run("empty name", func(t *testing.T) {
+		recorder := backend.HTTPPost("/api/v1/setup/complete", `{
+			"name":"",
+			"email":"owner@patchbase.local",
+			"password":"very-secure-pass"
+		}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("empty email", func(t *testing.T) {
+		recorder := backend.HTTPPost("/api/v1/setup/complete", `{
+			"name":"Admin",
+			"email":"",
+			"password":"very-secure-pass"
+		}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("whitespace only email", func(t *testing.T) {
+		recorder := backend.HTTPPost("/api/v1/setup/complete", `{
+			"name":"Admin",
+			"email":"   ",
+			"password":"very-secure-pass"
+		}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("password too short", func(t *testing.T) {
+		recorder := backend.HTTPPost("/api/v1/setup/complete", `{
+			"name":"Admin",
+			"email":"owner@patchbase.local",
+			"password":"short"
+		}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("all fields empty", func(t *testing.T) {
+		recorder := backend.HTTPPost("/api/v1/setup/complete", `{
+			"name":"",
+			"email":"",
+			"password":""
+		}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("missing fields", func(t *testing.T) {
+		recorder := backend.HTTPPost("/api/v1/setup/complete", `{}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+
+	t.Run("nil value fields", func(t *testing.T) {
+		recorder := backend.HTTPPost("/api/v1/setup/complete", `{
+			"name":null,
+			"email":null,
+			"password":null
+		}`, apitesting.WithBearerToken(token))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	})
+}
+
+func TestCompleteEmailAlreadyInUse(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	token, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPPost("/api/v1/setup/complete", `{
+		"name":"Admin",
+		"email":"user@patchbase.local",
+		"password":"very-secure-pass"
+	}`, apitesting.WithBearerToken(token))
+	assert.Equal(t, http.StatusConflict, recorder.Code)
+	assert.JSONEq(t, `{"error":"email is already in use"}`, recorder.Body.String())
+}
+
+func TestCompleteAlreadyCompleted(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	token, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPPost("/api/v1/setup/complete", `{
+		"name":"Setup Admin",
+		"email":"owner@patchbase.local",
+		"password":"very-secure-pass"
+	}`, apitesting.WithBearerToken(token))
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	var payload map[string]any
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
+	newToken, ok := payload["access_token"].(string)
+	require.True(t, ok)
+	require.NotEmpty(t, newToken)
+
+	recorderDup := backend.HTTPPost("/api/v1/setup/complete", `{
+		"name":"Another Admin",
+		"email":"other@patchbase.local",
+		"password":"very-secure-pass"
+	}`, apitesting.WithBearerToken(newToken))
+	assert.Equal(t, http.StatusConflict, recorderDup.Code)
+	assert.JSONEq(t, `{"error":"initial setup already completed"}`, recorderDup.Body.String())
+}
+
+func TestCompleteUnauthorized(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+
+	recorder := backend.HTTPPost("/api/v1/setup/complete", `{
+		"name":"Admin",
+		"email":"owner@patchbase.local",
+		"password":"very-secure-pass"
+	}`)
+	assert.Equal(t, http.StatusUnauthorized, recorder.Code)
+}
+
+func TestCompleteForbiddenNonAdmin(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	token, err := backend.IssueAccessToken(context.Background(), "u_user")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPPost("/api/v1/setup/complete", `{
+		"name":"User Admin",
+		"email":"user-admin@patchbase.local",
+		"password":"very-secure-pass"
+	}`, apitesting.WithBearerToken(token))
+	assert.Equal(t, http.StatusForbidden, recorder.Code)
+	assert.JSONEq(t, `{"error":"only admins can complete setup"}`, recorder.Body.String())
+}

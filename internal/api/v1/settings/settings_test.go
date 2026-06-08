@@ -75,3 +75,52 @@ func TestPatchSettings(t *testing.T) {
 	require.NoError(t, json.Unmarshal(recorderGet.Body.Bytes(), &payload))
 	assert.Equal(t, "ubuntu", payload["default_ssh_pull_user"])
 }
+
+func TestPatchSettingsMalformedJSON(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	recorder := backend.HTTPPatch("/api/v1/settings", `not json`, apitesting.WithBearerToken(adminToken))
+	assert.Equal(t, http.StatusBadRequest, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"error":"invalid request body"`)
+}
+
+func TestPatchSettingsValidation(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	t.Run("default ssh pull user with only whitespace", func(t *testing.T) {
+		recorder := backend.HTTPPatch("/api/v1/settings", `{"default_ssh_pull_user": "   "}`, apitesting.WithBearerToken(adminToken))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+		assert.JSONEq(t, `{"error":"default ssh pull user cannot be empty"}`, recorder.Body.String())
+	})
+
+	t.Run("default ssh pull user with empty string", func(t *testing.T) {
+		recorder := backend.HTTPPatch("/api/v1/settings", `{"default_ssh_pull_user": ""}`, apitesting.WithBearerToken(adminToken))
+		assert.Equal(t, http.StatusBadRequest, recorder.Code)
+		assert.JSONEq(t, `{"error":"default ssh pull user cannot be empty"}`, recorder.Body.String())
+	})
+
+	t.Run("ask to copy public key with true", func(t *testing.T) {
+		recorder := backend.HTTPPatch("/api/v1/settings", `{"ask_to_copy_public_key": true}`, apitesting.WithBearerToken(adminToken))
+		assert.Equal(t, http.StatusOK, recorder.Code)
+	})
+
+	t.Run("ask to copy public key with false", func(t *testing.T) {
+		recorder := backend.HTTPPatch("/api/v1/settings", `{"ask_to_copy_public_key": false}`, apitesting.WithBearerToken(adminToken))
+		assert.Equal(t, http.StatusOK, recorder.Code)
+	})
+
+	t.Run("empty body", func(t *testing.T) {
+		recorder := backend.HTTPPatch("/api/v1/settings", `{}`, apitesting.WithBearerToken(adminToken))
+		assert.Equal(t, http.StatusOK, recorder.Code)
+	})
+}
