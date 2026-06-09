@@ -74,6 +74,9 @@ func enroll(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return fmt.Errorf("register host: %w", err)
 	}
+	if registerResult.Status >= 400 {
+		return fmt.Errorf("register host rejected (status %d): %s", registerResult.Status, registerResult.ErrorMessage)
+	}
 	if registerResult.Response == nil || registerResult.Response.HostAccessToken == "" {
 		return fmt.Errorf("register host: invalid response")
 	}

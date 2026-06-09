@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	agent "go.patchbase.net/proto/agent"
 	"google.golang.org/protobuf/proto"
@@ -51,7 +52,7 @@ func NewHTTPClient(serverURL string, caCertPath string, allowInsecureHTTP bool) 
 
 	return &HTTPClient{
 		serverURL: strings.TrimRight(serverURL, "/"),
-		client:    &http.Client{Transport: transport},
+		client:    &http.Client{Transport: transport, Timeout: 60 * time.Second},
 	}, nil
 }
 
@@ -86,6 +87,7 @@ func (c *HTTPClient) doRequest(ctx context.Context, method string, endpoint stri
 		req.Header.Set("Authorization", "Bearer "+authToken)
 	}
 	req.Header.Set("Content-Type", "application/x-protobuf")
+	req.Header.Set("Accept", "application/x-protobuf")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -113,19 +115,30 @@ func httpPost[R any](c *HTTPClient, ctx context.Context, endpoint string, payloa
 	}
 
 	result := &Result[R]{
-		Endpoint:  endpoint,
-		Status:    resp.StatusCode,
-		RequestID: resp.Header.Get("X-Request-Id"),
-		Body:      respBody,
+		Endpoint:     endpoint,
+		Status:       resp.StatusCode,
+		RequestID:    resp.Header.Get("X-Request-Id"),
+		Body:         respBody,
+		Response:     nil,
+		ErrorMessage: "",
 	}
 
-	var r R
-	pm, ok := any(&r).(proto.Message)
-	if !ok {
-		return nil, fmt.Errorf("internal error: type %T does not implement proto.Message", &r)
-	}
-	if err := proto.Unmarshal(respBody, pm); err == nil {
-		result.Response = &r
+	if resp.StatusCode >= 400 {
+		var apiErr agent.APIError
+		if err := proto.Unmarshal(respBody, &apiErr); err == nil && apiErr.Error != "" {
+			result.ErrorMessage = apiErr.Error
+		} else {
+			result.ErrorMessage = string(respBody)
+		}
+	} else {
+		var r R
+		pm, ok := any(&r).(proto.Message)
+		if !ok {
+			return nil, fmt.Errorf("internal error: type %T does not implement proto.Message", &r)
+		}
+		if err := proto.Unmarshal(respBody, pm); err == nil {
+			result.Response = &r
+		}
 	}
 
 	return result, nil

@@ -76,7 +76,9 @@ func runSync(cmd *cobra.Command, args []string) error {
 	slog.Info("Sync completed", "status", result.Status, "endpoint", result.Endpoint)
 	if result.Status < 200 || result.Status >= 300 {
 		if result.RequestID != "" {
-			slog.Error("Sync rejected", "request_id", result.RequestID, "message", string(result.Body))
+			slog.Error("Sync rejected", "request_id", result.RequestID, "message", result.ErrorMessage)
+		} else {
+			slog.Error("Sync rejected", "message", result.ErrorMessage)
 		}
 	}
 	if result.Response != nil {
@@ -86,8 +88,8 @@ func runSync(cmd *cobra.Command, args []string) error {
 			"snapshot_id", result.Response.SnapshotId,
 			"next_check_in_seconds", result.Response.NextCheckInSeconds,
 		)
-	} else if len(result.Body) != 0 {
-		slog.Error("Sync error response", "body", string(result.Body))
+	} else if result.ErrorMessage != "" {
+		slog.Error("Sync error response", "message", result.ErrorMessage)
 	}
 
 	if result.Status < 200 || result.Status >= 300 {

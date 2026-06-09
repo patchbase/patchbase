@@ -123,3 +123,68 @@ func TestHTTPClient_PostSnapshot(t *testing.T) {
 	assert.Equal(t, "snap-123", res.Response.SnapshotId)
 	assert.Equal(t, int32(60), res.Response.NextCheckInSeconds)
 }
+
+func TestNewHTTPClient_InvalidURL(t *testing.T) {
+	_, err := NewHTTPClient("http://non-loopback.local", "", false)
+	assert.ErrorContains(t, err, "http only allowed for loopback")
+}
+
+func TestHTTPClient_Non2xxResponse(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(t, "application/x-protobuf", r.Header.Get("Accept"))
+		w.Header().Set("X-Request-Id", "req-err")
+		w.WriteHeader(http.StatusForbidden)
+		apiErr := &agent.APIError{Error: "invalid host token"}
+		respBytes, _ := proto.Marshal(apiErr)
+		w.Write(respBytes) // nolint:errcheck
+	}))
+	defer srv.Close()
+
+	c, err := NewHTTPClient(srv.URL, "", false)
+	require.NoError(t, err)
+
+	res, err := c.PostSnapshot(context.Background(), "bad-tok", &agent.AgentSnapshot{})
+	require.NoError(t, err) // the http request itself succeeds
+	require.NotNil(t, res)
+
+	assert.Equal(t, http.StatusForbidden, res.Status)
+	assert.Equal(t, "invalid host token", res.ErrorMessage)
+	assert.Nil(t, res.Response)
+}
+
+func TestHTTPClient_InvalidProtobufError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("just some plain text error")) // nolint:errcheck
+	}))
+	defer srv.Close()
+
+	c, err := NewHTTPClient(srv.URL, "", false)
+	require.NoError(t, err)
+
+	res, err := c.PostSnapshot(context.Background(), "tok", &agent.AgentSnapshot{})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+
+	assert.Equal(t, http.StatusInternalServerError, res.Status)
+	assert.Equal(t, "just some plain text error", res.ErrorMessage)
+}
+
+func TestHTTPClient_ContextTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Do nothing, let it timeout
+	}))
+	defer srv.Close()
+
+	c, err := NewHTTPClient(srv.URL, "", false)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel() // cancel immediately
+
+	res, err := c.PostSnapshot(ctx, "tok", &agent.AgentSnapshot{})
+	assert.ErrorContains(t, err, "do request")
+	assert.ErrorContains(t, err, "context canceled")
+	assert.Nil(t, res)
+}
+
