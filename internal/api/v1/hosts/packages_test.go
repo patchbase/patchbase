@@ -357,3 +357,200 @@ func TestHostVulnerablePackages_SeverityFallbackFromAdvisory(t *testing.T) {
 	require.NotEmpty(t, groups)
 	assert.Equal(t, "Important", groups[0]["severity_label"])
 }
+func TestHostPackages_GroupingEdgeCases(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	queries := db.New(backend.DB())
+
+	hostID := id.New("h")
+	_, err = queries.InsertAgentHost(ctx, db.InsertAgentHostParams{
+		ID:           hostID,
+		DisplayName:  utils.Some("edge-cases-host"),
+		MachineID:    utils.Some("edge-cases-machine"),
+		Hostname:     utils.Some("edge-cases-host"),
+		IpAddress:    utils.Some("10.0.0.100"),
+		OsName:       "Ubuntu",
+		OsVersion:    "22.04",
+		Architecture: "x86_64",
+	})
+	require.NoError(t, err)
+
+	_, err = queries.ApproveHostByID(ctx, hostID)
+	require.NoError(t, err)
+
+	snapshotID := id.New("snap")
+	_, err = backend.DB().Exec(ctx, `
+		INSERT INTO host_snapshots (id, host_id, collected_at, payload, running_kernel_nevra, boot_time, has_process_data)
+		VALUES ($1, $2, now(), $3, '5.15.0-156-generic', NULL, false)
+	`, snapshotID, hostID, []byte{})
+	require.NoError(t, err)
+
+	// Advisory 1: Multiple CVEs, unknown severity.
+	_, err = backend.DB().Exec(ctx, `
+		INSERT INTO advisories (id, source_system, raw_source_id, vendor, advisory_type, severity, summary, evidence_tier, is_security, updated_at)
+		VALUES ('USN-1000-1', 'ubuntu_usn_api', '1000-1', 'ubuntu', 'security', '', 'Unknown severity with multiple CVEs', 'vendor_db', true, '2026-05-20T10:00:00Z')
+	`)
+	require.NoError(t, err)
+	_, err = backend.DB().Exec(ctx, `
+		INSERT INTO advisory_references (id, advisory_id, ref_type, ref_value, url)
+		VALUES 
+			('ref1', 'USN-1000-1', 'cve', 'CVE-2026-10001', 'https://cve.org/10001'),
+			('ref2', 'USN-1000-1', 'cve', 'CVE-2026-10002', 'https://cve.org/10002')
+	`)
+	require.NoError(t, err)
+
+	// Advisory 2 & 3: Multiple advisories for same package, equal severities (critical) to test deterministic order
+	_, err = backend.DB().Exec(ctx, `
+		INSERT INTO advisories (id, source_system, raw_source_id, vendor, advisory_type, severity, summary, evidence_tier, is_security, updated_at)
+		VALUES 
+			('USN-2000-2', 'ubuntu_usn_api', '2000-2', 'ubuntu', 'security', 'critical', 'Critical 2', 'vendor_db', true, '2026-05-21T10:00:00Z'),
+			('USN-2000-1', 'ubuntu_usn_api', '2000-1', 'ubuntu', 'security', 'critical', 'Critical 1', 'vendor_db', true, '2026-05-21T10:00:00Z')
+	`)
+	require.NoError(t, err)
+
+	// Advisory 4: reboot_host
+	_, err = backend.DB().Exec(ctx, `
+		INSERT INTO advisories (id, source_system, raw_source_id, vendor, advisory_type, severity, summary, evidence_tier, is_security, updated_at)
+		VALUES ('USN-3000-1', 'ubuntu_usn_api', '3000-1', 'ubuntu', 'security', 'high', 'Reboot required', 'vendor_db', true, '2026-05-22T10:00:00Z')
+	`)
+	require.NoError(t, err)
+
+	// Insert decision records
+	// 1. Unknown severity
+	err = queries.InsertDecisionRecord(ctx, db.InsertDecisionRecordParams{
+		ID:             id.New("d1"),
+		HostID:         hostID,
+		SnapshotID:     snapshotID,
+		AdvisoryID:     "USN-1000-1",
+		PackageName:    "unknown-pkg",
+		InstalledNevra: utils.Some("unknown-pkg-0:1.0.0"),
+		FixedNevra:     utils.Some("unknown-pkg-0:1.0.1"),
+		Status:         "affected_fix_available",
+		Action:         "update_package",
+		Severity:       utils.None[string](),
+		EvidenceTier:   "vendor_db",
+		ReasonCode:     "vendor_fix_available_not_installed",
+		ComputedAt:     time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	require.NoError(t, err)
+
+	// Duplicate decision row (same package, same advisory, different nevra)
+	err = queries.InsertDecisionRecord(ctx, db.InsertDecisionRecordParams{
+		ID:             id.New("d1-dup"),
+		HostID:         hostID,
+		SnapshotID:     snapshotID,
+		AdvisoryID:     "USN-1000-1",
+		PackageName:    "unknown-pkg",
+		InstalledNevra: utils.Some("unknown-pkg-0:1.0.0-alt"),
+		FixedNevra:     utils.Some("unknown-pkg-0:1.0.1"),
+		Status:         "affected_fix_available",
+		Action:         "update_package",
+		Severity:       utils.None[string](),
+		EvidenceTier:   "vendor_db",
+		ReasonCode:     "vendor_fix_available_not_installed",
+		ComputedAt:     time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	require.NoError(t, err)
+
+	// 2. Multiple advisories per package & equal severity deterministic order
+	err = queries.InsertDecisionRecord(ctx, db.InsertDecisionRecordParams{
+		ID:             id.New("d2"),
+		HostID:         hostID,
+		SnapshotID:     snapshotID,
+		AdvisoryID:     "USN-2000-2",
+		PackageName:    "critical-pkg",
+		InstalledNevra: utils.Some("critical-pkg-0:2.0.0"),
+		FixedNevra:     utils.Some("critical-pkg-0:2.0.1"),
+		Status:         "affected_fix_available",
+		Action:         "update_package",
+		Severity:       utils.Some("critical"),
+		EvidenceTier:   "vendor_db",
+		ReasonCode:     "vendor_fix_available_not_installed",
+		ComputedAt:     time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	require.NoError(t, err)
+
+	err = queries.InsertDecisionRecord(ctx, db.InsertDecisionRecordParams{
+		ID:             id.New("d3"),
+		HostID:         hostID,
+		SnapshotID:     snapshotID,
+		AdvisoryID:     "USN-2000-1",
+		PackageName:    "critical-pkg",
+		InstalledNevra: utils.Some("critical-pkg-0:2.0.0"),
+		FixedNevra:     utils.Some("critical-pkg-0:2.0.1"),
+		Status:         "affected_fix_available",
+		Action:         "update_package",
+		Severity:       utils.Some("critical"),
+		EvidenceTier:   "vendor_db",
+		ReasonCode:     "vendor_fix_available_not_installed",
+		ComputedAt:     time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	require.NoError(t, err)
+
+	// 3. reboot_host action (fixed-package-installed-pending-activation)
+	err = queries.InsertDecisionRecord(ctx, db.InsertDecisionRecordParams{
+		ID:             id.New("d4"),
+		HostID:         hostID,
+		SnapshotID:     snapshotID,
+		AdvisoryID:     "USN-3000-1",
+		PackageName:    "reboot-pkg",
+		InstalledNevra: utils.Some("reboot-pkg-0:3.0.0"),
+		FixedNevra:     utils.Some("reboot-pkg-0:3.0.1"),
+		Status:         "fixed_pending_activation",
+		Action:         "reboot_host",
+		Severity:       utils.Some("high"),
+		EvidenceTier:   "vendor_db",
+		ReasonCode:     "vendor_fix_installed_pending_reboot",
+		ComputedAt:     time.Now().UTC().Format(time.RFC3339Nano),
+	})
+	require.NoError(t, err)
+
+	// Get vulnerable packages
+	recorder := backend.HTTPGet(
+		fmt.Sprintf("/api/v1/hosts/%s/packages/vulnerable", hostID),
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusOK, recorder.Code)
+
+	var groups []map[string]any
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &groups))
+	
+
+	// Assertions based on edge cases
+	require.Len(t, groups, 3)
+
+	// Group 1: reboot-pkg (reboot_host action has highest priority: 4)
+	assert.Equal(t, "reboot", groups[0]["family_label"])
+	assert.Equal(t, "Reboot required", groups[0]["action_label"])
+	advisories0 := groups[0]["advisories"].([]any)
+	require.Len(t, advisories0, 1)
+
+	// Group 2: critical-pkg (update_package action: priority 2, but severity critical: priority 4)
+	assert.Equal(t, "critical", groups[1]["family_label"])
+	assert.Equal(t, "Critical", groups[1]["severity_label"])
+	advisories1 := groups[1]["advisories"].([]any)
+	require.Len(t, advisories1, 2)
+	// USN-2000-1 should come before USN-2000-2 (deterministic sort by ID when updated_at and severity are equal)
+	assert.Equal(t, "USN-2000-1", advisories1[0].(map[string]any)["advisory_id"])
+	assert.Equal(t, "USN-2000-2", advisories1[1].(map[string]any)["advisory_id"])
+
+	// Group 3: unknown-pkg (unknown severity: priority 0)
+	assert.Equal(t, "unknown", groups[2]["family_label"])
+	assert.Equal(t, "Unknown", groups[2]["severity_label"])
+	advisories2 := groups[2]["advisories"].([]any)
+	require.Len(t, advisories2, 1)
+	adv2 := advisories2[0].(map[string]any)
+	cves := adv2["cves"].([]any)
+	require.Len(t, cves, 2) // Multiple CVEs
+	assert.Equal(t, "CVE-2026-10001", cves[0].(map[string]any)["id"])
+
+	// Duplicate decision row: Check if we have two items in the advisory
+	items := adv2["items"].([]any)
+	require.Len(t, items, 2)
+}
