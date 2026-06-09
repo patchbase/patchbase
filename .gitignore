@@ -27,3 +27,6 @@ tags
 [._]ss[a-gi-z]
 [._]sw[a-p]
 
+# Coverage reports
+bazel-coverage-report/
+abs_coverage.dat

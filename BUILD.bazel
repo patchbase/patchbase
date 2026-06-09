@@ -94,3 +94,27 @@ sh_binary(
         for arch in LINUX_ARCHES
     ],
 )
+
+write_file(
+    name = "coverage_report_sh",
+    out = "coverage_report.sh",
+    content = [
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "cd \"$BUILD_WORKSPACE_DIRECTORY\"",
+        "echo 'Running bazel coverage...'",
+        "bazel coverage --combined_report=lcov //internal/...",
+        "echo 'Processing coverage data...'",
+        "sed 's|^SF:|SF:'\"$BUILD_WORKSPACE_DIRECTORY\"'/|' bazel-out/_coverage/_coverage_report.dat > abs_coverage.dat",
+        "rm -rf bazel-coverage-report",
+        "genhtml abs_coverage.dat -o bazel-coverage-report --prefix \"$BUILD_WORKSPACE_DIRECTORY\"",
+        "rm abs_coverage.dat",
+        "echo 'Coverage report generated in bazel-coverage-report/'",
+    ],
+    is_executable = True,
+)
+
+sh_binary(
+    name = "coverage_report",
+    srcs = [":coverage_report_sh"],
+)
