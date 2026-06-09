@@ -4,6 +4,8 @@ go_api_library(
     name = "settings",
     srcs = [
         "get_settings.go",
+        "send_report.go",
+        "test_email.go",
         "update_settings.go",
     ],
     importpath = "go.patchbase.net/server/internal/api/v1/settings",
@@ -11,6 +13,7 @@ go_api_library(
     deps = [
         "//internal/api/auth",
         "//internal/api/webutil",
+        "//internal/mailer",
         "//internal/services",
         "//internal/utils",
         "@com_github_samber_do_v2//:do",
@@ -18,8 +21,46 @@ go_api_library(
 )
 
 integration_test(
-    name = "settings_test",
-    srcs = ["settings_test.go"],
+    name = "get_test",
+    srcs = ["get_test.go"],
+    deps = [
+        "//internal/testing",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+integration_test(
+    name = "send_report_test",
+    srcs = ["send_report_test.go"],
+    deps = [
+        "//internal/mailer",
+        "//internal/mock",
+        "//internal/testing",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)
+
+integration_test(
+    name = "test_email_test",
+    srcs = ["test_email_test.go"],
+    deps = [
+        "//internal/mailer",
+        "//internal/mock",
+        "//internal/testing",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
+    ],
+)
+
+integration_test(
+    name = "update_settings_test",
+    srcs = ["update_settings_test.go"],
     deps = [
         "//internal/testing",
         "@com_github_stretchr_testify//assert",

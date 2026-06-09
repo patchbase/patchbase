@@ -4,6 +4,7 @@ go_library(
     name = "queue",
     srcs = [
         "advisory_sync_worker.go",
+        "email_report.go",
         "noop_worker.go",
         "periodic.go",
         "river.go",
@@ -13,6 +14,7 @@ go_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/config",
+        "//internal/mailer",
         "//internal/services",
         "//internal/sql",
         "@com_github_jackc_pgx_v5//:pgx",

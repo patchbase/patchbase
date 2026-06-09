@@ -9,6 +9,7 @@ import (
 	"go.patchbase.net/server/internal/api"
 	"go.patchbase.net/server/internal/api/auth"
 	"go.patchbase.net/server/internal/config"
+	"go.patchbase.net/server/internal/mailer"
 	"go.patchbase.net/server/internal/queue"
 	"go.patchbase.net/server/internal/services"
 	"go.patchbase.net/server/internal/services/matchers"
@@ -37,6 +38,7 @@ func New(ctx context.Context, cfg config.Config) do.Injector {
 	do.Provide[services.Auth](injector, services.NewAuth)
 	do.Provide[services.Hosts](injector, services.NewHosts)
 	do.Provide[services.Settings](injector, services.NewSettings)
+	do.Provide[mailer.Mailer](injector, mailer.NewMailer)
 	do.Provide[services.AdvisorySyncService](injector, services.NewAdvisorySync)
 	do.Provide[matchers.Matcher](injector, matchers.NewMatcher)
 

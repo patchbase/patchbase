@@ -55,6 +55,7 @@ type Querier interface {
 	InsertManualHost(ctx context.Context, arg InsertManualHostParams) (Host, error)
 	InsertRegistrationToken(ctx context.Context, arg InsertRegistrationTokenParams) (RegistrationToken, error)
 	InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (InsertSSHHostRow, error)
+	ListAdminUsers(ctx context.Context) ([]User, error)
 	ListAdvisoriesByStreamIDs(ctx context.Context, dollar_1 []string) ([]Advisory, error)
 	ListAdvisoryProductStreamsByStreamIDs(ctx context.Context, dollar_1 []string) ([]AdvisoryProductStream, error)
 	ListAdvisoryReferencesByStreamIDs(ctx context.Context, dollar_1 []string) ([]AdvisoryReference, error)

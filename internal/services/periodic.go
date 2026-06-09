@@ -8,4 +8,5 @@ type PeriodicJobManager interface {
 	RemoveAdvisorySyncJob(ctx context.Context, scopeKey string) error
 	AddSSHPullJob(ctx context.Context, hostID string, frequencyMinutes int32, runOnStart bool) error
 	RemoveSSHPullJob(ctx context.Context, hostID string) error
+	SetEmailReportJob(ctx context.Context, frequency string) error
 }

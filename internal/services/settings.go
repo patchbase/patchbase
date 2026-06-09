@@ -33,6 +33,31 @@ type GlobalSSHKeyPair struct {
 	PrivateKey string `json:"private_key"`
 }
 
+type SMTPSettings struct {
+	Host       string `json:"host"`
+	Port       int    `json:"port"`
+	Username   string `json:"username"`
+	Password   string `json:"password"` // Returns empty string if unset/unretrievable unless being updated
+	From       string `json:"from"`
+	ReportHour int    `json:"report_hour"` // Hour in UTC (0-23)
+}
+
+type smtpSettingsDB struct {
+	Host              string `json:"host"`
+	Port              int    `json:"port"`
+	Username          string `json:"username"`
+	EncryptedPassword string `json:"encrypted_password"`
+	From              string `json:"from"`
+	ReportHour        *int   `json:"report_hour"`
+}
+
+type EmailFrequency string
+
+const (
+	EmailFrequencyDaily EmailFrequency = "daily"
+	EmailFrequencyNever EmailFrequency = "never"
+)
+
 type Settings interface {
 	TryInitialSetup(ctx context.Context) (bool, error)
 	Status(ctx context.Context) (InitialSetupDone, error)
@@ -42,6 +67,10 @@ type Settings interface {
 	SetDefaultSSHPullUser(ctx context.Context, user string) error
 	GetAskToCopyPublicKey(ctx context.Context) (bool, error)
 	SetAskToCopyPublicKey(ctx context.Context, ask bool) error
+	GetSMTPSettings(ctx context.Context) (SMTPSettings, error)
+	SetSMTPSettings(ctx context.Context, s SMTPSettings) error
+	GetEmailFrequency(ctx context.Context) (string, error)
+	SetEmailFrequency(ctx context.Context, frequency string) error
 }
 
 type settings struct {
@@ -421,6 +450,89 @@ func (s *settings) SetAskToCopyPublicKey(ctx context.Context, ask bool) error {
 	manager := NewSettingManager[bool]("ask_to_copy_public_key", s.sql)
 	if err := manager.Set(ctx, ask); err != nil {
 		return fmt.Errorf("failed to set ask to copy public key setting: %w", err)
+	}
+	return nil
+}
+
+func (s *settings) GetSMTPSettings(ctx context.Context) (SMTPSettings, error) {
+	manager := NewSettingManager[smtpSettingsDB]("smtp_settings", s.sql)
+	val, err := manager.Get(ctx)
+	if err != nil {
+		return SMTPSettings{}, fmt.Errorf("failed to get smtp settings: %w", err)
+	}
+	defaultHour := 9
+	if val.ReportHour != nil {
+		defaultHour = *val.ReportHour
+	}
+	res := SMTPSettings{
+		Host:       val.Host,
+		Port:       val.Port,
+		Username:   val.Username,
+		Password:   "",
+		From:       val.From,
+		ReportHour: defaultHour,
+	}
+	if val.EncryptedPassword != "" {
+		dec, err := s.crypto.Decrypt(val.EncryptedPassword)
+		if err != nil {
+			return SMTPSettings{}, fmt.Errorf("failed to decrypt smtp password: %w", err)
+		}
+		res.Password = dec
+	}
+	return res, nil
+}
+
+func (s *settings) SetSMTPSettings(ctx context.Context, s_ SMTPSettings) error {
+	if s_.ReportHour < 0 || s_.ReportHour > 23 {
+		return fmt.Errorf("report hour must be between 0 and 23")
+	}
+	manager := NewSettingManager[smtpSettingsDB]("smtp_settings", s.sql)
+
+	encryptedPass := ""
+	if s_.Password != "" {
+		enc, err := s.crypto.Encrypt(s_.Password)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt smtp password: %w", err)
+		}
+		encryptedPass = enc
+	} else {
+		oldVal, err := manager.Get(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to retrieve existing smtp settings to preserve password: %w", err)
+		}
+		encryptedPass = oldVal.EncryptedPassword
+	}
+
+	val := smtpSettingsDB{
+		Host:              s_.Host,
+		Port:              s_.Port,
+		Username:          s_.Username,
+		EncryptedPassword: encryptedPass,
+		From:              s_.From,
+		ReportHour:        &s_.ReportHour,
+	}
+	if err := manager.Set(ctx, val); err != nil {
+		return fmt.Errorf("failed to set smtp settings: %w", err)
+	}
+	return nil
+}
+
+func (s *settings) GetEmailFrequency(ctx context.Context) (string, error) {
+	manager := NewSettingManager[string]("email_frequency", s.sql)
+	val, err := manager.Get(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to get email frequency: %w", err)
+	}
+	if val == "" {
+		return string(EmailFrequencyNever), nil
+	}
+	return val, nil
+}
+
+func (s *settings) SetEmailFrequency(ctx context.Context, frequency string) error {
+	manager := NewSettingManager[string]("email_frequency", s.sql)
+	if err := manager.Set(ctx, frequency); err != nil {
+		return fmt.Errorf("failed to set email frequency: %w", err)
 	}
 	return nil
 }

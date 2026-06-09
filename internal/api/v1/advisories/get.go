@@ -4,7 +4,6 @@ import (
 	"errors"
 	"net/http"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
 	"go.patchbase.net/server/internal/api/v1/entities"
@@ -24,7 +23,7 @@ func GetAdvisory(i do.Injector) apiauth.AuthenticatedHandler {
 
 		adv, err := svc.GetAdvisory(r.Context(), id)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if errors.Is(err, services.ErrAdvisoryNotFound) {
 				webutil.WriteAPIError(w, r, http.StatusNotFound, "advisory not found", nil)
 				return
 			}

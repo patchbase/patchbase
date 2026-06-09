@@ -21,6 +21,18 @@ type sshJobInfo struct {
 	frequencyMinutes int32
 }
 
+type dailyHourSchedule struct {
+	hour int
+}
+
+func (s dailyHourSchedule) Next(current time.Time) time.Time {
+	next := time.Date(current.Year(), current.Month(), current.Day(), s.hour, 0, 0, 0, time.UTC)
+	if !next.After(current) {
+		next = next.AddDate(0, 0, 1)
+	}
+	return next
+}
+
 type PeriodicJobManager struct {
 	injector do.Injector
 	queries  sql.Querier
@@ -84,6 +96,17 @@ func (p *PeriodicJobManager) Initialize(ctx context.Context) error {
 		if err := p.AddSSHPullJob(ctx, host.ID, freq, false); err != nil {
 			p.logger.ErrorContext(ctx, "failed to register initial ssh pull job", "host_id", host.ID, "error", err)
 		}
+	}
+
+	// 3. Initialize Email Report Job
+	settingsService, err := do.Invoke[services.Settings](p.injector)
+	if err == nil {
+		freq, _ := settingsService.GetEmailFrequency(ctx)
+		if err := p.SetEmailReportJob(ctx, freq); err != nil {
+			p.logger.ErrorContext(ctx, "failed to register email report job", "error", err)
+		}
+	} else {
+		p.logger.ErrorContext(ctx, "failed to get settings service for email report init", "error", err)
 	}
 
 	return nil
@@ -249,4 +272,59 @@ func (p *PeriodicJobManager) HasSSHJobForTest(hostID string) bool {
 	defer p.mu.Unlock()
 	_, ok := p.sshJobs[hostID]
 	return ok
+}
+
+func (p *PeriodicJobManager) SetEmailReportJob(ctx context.Context, frequency string) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	client, err := do.Invoke[*river.Client[pgx.Tx]](p.injector)
+	if err != nil {
+		return fmt.Errorf("failed to get *river.Client: %w", err)
+	}
+
+	client.PeriodicJobs().RemoveByID("email-report")
+
+	if frequency != string(services.EmailFrequencyDaily) {
+		p.logger.InfoContext(ctx, "email report job disabled or unknown frequency", "frequency", frequency)
+		return nil
+	}
+
+	settingsSvc, err := do.Invoke[services.Settings](p.injector)
+	if err != nil {
+		return fmt.Errorf("failed to get settings service: %w", err)
+	}
+	smtpSettings, err := settingsSvc.GetSMTPSettings(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get smtp settings: %w", err)
+	}
+
+	job := river.NewPeriodicJob(
+		dailyHourSchedule{hour: smtpSettings.ReportHour},
+		func() (river.JobArgs, *river.InsertOpts) {
+			return SendReportArgs{}, &river.InsertOpts{
+				UniqueOpts: river.UniqueOpts{
+					ByArgs: true,
+					ByState: []rivertype.JobState{
+						rivertype.JobStateAvailable,
+						rivertype.JobStatePending,
+						rivertype.JobStateRunning,
+						rivertype.JobStateScheduled,
+					},
+				},
+			}
+		},
+		&river.PeriodicJobOpts{
+			ID:         "email-report",
+			RunOnStart: false,
+		},
+	)
+
+	_, err = client.PeriodicJobs().AddSafely(job)
+	if err != nil {
+		return fmt.Errorf("add periodic email report job: %w", err)
+	}
+
+	p.logger.InfoContext(ctx, "registered periodic email report job", "frequency", frequency)
+	return nil
 }

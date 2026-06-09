@@ -43,10 +43,16 @@ func NewRiverClient(i do.Injector) (*river.Client[pgx.Tx], error) {
 		return nil, fmt.Errorf("failed to create advisory sync worker: %w", err)
 	}
 
+	emailWorker, err := NewEmailReportWorker(i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create email report worker: %w", err)
+	}
+
 	workers := river.NewWorkers()
 	river.AddWorker(workers, NewNoopWorker(queries, logger))
 	river.AddWorker(workers, sshWorker)
 	river.AddWorker(workers, advisoryWorker)
+	river.AddWorker(workers, emailWorker)
 
 	client, err := river.NewClient(riverpgxv5.New(pool), &river.Config{
 		Logger:   logger.With("source", "river"),

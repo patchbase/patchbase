@@ -9,6 +9,7 @@ go_library(
         "//internal/api",
         "//internal/api/auth",
         "//internal/config",
+        "//internal/mailer",
         "//internal/queue",
         "//internal/services",
         "//internal/services/matchers",

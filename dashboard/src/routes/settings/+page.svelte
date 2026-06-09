@@ -1,7 +1,8 @@
 <script lang="ts">
     import { onMount } from "svelte";
     import AppLayout from "$lib/components/AppLayout.svelte";
-    import { getSettings, updateSettings } from "$lib/api/settings.js";
+    import { getSettings, updateSettings, testEmail, sendReportNow } from "$lib/api/settings.js";
+    import type { SMTPSettings } from "$lib/api/settings.js";
 
     let globalPublicKey = $state("");
     let defaultSshUser = $state("");
@@ -13,6 +14,21 @@
     let saving = $state(false);
     let saved = $state(false);
 
+    let smtpSettings = $state<SMTPSettings>({
+        host: "",
+        port: 587,
+        username: "",
+        password: "",
+        from: "",
+        report_hour: 9,
+    });
+    let emailFrequency = $state("never");
+    let testEmailTo = $state("");
+    let testEmailLoading = $state(false);
+    let sendReportLoading = $state(false);
+    let testEmailSuccess = $state(false);
+    let reportSuccess = $state(false);
+
     async function loadSettings(): Promise<void> {
         loading = true;
         error = "";
@@ -21,6 +37,12 @@
             globalPublicKey = data.global_ssh_public_key;
             defaultSshUser = data.default_ssh_pull_user || "root";
             askToCopyPublicKey = data.ask_to_copy_public_key;
+            if (data.smtp_settings) {
+                smtpSettings = { ...data.smtp_settings, password: "" };
+            }
+            if (data.email_frequency) {
+                emailFrequency = data.email_frequency;
+            }
         } catch (err) {
             error =
                 err instanceof Error ? err.message : "Failed to load settings";
@@ -37,6 +59,8 @@
             await updateSettings({
                 default_ssh_pull_user: defaultSshUser,
                 ask_to_copy_public_key: askToCopyPublicKey,
+                smtp_settings: smtpSettings,
+                email_frequency: emailFrequency,
             });
             saved = true;
             setTimeout(() => {
@@ -47,6 +71,40 @@
                 err instanceof Error ? err.message : "Failed to save settings";
         } finally {
             saving = false;
+        }
+    }
+
+    async function handleTestEmail(): Promise<void> {
+        if (!testEmailTo) {
+            error = "Test email address is required";
+            return;
+        }
+        testEmailLoading = true;
+        error = "";
+        testEmailSuccess = false;
+        try {
+            await testEmail(testEmailTo);
+            testEmailSuccess = true;
+            setTimeout(() => (testEmailSuccess = false), 3000);
+        } catch (err) {
+            error = err instanceof Error ? err.message : "Failed to send test email";
+        } finally {
+            testEmailLoading = false;
+        }
+    }
+
+    async function handleSendReportNow(): Promise<void> {
+        sendReportLoading = true;
+        error = "";
+        reportSuccess = false;
+        try {
+            await sendReportNow();
+            reportSuccess = true;
+            setTimeout(() => (reportSuccess = false), 3000);
+        } catch (err) {
+            error = err instanceof Error ? err.message : "Failed to send report";
+        } finally {
+            sendReportLoading = false;
         }
     }
 
@@ -197,16 +255,91 @@
                 </div>
             </div>
         {:else if activeTab === "integrations"}
-            <div class="settings-card">
-                <h2 class="settings-title">Third-party Integrations</h2>
+            <div class="settings-card" style="margin-bottom: 24px;">
+                <h2 class="settings-title">Email Notifications (SMTP)</h2>
                 <p class="settings-description">
-                    Configure external integrations, webhook notifications, and
-                    alert systems here.
+                    Configure your SMTP server to receive daily patch reports.
                 </p>
-                <div>
-                    <p style="color: var(--text-dim); font-style: italic;">
-                        No integrations configured yet.
-                    </p>
+                <form
+                    onsubmit={(e) => {
+                        e.preventDefault();
+                        void saveSettings();
+                    }}
+                >
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px;">
+                        <div>
+                            <label class="key-label" for="smtp-host">Host</label>
+                            <input id="smtp-host" type="text" class="form-input" bind:value={smtpSettings.host} placeholder="smtp.example.com" />
+                        </div>
+                        <div>
+                            <label class="key-label" for="smtp-port">Port</label>
+                            <input id="smtp-port" type="number" class="form-input" bind:value={smtpSettings.port} placeholder="587" />
+                        </div>
+                        <div>
+                            <label class="key-label" for="smtp-username">Username</label>
+                            <input id="smtp-username" type="text" class="form-input" bind:value={smtpSettings.username} />
+                        </div>
+                        <div>
+                            <label class="key-label" for="smtp-password">Password</label>
+                            <input id="smtp-password" type="password" class="form-input" bind:value={smtpSettings.password} placeholder="Leave blank to keep unchanged" />
+                        </div>
+                        <div style="grid-column: span 2;">
+                            <label class="key-label" for="smtp-from">From Address</label>
+                            <input id="smtp-from" type="email" class="form-input" bind:value={smtpSettings.from} placeholder="noreply@example.com" />
+                        </div>
+                        <div style="grid-column: span 2;">
+                            <label class="key-label" for="email-frequency">Report Frequency</label>
+                            <select id="email-frequency" class="form-input" bind:value={emailFrequency}>
+                                <option value="never">Never (Disabled)</option>
+                                <option value="daily">Daily</option>
+                            </select>
+                        </div>
+                        {#if emailFrequency === 'daily'}
+                            <div style="grid-column: span 2;">
+                                <label class="key-label" for="report-hour">Report Hour (UTC)</label>
+                                <select id="report-hour" class="form-input" bind:value={smtpSettings.report_hour}>
+                                    {#each Array.from({length: 24}, (_, i) => i) as hour}
+                                        <option value={hour}>{hour.toString().padStart(2, '0')}:00 UTC</option>
+                                    {/each}
+                                </select>
+                            </div>
+                        {/if}
+                    </div>
+                    <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 24px;">
+                        <button type="submit" class="btn btn-primary" disabled={saving}>
+                            {saving ? "Saving..." : "Save Settings"}
+                        </button>
+                        {#if saved}
+                            <span style="color: var(--green); font-size: 14px;">Saved!</span>
+                        {/if}
+                    </div>
+                </form>
+
+                <hr style="border: none; border-top: 1px solid var(--border); margin: 24px 0;" />
+                
+                <h3 class="settings-title" style="font-size: 16px;">Test & Manual Actions</h3>
+                <div style="display: flex; flex-direction: column; gap: 16px; margin-top: 16px;">
+                    <div style="display: flex; gap: 12px; align-items: flex-end;">
+                        <div style="flex: 1;">
+                            <label class="key-label" for="test-email">Test Email Address</label>
+                            <input id="test-email" type="email" class="form-input" bind:value={testEmailTo} placeholder="admin@example.com" />
+                        </div>
+                        <button type="button" class="btn btn-secondary" onclick={handleTestEmail} disabled={testEmailLoading}>
+                            {testEmailLoading ? "Sending..." : "Send Test Email"}
+                        </button>
+                        {#if testEmailSuccess}
+                            <span style="color: var(--green); font-size: 14px; align-self: center;">Test sent!</span>
+                        {/if}
+                    </div>
+
+                    <div style="display: flex; gap: 12px; align-items: center; margin-top: 8px;">
+                        <button type="button" class="btn btn-secondary" onclick={handleSendReportNow} disabled={sendReportLoading}>
+                            {sendReportLoading ? "Sending..." : "Send Report Now"}
+                        </button>
+                        {#if reportSuccess}
+                            <span style="color: var(--green); font-size: 14px;">Report sent!</span>
+                        {/if}
+                    </div>
                 </div>
             </div>
         {:else if activeTab === "security"}

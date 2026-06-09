@@ -1,0 +1,64 @@
+# gazelle:ignore
+
+load("@aspect_bazel_lib//lib:write_source_files.bzl", "write_source_file")
+load("@bazel_gomock//rules:gomock.bzl", "gomock")
+load("@rules_go//go:def.bzl", "go_library")
+
+gomock(
+    name = "mailer",
+    out = "mailer.go",
+    interfaces = [
+        "Mailer",
+    ],
+    library = "//internal/mailer",
+    mock_names = {
+        "Mailer": "MockMailer",
+    },
+    package = "mock",
+)
+
+gomock(
+    name = "sql",
+    out = "sql.go",
+    interfaces = [
+        "Querier",
+    ],
+    library = "//internal/sql",
+    mock_names = {
+        "Querier": "MockSQLQuerier",
+    },
+    package = "mock",
+    source = "//internal/sql:querier.go",
+)
+
+write_source_file(
+    name = "write_mailer",
+    in_file = "mailer",
+    out_file = "mock_mailer.go",
+    visibility = ["//visibility:private"],
+)
+
+write_source_file(
+    name = "write_sql",
+    in_file = "sql",
+    out_file = "mock_sql.go",
+    visibility = ["//visibility:private"],
+)
+
+go_library(
+    name = "mock",
+    srcs = [
+        ":mailer",
+        ":sql",
+    ],
+    importpath = "go.patchbase.net/server/internal/mock",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//internal/mailer",
+        "//internal/services",
+        "//internal/utils",
+        "//internal/sql",
+        "@com_github_jackc_pgx_v5//pgtype",
+        "@org_uber_go_mock//gomock",
+    ],
+)

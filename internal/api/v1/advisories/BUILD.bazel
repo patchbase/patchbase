@@ -16,7 +16,6 @@ go_api_library(
         "//internal/api/v1/entities",
         "//internal/api/webutil",
         "//internal/services",
-        "@com_github_jackc_pgx_v5//:pgx",
         "@com_github_samber_do_v2//:do",
     ],
 )

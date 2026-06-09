@@ -1,0 +1,20 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "mailer",
+    srcs = [
+        "interface.go",
+        "mailer.go",
+    ],
+    embedsrcs = [
+        "templates/report.html.tmpl",
+        "templates/report.txt.tmpl",
+    ],
+    importpath = "go.patchbase.net/server/internal/mailer",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/services",
+        "//internal/sql",
+        "@com_github_samber_do_v2//:do",
+    ],
+)

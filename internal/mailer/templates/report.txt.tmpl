@@ -1,0 +1,11 @@
+Daily PatchBase Report
+
+Total Hosts: {{ .TotalHosts }}
+Hosts with Critical Updates: {{ .WithCritical }}
+Hosts with Important Updates: {{ .WithImportant }}
+Hosts with Medium Updates: {{ .WithMedium }}
+
+Top 5 Hosts:
+{{- range .TopHosts }}
+- {{ .Hostname }}: {{ .CriticalCount }} Critical, {{ .ImportantCount }} Important, {{ .ModerateCount }} Medium
+{{- end }}

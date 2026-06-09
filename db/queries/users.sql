@@ -25,6 +25,13 @@ WHERE is_admin = TRUE
 ORDER BY created_at ASC
 LIMIT 1;
 
+-- name: ListAdminUsers :many
+SELECT *
+FROM users
+WHERE is_admin = TRUE
+  AND archived_at IS NULL
+ORDER BY created_at ASC;
+
 -- name: GetUserByEmail :one
 SELECT *
 FROM users

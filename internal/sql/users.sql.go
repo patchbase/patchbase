@@ -180,6 +180,45 @@ func (q *Queries) GetUserByID(ctx context.Context, id string) (User, error) {
 	return i, err
 }
 
+const listAdminUsers = `-- name: ListAdminUsers :many
+SELECT id, email, name, password_hash, is_admin, password_reset_required, last_login_at, archived_at, created_at, updated_at
+FROM users
+WHERE is_admin = TRUE
+  AND archived_at IS NULL
+ORDER BY created_at ASC
+`
+
+func (q *Queries) ListAdminUsers(ctx context.Context) ([]User, error) {
+	rows, err := q.db.Query(ctx, listAdminUsers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.Name,
+			&i.PasswordHash,
+			&i.IsAdmin,
+			&i.PasswordResetRequired,
+			&i.LastLoginAt,
+			&i.ArchivedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateUserEmail = `-- name: UpdateUserEmail :one
 UPDATE users
 SET email = $2

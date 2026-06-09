@@ -36,6 +36,8 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 	mux.HandleFunc("PATCH /api/v1/profile", auth.Required(profilev1.UpdateProfile(i)))
 	mux.HandleFunc("GET /api/v1/settings", auth.Required(settingsv1.GetSettings(i)))
 	mux.HandleFunc("PATCH /api/v1/settings", auth.Required(settingsv1.UpdateSettings(i)))
+	mux.HandleFunc("POST /api/v1/settings/test-email", auth.Required(settingsv1.TestEmail(i)))
+	mux.HandleFunc("POST /api/v1/settings/send-report", auth.Required(settingsv1.SendReport(i)))
 	mux.HandleFunc("POST /api/v1/agent/register", agentv1.Register(i))
 	mux.HandleFunc("POST /api/v1/agent/snapshots", agentv1.Snapshots(i))
 

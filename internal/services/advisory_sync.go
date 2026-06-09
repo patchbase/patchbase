@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -29,6 +30,8 @@ import (
 	// Import pure-Go sqlite driver
 	_ "modernc.org/sqlite"
 )
+
+var ErrAdvisoryNotFound = errors.New("advisory not found")
 
 type AdvisorySyncArgs struct {
 	ScopeKey string `json:"scope_key"`
@@ -528,7 +531,7 @@ func (s *advisorySyncService) GetOverview(ctx context.Context) (AdvisoryOverview
 }
 
 func (s *advisorySyncService) GetAdvisory(ctx context.Context, id string) (db.Advisory, error) {
-	return s.queries.GetAdvisory(ctx, id)
+	return db.Required(s.queries.GetAdvisory(ctx, id))(ErrAdvisoryNotFound)
 }
 
 func optTime(o pgtype.Timestamptz) *time.Time {
