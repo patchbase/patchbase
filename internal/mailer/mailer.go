@@ -62,6 +62,7 @@ func (m *mailer) TestConnection(ctx context.Context, s services.SMTPSettings, to
 	auth := smtp.PlainAuth("", s.Username, s.Password, s.Host)
 
 	msg := []byte("To: " + to + "\r\n" +
+		"From: " + s.From + "\r\n" +
 		"Subject: Test Email from PatchBase\r\n" +
 		"\r\n" +
 		"This is a test email to verify your SMTP settings.\r\n")
@@ -164,6 +165,7 @@ func (m *mailer) SendReport(ctx context.Context, to []string) error {
 	}
 
 	var msgBuf bytes.Buffer
+	fmt.Fprintf(&msgBuf, "From: %s\r\n", s.From)
 	fmt.Fprintf(&msgBuf, "To: %s\r\n", strings.Join(to, ", "))
 	msgBuf.WriteString("Subject: PatchBase Daily Report\r\n")
 	msgBuf.WriteString("MIME-Version: 1.0\r\n")
