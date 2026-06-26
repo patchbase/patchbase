@@ -746,3 +746,64 @@ func TestAggregateHostCurrentState(t *testing.T) {
 	assert.Equal(t, int32(1), state.NoFix)
 	assert.Equal(t, int32(2), state.AvailableUpdates)
 }
+
+func TestDerivedAPTSourceKeysFromBinary(t *testing.T) {
+	tests := []struct {
+		name     string
+		pkgName  string
+		expected []string
+	}{
+		{
+			name:     "ubuntu generic kernel",
+			pkgName:  "linux-image-5.15.0-101-generic",
+			expected: []string{"linux"},
+		},
+		{
+			name:     "ubuntu aws kernel",
+			pkgName:  "linux-image-5.15.0-101-aws",
+			expected: []string{"linux-aws"},
+		},
+		{
+			name:     "debian versioned amd64 kernel",
+			pkgName:  "linux-image-6.1.0-21-amd64",
+			expected: []string{"linux"},
+		},
+		{
+			name:     "debian meta package",
+			pkgName:  "linux-image-amd64",
+			expected: []string{"linux"},
+		},
+		{
+			name:     "debian cloud kernel",
+			pkgName:  "linux-image-6.1.0-21-cloud-amd64",
+			expected: []string{"linux"},
+		},
+		{
+			name:     "debian arm64 meta package",
+			pkgName:  "linux-image-arm64",
+			expected: []string{"linux"},
+		},
+		{
+			name:     "ubuntu unsigned generic kernel",
+			pkgName:  "linux-image-unsigned-6.8.0-31-generic",
+			expected: []string{"linux"},
+		},
+		{
+			name:     "debian headers package",
+			pkgName:  "linux-headers-amd64",
+			expected: []string{"linux"},
+		},
+		{
+			name:     "non-kernel package",
+			pkgName:  "openssl",
+			expected: nil,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := derivedAPTSourceKeysFromBinary(tc.pkgName)
+			assert.Equal(t, tc.expected, got)
+		})
+	}
+}

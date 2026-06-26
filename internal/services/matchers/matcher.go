@@ -955,13 +955,16 @@ func derivedAPTSourceKeysFromBinary(name string) []string {
 	}
 
 	lastDash := strings.LastIndex(rest, "-")
-	if lastDash <= 0 || lastDash == len(rest)-1 {
+	var flavor string
+	if lastDash < 0 {
+		flavor = rest
+	} else if lastDash == 0 || lastDash == len(rest)-1 {
 		return nil
+	} else {
+		flavor = rest[lastDash+1:]
 	}
-
-	flavor := rest[lastDash+1:]
 	switch flavor {
-	case "generic":
+	case "generic", "amd64", "arm64", "armhf", "i386", "powerpc", "ppc64el", "s390x", "cloud-amd64", "cloud-arm64", "rt-amd64", "rt-arm64":
 		return []string{"linux"}
 	case "lowlatency":
 		return []string{"linux-lowlatency"}
