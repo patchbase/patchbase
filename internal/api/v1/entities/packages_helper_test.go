@@ -12,7 +12,7 @@ import (
 func TestMapDecisionRow_CVEs(t *testing.T) {
 	tests := []struct {
 		name       string
-		cvesInput  interface{}
+		cvesInput  any
 		expectCVEs []CVEInfo
 	}{
 		{
@@ -47,8 +47,8 @@ func TestMapDecisionRow_CVEs(t *testing.T) {
 		},
 		{
 			name: "Slice of maps input (pgx style)",
-			cvesInput: []interface{}{
-				map[string]interface{}{"id": "CVE-2026-33416", "url": "https://url1"},
+			cvesInput: []any{
+				map[string]any{"id": "CVE-2026-33416", "url": "https://url1"},
 			},
 			expectCVEs: []CVEInfo{
 				{ID: "CVE-2026-33416", URL: "https://url1"},

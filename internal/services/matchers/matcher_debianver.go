@@ -227,17 +227,17 @@ func parseDebianEVRFromNEVR(value string) (evr, error) {
 		}
 	}
 
-	colonIdx := strings.Index(body, ":")
+	before, after, ok := strings.Cut(body, ":")
 	var versionReleasePart string
 	epoch := int64(0)
-	if colonIdx != -1 {
-		epochPart := body[:colonIdx]
+	if ok {
+		epochPart := before
 		lastDash := strings.LastIndex(epochPart, "-")
 		epochStr := epochPart[lastDash+1:]
 		if ep, err := strconv.ParseInt(epochStr, 10, 64); err == nil {
 			epoch = ep
 		}
-		versionReleasePart = body[colonIdx+1:]
+		versionReleasePart = after
 	} else {
 		versionStart := -1
 		for i := 0; i < len(body); i++ {
@@ -282,8 +282,8 @@ func parseRunningKernelDebianEVR(value string) (evr, error) {
 		return none, fmt.Errorf("empty running kernel version")
 	}
 
-	idx := strings.Index(trimmed, "-")
-	if idx == -1 {
+	before, after, ok := strings.Cut(trimmed, "-")
+	if !ok {
 		return evr{
 			epoch:   0,
 			version: trimmed,
@@ -293,8 +293,8 @@ func parseRunningKernelDebianEVR(value string) (evr, error) {
 
 	return evr{
 		epoch:   0,
-		version: trimmed[:idx],
-		release: trimmed[idx+1:],
+		version: before,
+		release: after,
 	}, nil
 }
 

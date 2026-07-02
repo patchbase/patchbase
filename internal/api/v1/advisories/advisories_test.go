@@ -146,7 +146,7 @@ func TestAdvisoryEndpoints_ManualSync_Repeated(t *testing.T) {
 	scopeKey := "ubuntu-22.04-x86_64"
 
 	// Trigger manual sync twice
-	for i := 0; i < 2; i++ {
+	for range 2 {
 		syncRecorder := backend.HTTPPost(
 			fmt.Sprintf("/api/v1/advisories/scopes/%s/sync", scopeKey),
 			"{}",

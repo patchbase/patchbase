@@ -1014,7 +1014,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 				CollectedAt:        sql.TimestamptzFromTime(res.CollectedAt),
 				Payload:            res.Payload,
 				RunningKernelNevra: res.RunningKernel,
-				BootTime:           utils.MapOpt(res.BootTime, sql.TimestamptzFromTime).UnwrapOrZero(),
+				BootTime:           res.BootTime.Map(sql.TimestamptzFromTime).UnwrapOrZero(),
 				HasProcessData:     res.HasProcessData,
 			})
 			if insertSnapshotErr != nil {
@@ -1296,7 +1296,7 @@ func (s *hosts) IngestManualReport(ctx context.Context, hostID string, reportCon
 
 	queries := sql.New(tx)
 
-	bootTime := utils.MapOpt(res.BootTime, sql.TimestamptzFromTime).UnwrapOrZero()
+	bootTime := res.BootTime.Map(sql.TimestamptzFromTime).UnwrapOrZero()
 
 	snapshotRow, err := queries.InsertHostSnapshot(ctx, sql.InsertHostSnapshotParams{
 		ID:                 id.New("snap"),

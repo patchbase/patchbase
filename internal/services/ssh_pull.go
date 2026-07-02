@@ -291,7 +291,7 @@ func detectOSFamilyFromReleaseOutput(output []byte) string {
 		return ""
 	}
 
-	for _, candidate := range strings.Split(line, "\n") {
+	for candidate := range strings.SplitSeq(line, "\n") {
 		trimmed := strings.TrimSpace(candidate)
 		if trimmed == "" {
 			continue
@@ -302,7 +302,7 @@ func detectOSFamilyFromReleaseOutput(output []byte) string {
 			return family
 		}
 		if hasLike {
-			for _, token := range strings.Fields(strings.ReplaceAll(idLike, ",", " ")) {
+			for token := range strings.FieldsSeq(strings.ReplaceAll(idLike, ",", " ")) {
 				if family := normalizeOSFamilyString(token); family != "" {
 					return family
 				}
@@ -332,8 +332,8 @@ func ParseSSHPullReport(output []byte, collectedAt time.Time) (SSHPullResult, er
 	}
 
 	fields := map[string]string{}
-	firstPartLines := strings.Split(parts[0], "\n")
-	for _, line := range firstPartLines {
+	firstPartLines := strings.SplitSeq(parts[0], "\n")
+	for line := range firstPartLines {
 		line = strings.TrimSpace(line)
 		if !strings.HasPrefix(line, "_PB_METADATA_") {
 			continue
@@ -356,7 +356,7 @@ func ParseSSHPullReport(output []byte, collectedAt time.Time) (SSHPullResult, er
 
 	osFamily := normalizeOSFamilyString(fields["OS_ID"])
 	if osFamily == "" {
-		for _, token := range strings.Fields(strings.ReplaceAll(fields["OS_ID_LIKE"], ",", " ")) {
+		for token := range strings.FieldsSeq(strings.ReplaceAll(fields["OS_ID_LIKE"], ",", " ")) {
 			osFamily = normalizeOSFamilyString(token)
 			if osFamily != "" {
 				break
@@ -369,7 +369,7 @@ func ParseSSHPullReport(output []byte, collectedAt time.Time) (SSHPullResult, er
 
 	osMajor := int32(0)
 	if rawVersion := strings.TrimSpace(fields["OS_VERSION"]); rawVersion != "" {
-		majorPart := strings.Split(rawVersion, ".")[0]
+		majorPart, _, _ := strings.Cut(rawVersion, ".")
 		if parsed, err := strconv.ParseInt(majorPart, 10, 32); err == nil {
 			osMajor = int32(parsed)
 		}
@@ -503,7 +503,7 @@ func ParseSSHPullReport(output []byte, collectedAt time.Time) (SSHPullResult, er
 			Processes:     nil,
 		},
 	}
-	agentSnap.Host.BootTime = utils.MapOpt(bootPtr, timestamppb.New).UnwrapOr(nil)
+	agentSnap.Host.BootTime = bootPtr.Map(timestamppb.New).UnwrapOr(nil)
 
 	payload, err := proto.Marshal(agentSnap)
 	if err != nil {

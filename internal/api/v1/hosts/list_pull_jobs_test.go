@@ -42,7 +42,7 @@ func TestListPullJobsReturnsLastTenEntries(t *testing.T) {
 	assert.Empty(t, emptyJobs)
 
 	baseStartedAt := time.Now().UTC().Add(-12 * time.Minute)
-	for i := 0; i < 12; i++ {
+	for i := range 12 {
 		_, err := backend.DB().Exec(context.Background(), `
 			INSERT INTO host_ssh_pull_jobs (id, host_id, status, started_at)
 			VALUES ($1, $2, 'success', $3)

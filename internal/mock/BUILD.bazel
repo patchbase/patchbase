@@ -15,6 +15,7 @@ gomock(
         "Mailer": "MockMailer",
     },
     package = "mock",
+    source = "//internal/mailer:interface.go",
 )
 
 gomock(

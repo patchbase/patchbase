@@ -584,15 +584,13 @@ func TestMatcher_Concurrent_MatchSnapshot(t *testing.T) {
 	// Run concurrently
 	var wg sync.WaitGroup
 	errCh := make(chan error, 5)
-	for i := 0; i < 5; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+	for range 5 {
+		wg.Go(func() {
 			_, err := matcher.MatchSnapshot(ctx, hostID, snapshotID)
 			if err != nil {
 				errCh <- err
 			}
-		}()
+		})
 	}
 
 	wg.Wait()

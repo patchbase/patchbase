@@ -272,7 +272,7 @@ func TestHostIngestion_RepeatedSnapshotsKeepAdvisorySyncRateBounded(t *testing.T
 	hostsService := do.MustInvoke[services.Hosts](backend.Injector())
 
 	// Call IngestAgentSnapshot multiple times
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		_, err := hostsService.IngestAgentSnapshot(ctx, token, snapshot)
 		require.NoError(t, err)
 	}

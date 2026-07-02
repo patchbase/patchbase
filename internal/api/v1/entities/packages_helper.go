@@ -272,8 +272,8 @@ func displayRPMIdentifier(value string) string {
 		return "unknown"
 	}
 
-	if strings.HasPrefix(trimmed, "0:") {
-		return strings.TrimPrefix(trimmed, "0:")
+	if after, ok := strings.CutPrefix(trimmed, "0:"); ok {
+		return after
 	}
 
 	marker := "-0:"

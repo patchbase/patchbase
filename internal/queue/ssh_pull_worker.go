@@ -65,8 +65,7 @@ func (w *SSHPullWorker) Work(ctx context.Context, job *river.Job[services.SSHPul
 			return river.JobCancel(err)
 		}
 
-		var sshErr *services.SSHPullError
-		if errors.As(err, &sshErr) {
+		if sshErr, ok := errors.AsType[*services.SSHPullError](err); ok {
 			if sshErr.ExitCode != -1 && sshErr.ExitCode != 255 {
 				// Command executed but returned non-zero. Not retriable.
 				return river.JobCancel(err)

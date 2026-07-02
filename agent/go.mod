@@ -1,6 +1,6 @@
 module go.patchbase.net/agent
 
-go 1.25.0
+go 1.27
 
 require (
 	github.com/spf13/afero v1.15.0

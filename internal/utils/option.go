@@ -102,6 +102,14 @@ func (o Option[T]) IsNone() bool {
 	return !o.present
 }
 
+// IsNoneOrDefault returns true if the Option is None or if the contained value is the zero value for its type.
+func (o Option[T]) IsNoneOrDefault() bool {
+	if !o.present {
+		return true
+	}
+	return reflect.ValueOf(&o.value).Elem().IsZero()
+}
+
 // Get returns the contained value and a boolean indicating presence.
 // If the Option is None, the boolean will be false and the value will be the zero value of T.
 // Example:
@@ -277,13 +285,34 @@ func (o Option[T]) String() string {
 	return "None"
 }
 
-// MapOpt applies a function to the contained value (if any),
+// Map applies a function to the contained value (if any),
 // and returns a new Option containing the result.
-func MapOpt[T any, U any](opt Option[T], f func(T) U) Option[U] {
-	if opt.present {
-		return Some(f(opt.value))
+func (o Option[T]) Map[U any](f func(T) U) Option[U] {
+	if o.present {
+		return Some(f(o.value))
 	}
 	return None[U]()
+}
+
+func (o Option[T]) FlatMap[U any](f func(T) Option[U]) Option[U] {
+	if o.present {
+		return f(o.value)
+	}
+	return None[U]()
+}
+
+// Filter returns None if the option is None, otherwise calls predicate with the wrapped value
+// and returns the Option if the predicate returns true, or None if it returns false.
+func (o Option[T]) Filter(predicate func(T) bool) Option[T] {
+	if o.present && predicate(o.value) {
+		return o
+	}
+	return None[T]()
+}
+
+// IsSomeAnd returns true if the option is a Some and the value inside of it matches a predicate.
+func (o Option[T]) IsSomeAnd(f func(T) bool) bool {
+	return o.present && f(o.value)
 }
 
 // CollectValues collects all present values from a slice of Option[T] into a slice of T.
@@ -304,13 +333,6 @@ func CoalesceOpt[T any](opts ...Option[T]) Option[T] {
 		}
 	}
 	return None[T]()
-}
-
-func FlatMapOpt[T any, U any](opt Option[T], f func(T) Option[U]) Option[U] {
-	if opt.present {
-		return f(opt.value)
-	}
-	return None[U]()
 }
 
 func NonZeroOption[T comparable](value T) Option[T] {

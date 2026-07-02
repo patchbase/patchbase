@@ -1,6 +1,6 @@
 module go.patchbase.net/proto/agent
 
-go 1.25
+go 1.27
 
 require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.3

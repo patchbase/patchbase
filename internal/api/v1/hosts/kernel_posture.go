@@ -293,11 +293,8 @@ func compareVersionSegments(left string, right string) int {
 	rightTokens := strings.FieldsFunc(right, func(r rune) bool {
 		return r == '.' || r == '-' || r == '_' || r == ':'
 	})
-	maxLen := len(leftTokens)
-	if len(rightTokens) > maxLen {
-		maxLen = len(rightTokens)
-	}
-	for i := 0; i < maxLen; i++ {
+	maxLen := max(len(rightTokens), len(leftTokens))
+	for i := range maxLen {
 		leftToken := ""
 		if i < len(leftTokens) {
 			leftToken = leftTokens[i]

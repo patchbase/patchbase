@@ -144,13 +144,13 @@ func TestEqual(t *testing.T) {
 func TestMapOpt(t *testing.T) {
 	t.Run("Some maps to Some", func(t *testing.T) {
 		o := Some(21)
-		mapped := MapOpt(o, func(x int) int { return x * 2 })
+		mapped := o.Map(func(x int) int { return x * 2 })
 		require.Equal(t, Some(42), mapped)
 	})
 
 	t.Run("None maps to None", func(t *testing.T) {
 		o := None[int]()
-		mapped := MapOpt(o, func(x int) int { return x * 2 })
+		mapped := o.Map(func(x int) int { return x * 2 })
 		require.Equal(t, None[int](), mapped)
 	})
 }
@@ -192,19 +192,19 @@ func TestFlatMapOpt(t *testing.T) {
 	}
 
 	t.Run("Some and f returns Some", func(t *testing.T) {
-		result := FlatMapOpt(Some(42), half)
+		result := Some(42).FlatMap(half)
 		require.Equal(t, Some(21), result)
 	})
 
 	t.Run("Some and f returns None", func(t *testing.T) {
-		result := FlatMapOpt(Some(3), half)
+		result := Some(3).FlatMap(half)
 		require.Equal(t, None[int](), result)
 	})
 
 	t.Run("None skips f", func(t *testing.T) {
 		called := false
 		f := func(x int) Option[int] { called = true; return Some(x) }
-		result := FlatMapOpt(None[int](), f)
+		result := None[int]().FlatMap(f)
 		require.Equal(t, None[int](), result)
 		require.False(t, called)
 	})
@@ -308,5 +308,60 @@ func TestOption_Non_Zero(t *testing.T) {
 		require.True(t, opt.IsNone())
 		optStr := NonZeroOption("")
 		require.True(t, optStr.IsNone())
+	})
+}
+
+func TestOption_Filter(t *testing.T) {
+	isEven := func(x int) bool { return x%2 == 0 }
+
+	t.Run("Some and predicate true returns Some", func(t *testing.T) {
+		require.Equal(t, Some(42), Some(42).Filter(isEven))
+	})
+
+	t.Run("Some and predicate false returns None", func(t *testing.T) {
+		require.Equal(t, None[int](), Some(41).Filter(isEven))
+	})
+
+	t.Run("None skips predicate and returns None", func(t *testing.T) {
+		called := false
+		f := func(x int) bool { called = true; return true }
+		require.Equal(t, None[int](), None[int]().Filter(f))
+		require.False(t, called)
+	})
+}
+
+func TestOption_IsSomeAnd(t *testing.T) {
+	isEven := func(x int) bool { return x%2 == 0 }
+
+	t.Run("Some and predicate true returns true", func(t *testing.T) {
+		require.True(t, Some(42).IsSomeAnd(isEven))
+	})
+
+	t.Run("Some and predicate false returns false", func(t *testing.T) {
+		require.False(t, Some(41).IsSomeAnd(isEven))
+	})
+
+	t.Run("None skips predicate and returns false", func(t *testing.T) {
+		called := false
+		f := func(x int) bool { called = true; return true }
+		require.False(t, None[int]().IsSomeAnd(f))
+		require.False(t, called)
+	})
+}
+
+func TestOption_IsNoneOrDefault(t *testing.T) {
+	t.Run("None returns true", func(t *testing.T) {
+		require.True(t, None[int]().IsNoneOrDefault())
+		require.True(t, None[string]().IsNoneOrDefault())
+	})
+
+	t.Run("Some with zero value returns true", func(t *testing.T) {
+		require.True(t, Some(0).IsNoneOrDefault())
+		require.True(t, Some("").IsNoneOrDefault())
+	})
+
+	t.Run("Some with non-zero value returns false", func(t *testing.T) {
+		require.False(t, Some(42).IsNoneOrDefault())
+		require.False(t, Some("hello").IsNoneOrDefault())
 	})
 }

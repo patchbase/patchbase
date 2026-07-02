@@ -1,0 +1,31 @@
+From 2b2a26baea36342172f2802d9689122fa94155d2 Mon Sep 17 00:00:00 2001
+From: Jeff Hodges <jeff@somethingsimilar.com>
+Date: Fri, 5 Jun 2026 07:30:00 +0000
+Subject: [PATCH] fix archive mode usage on rules_go 0.61
+
+rules_go 0.61 removed the deprecated `.go` shortcut field from the
+go_context struct, so `go_ctx.go.path` fails at analysis time with
+"'struct' value has no field or method 'go'".
+
+This access the Go binary through the SDK instead via
+`go_ctx.sdk.go.path`, which works on both rules_go 0.60 and 0.61+. This
+also matches other uses of `go_ctx.sdk.go` elsewhere in this project.
+
+Fixes #303
+---
+ bazel/rules/gomock.bzl | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/bazel/rules/gomock.bzl b/bazel/rules/gomock.bzl
+index d3abb6a..dcfcf08 100644
+--- a/bazel/rules/gomock.bzl
++++ b/bazel/rules/gomock.bzl
+@@ -253,7 +253,7 @@ def _gomock_archive_impl(ctx):
+             export GOROOT=$(pwd)/{goroot} &&
+             {cmd} "$@"
+         """.format(
+-            go = go_ctx.go.path,
++            go = go_ctx.sdk.go.path,
+             goroot = go_ctx.sdk.root_file.dirname,
+             cmd = ctx.executable.mockgen_tool.path,
+         ),

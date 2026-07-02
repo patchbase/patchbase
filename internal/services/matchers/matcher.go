@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -251,7 +252,7 @@ func (m *matcher) MatchHostsForScope(ctx context.Context, scopeKey string) error
 	}
 
 	for _, host := range hosts {
-		if !host.LastSnapshotID.IsPresent() || host.LastSnapshotID.UnwrapOr("") == "" {
+		if host.LastSnapshotID.IsNoneOrDefault() {
 			continue
 		}
 		snapshotID := host.LastSnapshotID.UnwrapOr("")
@@ -716,7 +717,7 @@ func matchingRulesForPackage(pkg *agentpb.Package, rules []sql.AffectedPackageRu
 }
 
 func matchesRule(pkg *agentpb.Package, rule sql.AffectedPackageRule, osFamily string) (bool, error) {
-	if rule.RpmEvrRule.IsPresent() && rule.RpmEvrRule.UnwrapOr("") != "" {
+	if !rule.RpmEvrRule.IsNoneOrDefault() {
 		if osFamily == "apt" {
 			return evaluateDebianEVRRule(
 				evr{epoch: int64(pkg.GetEpoch()), version: pkg.GetVersion(), release: pkg.GetRelease()},
@@ -891,7 +892,7 @@ func candidatePackages(
 func packageMatchKeys(pkg *agentpb.Package) []string {
 	keys := keysForPackageMatch(pkg.GetName(), pkg.GetSourceRpm())
 	for _, derived := range derivedAPTSourceKeysFromBinary(pkg.GetName()) {
-		if !containsString(keys, derived) {
+		if !slices.Contains(keys, derived) {
 			keys = append(keys, derived)
 		}
 	}
@@ -917,15 +918,6 @@ func keysForPackageMatch(name string, source string) []string {
 	return keys
 }
 
-func containsString(items []string, target string) bool {
-	for _, item := range items {
-		if item == target {
-			return true
-		}
-	}
-	return false
-}
-
 func derivedAPTSourceKeysFromBinary(name string) []string {
 	trimmed := strings.ToLower(strings.TrimSpace(name))
 	if trimmed == "" {
@@ -945,8 +937,8 @@ func derivedAPTSourceKeysFromBinary(name string) []string {
 	}
 	rest := ""
 	for _, prefix := range prefixes {
-		if strings.HasPrefix(trimmed, prefix) {
-			rest = strings.TrimPrefix(trimmed, prefix)
+		if after, ok := strings.CutPrefix(trimmed, prefix); ok {
+			rest = after
 			break
 		}
 	}
@@ -1062,8 +1054,8 @@ func trimKernelPackagePrefixAPT(name string) (string, bool) {
 		"linux-buildinfo-",
 	}
 	for _, p := range prefixes {
-		if strings.HasPrefix(name, p) {
-			return strings.TrimPrefix(name, p), true
+		if after, ok := strings.CutPrefix(name, p); ok {
+			return after, true
 		}
 	}
 	return name, false
@@ -1178,14 +1170,14 @@ func indexReferencesByAdvisory(refs []sql.AdvisoryReference) map[string][]sql.Ad
 }
 
 func effectiveSeverity(advisory sql.Advisory, references []sql.AdvisoryReference) string {
-	if advisory.Severity.IsPresent() && strings.TrimSpace(advisory.Severity.UnwrapOr("")) != "" {
+	if !advisory.Severity.Map(strings.TrimSpace).IsNoneOrDefault() {
 		return strings.ToLower(strings.TrimSpace(advisory.Severity.UnwrapOr("")))
 	}
 
 	var highest string
 	highestPriority := -1
 	for _, ref := range references {
-		if ref.SeverityVendor.IsPresent() && strings.TrimSpace(ref.SeverityVendor.UnwrapOr("")) != "" {
+		if !ref.SeverityVendor.Map(strings.TrimSpace).IsNoneOrDefault() {
 			sv := strings.ToLower(strings.TrimSpace(ref.SeverityVendor.UnwrapOr("")))
 			prio := severityPriority(sv)
 			if prio > highestPriority {
@@ -1332,7 +1324,7 @@ func matchesPackageArch(pkgArch string, ruleArch string, osFamily string) bool {
 }
 
 func parseDecisionFixedEVR(record sql.InsertDecisionRecordParams, osFamily string) (evr, bool) {
-	if !record.FixedNevra.IsPresent() || strings.TrimSpace(record.FixedNevra.UnwrapOr("")) == "" {
+	if record.FixedNevra.Map(strings.TrimSpace).IsNoneOrDefault() {
 		return evr{epoch: 0, version: "", release: ""}, false
 	}
 

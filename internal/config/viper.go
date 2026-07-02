@@ -13,7 +13,7 @@ import (
 
 type DefaultValue struct {
 	Key   string
-	Value interface{}
+	Value any
 }
 
 var (
@@ -86,7 +86,7 @@ func newConfig(defaults []DefaultValue) (*Config, error) {
 	return &config, nil
 }
 
-func SetDefault(key string, value interface{}) {
+func SetDefault(key string, value any) {
 	Defaults = append(Defaults, DefaultValue{
 		Key:   key,
 		Value: value,

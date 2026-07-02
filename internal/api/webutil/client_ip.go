@@ -10,8 +10,8 @@ import (
 func ClientIP(r *http.Request) string {
 	trusted := isRemoteAddrLocal(r)
 	if xff := r.Header.Get("X-Forwarded-For"); trusted && xff != "" {
-		if i := strings.IndexByte(xff, ','); i != -1 {
-			return strings.TrimSpace(xff[:i])
+		if before, _, ok := strings.Cut(xff, ","); ok {
+			return strings.TrimSpace(before)
 		}
 		return strings.TrimSpace(xff)
 	}

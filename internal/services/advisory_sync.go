@@ -602,11 +602,11 @@ func ImportAdvisoryDB(ctx context.Context, tx pgx.Tx, q *db.Queries, sqliteDB *s
 			DistroFamily:  distroFamily,
 			DistroName:    distroName,
 			MajorVersion:  majorVersion,
-			MinorVersion:  optFromPtr(minorVersion),
-			Architecture:  optFromPtr(architecture),
+			MinorVersion:  utils.FromPtr(minorVersion),
+			Architecture:  utils.FromPtr(architecture),
 			RepoFamily:    repoFamily,
-			RepoIDPattern: optFromPtr(repoIDPattern),
-			Cpe:           optFromPtr(cpe),
+			RepoIDPattern: utils.FromPtr(repoIDPattern),
+			Cpe:           utils.FromPtr(cpe),
 			Status:        status,
 		})
 	}
@@ -690,14 +690,14 @@ func ImportAdvisoryDB(ctx context.Context, tx pgx.Tx, q *db.Queries, sqliteDB *s
 			ID:           id,
 			SourceSystem: sourceSystem,
 			RawSourceID:  rawSourceID,
-			SourceUrl:    optFromPtr(sourceURL),
+			SourceUrl:    utils.FromPtr(sourceURL),
 			Vendor:       vendor,
 			AdvisoryType: advisoryType,
-			Severity:     optFromPtr(severity),
-			Summary:      optFromPtr(summary),
-			Description:  optFromPtr(description),
-			PublishedAt:  optFromPtr(publishedAt),
-			UpdatedAt:    optFromPtr(updatedAt),
+			Severity:     utils.FromPtr(severity),
+			Summary:      utils.FromPtr(summary),
+			Description:  utils.FromPtr(description),
+			PublishedAt:  utils.FromPtr(publishedAt),
+			UpdatedAt:    utils.FromPtr(updatedAt),
 			EvidenceTier: evidenceTier,
 			IsSecurity:   isSecurity,
 		})
@@ -728,10 +728,10 @@ func ImportAdvisoryDB(ctx context.Context, tx pgx.Tx, q *db.Queries, sqliteDB *s
 			AdvisoryID:     advisoryID,
 			RefType:        refType,
 			RefValue:       refValue,
-			SeverityVendor: optFromPtr(severityVendor),
+			SeverityVendor: utils.FromPtr(severityVendor),
 			SeverityCvss:   severityCvss,
-			Title:          optFromPtr(title),
-			Url:            optFromPtr(url),
+			Title:          utils.FromPtr(title),
+			Url:            utils.FromPtr(url),
 		})
 		if err != nil {
 			return fmt.Errorf("insert advisory reference %s: %w", id, err)
@@ -783,12 +783,12 @@ func ImportAdvisoryDB(ctx context.Context, tx pgx.Tx, q *db.Queries, sqliteDB *s
 			AdvisoryID:        advisoryID,
 			ProductStreamID:   productStreamID,
 			PackageName:       packageName,
-			SourceRpm:         optFromPtr(sourceRPM),
-			Arch:              optFromPtr(arch),
-			EpochConstraint:   optFromPtr(epochConstraint),
-			VersionConstraint: optFromPtr(versionConstraint),
-			ReleaseConstraint: optFromPtr(releaseConstraint),
-			RpmEvrRule:        optFromPtr(rpmEvrRule),
+			SourceRpm:         utils.FromPtr(sourceRPM),
+			Arch:              utils.FromPtr(arch),
+			EpochConstraint:   utils.FromPtr(epochConstraint),
+			VersionConstraint: utils.FromPtr(versionConstraint),
+			ReleaseConstraint: utils.FromPtr(releaseConstraint),
+			RpmEvrRule:        utils.FromPtr(rpmEvrRule),
 			Context:           contextStr,
 			EvidenceTier:      evidenceTier,
 		})
@@ -822,10 +822,10 @@ func ImportAdvisoryDB(ctx context.Context, tx pgx.Tx, q *db.Queries, sqliteDB *s
 			Epoch:           epoch,
 			Version:         version,
 			Release:         release,
-			Arch:            optFromPtr(arch),
+			Arch:            utils.FromPtr(arch),
 			Nevra:           nevra,
-			SourceRpm:       optFromPtr(sourceRPM),
-			RepoFamily:      optFromPtr(repoFamily),
+			SourceRpm:       utils.FromPtr(sourceRPM),
+			RepoFamily:      utils.FromPtr(repoFamily),
 			EvidenceTier:    evidenceTier,
 		})
 		if err != nil {
@@ -837,13 +837,6 @@ func ImportAdvisoryDB(ctx context.Context, tx pgx.Tx, q *db.Queries, sqliteDB *s
 	}
 
 	return nil
-}
-
-func optFromPtr[T any](p *T) utils.Option[T] {
-	if p == nil {
-		return utils.None[T]()
-	}
-	return utils.Some(*p)
 }
 
 func isValidSha256Hex(s string) bool {
