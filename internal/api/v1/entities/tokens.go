@@ -1,14 +1,17 @@
 package entities
 
-import "go.patchbase.net/server/internal/services"
+import (
+	"go.patchbase.net/server/internal/services"
+	"go.patchbase.net/server/internal/utils"
+)
 
 type RegistrationToken struct {
-	ID              string  `json:"id"`
-	Name            string  `json:"name"`
-	CreatedByUserID string  `json:"created_by_user_id"`
-	CreatedAt       string  `json:"created_at"`
-	RevokedAt       *string `json:"revoked_at"`
-	LastUsedAt      *string `json:"last_used_at"`
+	ID              string             `json:"id"`
+	Name            string             `json:"name"`
+	CreatedByUserID string             `json:"created_by_user_id"`
+	CreatedAt       string             `json:"created_at"`
+	RevokedAt       utils.Option[string] `json:"revoked_at"`
+	LastUsedAt      utils.Option[string] `json:"last_used_at"`
 }
 
 type CreatedRegistrationToken struct {
@@ -24,8 +27,8 @@ func NewRegistrationToken(value services.RegistrationTokenInfo) RegistrationToke
 		Name:            value.Name,
 		CreatedByUserID: value.CreatedBy,
 		CreatedAt:       value.CreatedAt.UTC().Format(apiTimeLayout),
-		RevokedAt:       formatTimePtr(value.RevokedAt),
-		LastUsedAt:      formatTimePtr(value.LastUsedAt),
+		RevokedAt:       NewOptionalFormattedTime(value.RevokedAt),
+		LastUsedAt:      NewOptionalFormattedTime(value.LastUsedAt),
 	}
 }
 

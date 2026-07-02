@@ -1,9 +1,11 @@
 package entities
 
+import "go.patchbase.net/server/internal/utils"
+
 type CVEInfo struct {
-	ID    string   `json:"id"`
-	URL   string   `json:"url"`
-	Score *float64 `json:"score,omitempty"`
+	ID    string                `json:"id"`
+	URL   string                `json:"url"`
+	Score utils.Option[float64] `json:"score"`
 }
 
 type DecisionItem struct {
