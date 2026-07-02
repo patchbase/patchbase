@@ -53,7 +53,7 @@ write_file(
         "set -euo pipefail",
         "cd \"$BUILD_WORKSPACE_DIRECTORY\"",
         "rm -rf dist",
-        "mkdir -p dist/binaries dist/rpm",
+        "mkdir -p dist/binaries dist/rpm dist/deb",
     ] + [
         "cp bazel-bin/cmd/patchbase-server/patchbase-server_linux_{name} dist/binaries/patchbase-server-linux-{name}".format(name = arch["name"])
         for arch in LINUX_ARCHES
@@ -69,6 +69,18 @@ write_file(
     ] + [
         "cp bazel-bin/cmd/patchbase-server/patchbase-server-{name}-{version}-1.{name}.rpm dist/rpm/patchbase-server-{version}-1.{name}.rpm".format(
             name = arch["name"],
+            version = RELEASE_VERSION,
+        )
+        for arch in LINUX_ARCHES
+    ] + [
+        "cp bazel-bin/cmd/patchbase-server/patchbase-server_{arch}.deb dist/deb/patchbase-server_{version}-1_{arch}.deb".format(
+            arch = arch["goarch"],
+            version = RELEASE_VERSION,
+        )
+        for arch in LINUX_ARCHES
+    ] + [
+        "cp bazel-bin/agent/cmd/patchbase-agent/patchbase-agent_{arch}.deb dist/deb/patchbase-agent_{version}-1_{arch}.deb".format(
+            arch = arch["goarch"],
             version = RELEASE_VERSION,
         )
         for arch in LINUX_ARCHES
@@ -91,6 +103,12 @@ sh_binary(
         for arch in LINUX_ARCHES
     ] + [
         "//cmd/patchbase-server:patchbase-server-{name}".format(name = arch["name"])
+        for arch in LINUX_ARCHES
+    ] + [
+        "//cmd/patchbase-server:patchbase-server-deb-{name}".format(name = arch["name"])
+        for arch in LINUX_ARCHES
+    ] + [
+        "//agent/cmd/patchbase-agent:patchbase-agent-deb-{name}".format(name = arch["name"])
         for arch in LINUX_ARCHES
     ],
 )

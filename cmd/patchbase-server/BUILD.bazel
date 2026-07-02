@@ -1,5 +1,6 @@
 load("@rules_go//go:def.bzl", "go_binary", "go_library")
-load("@rules_pkg//pkg:mappings.bzl", "pkg_files")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_attributes", "pkg_files")
+load("@rules_pkg//pkg:pkg.bzl", "pkg_deb")
 load("@rules_pkg//pkg:rpm.bzl", "pkg_rpm")
 load("@rules_pkg//pkg:tar.bzl", "pkg_tar")
 load("//:version.bzl", "VERSION")
@@ -56,12 +57,64 @@ BACKEND_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
 ]
 
 [
+    pkg_files(
+        name = "deb_metadata_{name}".format(name = arch["name"]),
+        srcs = [
+            "//:config_example",
+            "//packaging:patchbase-server.service",
+        ],
+        attributes = pkg_attributes(
+            mode = "0644",
+        ),
+        renames = {
+            "//:config_example": "/etc/patchbase-server/config.example.yaml",
+            "//packaging:patchbase-server.service": "/lib/systemd/system/patchbase-server.service",
+        },
+        tags = ["manual"],
+    )
+    for arch in LINUX_ARCHES
+]
+
+[
+    pkg_files(
+        name = "deb_binary_{name}".format(name = arch["name"]),
+        srcs = [
+            ":patchbase-server_linux_{name}".format(name = arch["name"]),
+        ],
+        attributes = pkg_attributes(
+            mode = "0755",
+        ),
+        renames = {
+            ":patchbase-server_linux_{name}".format(name = arch["name"]): "/usr/bin/patchbase-server",
+        },
+        tags = ["manual"],
+    )
+    for arch in LINUX_ARCHES
+]
+
+[
     pkg_tar(
         name = "archive_{name}".format(name = arch["name"]),
         srcs = [
             ":rpm_files_{name}".format(name = arch["name"]),
         ],
         extension = "tar.gz",
+        tags = ["manual"],
+    )
+    for arch in LINUX_ARCHES
+]
+
+[
+    pkg_tar(
+        name = "deb_data_{name}".format(name = arch["name"]),
+        srcs = [
+            ":deb_binary_{name}".format(name = arch["name"]),
+            ":deb_metadata_{name}".format(name = arch["name"]),
+        ],
+        empty_dirs = [
+            "/etc/patchbase-server",
+            "/var/lib/patchbase-server",
+        ],
         tags = ["manual"],
     )
     for arch in LINUX_ARCHES
@@ -87,6 +140,33 @@ BACKEND_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
         ],
         release = "1",
         spec_file = ":patchbase-server_spec_{name}".format(name = arch["name"]),
+        tags = ["manual"],
+        version = BACKEND_VERSION,
+        visibility = ["//visibility:public"],
+    )
+    for arch in LINUX_ARCHES
+]
+
+[
+    pkg_deb(
+        name = "patchbase-server-deb-{name}".format(name = arch["name"]),
+        architecture = arch["goarch"],
+        data = ":deb_data_{name}".format(name = arch["name"]),
+        depends = [
+            "systemd",
+        ],
+        description = "PatchBase server is the backend service for PatchBase.",
+        maintainer = "Toni Pripoae <toni@patchbase.net>",
+        out = "patchbase-server_{arch}.deb".format(arch = arch["goarch"]),
+        package = "patchbase-server",
+        package_file_name = "patchbase-server_{version}-1_{arch}.deb".format(
+            arch = arch["goarch"],
+            version = BACKEND_VERSION,
+        ),
+        postinst = "//packaging:patchbase-server.postinst",
+        postrm = "//packaging:patchbase-server.postrm",
+        priority = "optional",
+        section = "admin",
         tags = ["manual"],
         version = BACKEND_VERSION,
         visibility = ["//visibility:public"],
