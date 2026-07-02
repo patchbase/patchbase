@@ -1,6 +1,7 @@
 package webutil
 
 import (
+	"errors"
 	"io"
 	"net/http"
 
@@ -20,6 +21,10 @@ func ValidateNoAuth[T any](fn ValidatedNoAuthFN[T]) http.HandlerFunc {
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
+			if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+				WriteAPIError(w, r, http.StatusRequestEntityTooLarge, "request body too large", nil)
+				return
+			}
 			WriteAPIError(w, r, http.StatusBadRequest, "read request body failed", nil)
 			return
 		}

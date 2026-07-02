@@ -25,6 +25,10 @@ api:
   # write_timeout: 60s
   # shutdown_timeout: 10s
 
+  # Maximum size of inbound request bodies in bytes; requests larger than this
+  # are rejected with HTTP 413. Default: 32 MiB.
+  # max_request_body_bytes: 33554432
+
 # SSL configuration (HTTPS)
 ssl:
   # Whether HTTPS is enabled

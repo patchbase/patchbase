@@ -191,10 +191,12 @@ integration_test(
     name = "ingest_manual_report_test",
     srcs = ["ingest_manual_report_test.go"],
     deps = [
+        "//internal/config",
         "//internal/sql",
         "//internal/sql/id",
         "//internal/testing",
         "//internal/utils",
+        "@com_github_samber_do_v2//:do",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],

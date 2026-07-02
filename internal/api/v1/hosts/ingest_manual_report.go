@@ -1,6 +1,7 @@
 package hosts
 
 import (
+	"errors"
 	"io"
 	"net/http"
 
@@ -31,6 +32,10 @@ func IngestManualReport(i do.Injector) apiauth.AuthenticatedHandler {
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
+			if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
+				webutil.WriteAPIError(w, r, http.StatusRequestEntityTooLarge, "request body too large", nil)
+				return
+			}
 			webutil.WriteAPIError(w, r, http.StatusBadRequest, "failed to read request body", nil)
 			return
 		}

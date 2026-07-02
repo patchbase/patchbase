@@ -3,12 +3,15 @@ package api
 import (
 	"bytes"
 	"crypto/tls"
+	"errors"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.patchbase.net/server/internal/api/webutil"
 )
 
@@ -117,4 +120,62 @@ func TestSecurityHeadersMiddlewareSkipsHSTSOnPlainHTTP(t *testing.T) {
 
 	assert.Empty(t, recorder.Header().Get("Strict-Transport-Security"))
 	assert.Equal(t, "DENY", recorder.Header().Get("X-Frame-Options"))
+}
+
+func TestMaxBodyBytesMiddleware_OversizedBodyProducesMaxBytesError(t *testing.T) {
+	called := false
+	handler := MaxBodyBytesMiddleware(1024)(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		_, err := io.ReadAll(r.Body)
+		require.Error(t, err, "MaxBytesReader must surface a *http.MaxBytesError")
+		_, ok := errors.AsType[*http.MaxBytesError](err)
+		require.True(t, ok, "error must be *http.MaxBytesError")
+		webutil.WriteAPIError(w, r, http.StatusRequestEntityTooLarge, "request body too large", nil)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/ingest", bytes.NewReader(bytes.Repeat([]byte("a"), 2048)))
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	assert.Equal(t, http.StatusRequestEntityTooLarge, recorder.Code)
+	assert.True(t, called, "downstream handler must run so it can observe the cap")
+}
+
+func TestMaxBodyBytesMiddleware_BodyAtLimitPasses(t *testing.T) {
+	called := false
+	handler := MaxBodyBytesMiddleware(8192)(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.Len(t, body, 1024)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/ingest", bytes.NewReader(bytes.Repeat([]byte("a"), 1024)))
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	assert.Equal(t, http.StatusOK, recorder.Code)
+	assert.True(t, called)
+}
+
+func TestMaxBodyBytesMiddleware_NonPositiveLimitUsesDefault(t *testing.T) {
+	called := false
+	handler := MaxBodyBytesMiddleware(0)(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.Len(t, body, 1024)
+		w.WriteHeader(http.StatusOK)
+	})
+
+	req := httptest.NewRequest(http.MethodPost, "/ingest", bytes.NewReader(bytes.Repeat([]byte("a"), 1024)))
+	recorder := httptest.NewRecorder()
+
+	handler.ServeHTTP(recorder, req)
+
+	assert.Equal(t, http.StatusOK, recorder.Code, "small body must pass under the default cap")
+	assert.True(t, called)
 }

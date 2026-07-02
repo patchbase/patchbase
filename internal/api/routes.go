@@ -15,6 +15,7 @@ import (
 	profilev1 "go.patchbase.net/server/internal/api/v1/profile"
 	settingsv1 "go.patchbase.net/server/internal/api/v1/settings"
 	setupv1 "go.patchbase.net/server/internal/api/v1/setup"
+	"go.patchbase.net/server/internal/config"
 )
 
 func NewMux(i do.Injector) (*http.ServeMux, error) {
@@ -22,6 +23,11 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to resolve auth: %w", err)
 	}
+	cfg, err := do.Invoke[config.Config](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to resolve config: %w", err)
+	}
+	bodyCap := MaxBodyBytesMiddleware(cfg.API.MaxRequestBodyBytes)
 	dashboardHandler, err := newDashboardHandler()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dashboard handler: %w", err)
@@ -38,8 +44,8 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 	mux.HandleFunc("PATCH /api/v1/settings", auth.Required(settingsv1.UpdateSettings(i)))
 	mux.HandleFunc("POST /api/v1/settings/test-email", auth.Required(settingsv1.TestEmail(i)))
 	mux.HandleFunc("POST /api/v1/settings/send-report", auth.Required(settingsv1.SendReport(i)))
-	mux.HandleFunc("POST /api/v1/agent/register", agentv1.Register(i))
-	mux.HandleFunc("POST /api/v1/agent/snapshots", agentv1.Snapshots(i))
+	mux.HandleFunc("POST /api/v1/agent/register", bodyCap(agentv1.Register(i)))
+	mux.HandleFunc("POST /api/v1/agent/snapshots", bodyCap(agentv1.Snapshots(i)))
 
 	mux.HandleFunc("GET /api/v1/advisories/scopes", auth.Required(advisoriesv1.GetScopeStatuses(i)))
 	mux.HandleFunc("POST /api/v1/advisories/scopes/{scopeKey}/sync", auth.Required(advisoriesv1.TriggerSync(i)))
@@ -57,7 +63,7 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 	mux.HandleFunc("POST /api/v1/hosts/manual", auth.Required(hostsv1.CreateManualHost(i)))
 	mux.HandleFunc("GET /api/v1/hosts/manual/script", auth.Required(hostsv1.GetCollectorScript(i)))
 	mux.HandleFunc("POST /api/v1/hosts/{hostID}/onboard-ssh", auth.Required(hostsv1.OnboardSSH(i)))
-	mux.HandleFunc("POST /api/v1/hosts/{hostID}/report", auth.Required(hostsv1.IngestManualReport(i)))
+	mux.HandleFunc("POST /api/v1/hosts/{hostID}/report", bodyCap(auth.Required(hostsv1.IngestManualReport(i))))
 	mux.HandleFunc("DELETE /api/v1/hosts/{hostID}", auth.Required(hostsv1.DeleteHost(i)))
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}", auth.Required(hostsv1.GetHost(i)))
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}/snapshot", auth.Required(hostsv1.GetLatestSnapshot(i)))

@@ -5,12 +5,15 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/samber/do/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	db "go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/sql/id"
+	"go.patchbase.net/server/internal/config"
 	apitesting "go.patchbase.net/server/internal/testing"
 	"go.patchbase.net/server/internal/utils"
 )
@@ -95,4 +98,41 @@ archive.ubuntu.com Enabled`
 		)
 		require.Equal(t, http.StatusBadRequest, recorder.Code)
 	})
+}
+
+func TestIngestManualReport_OversizedBodyReturns413(t *testing.T) {
+	backend := apitesting.NewBackend(
+		t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+		apitesting.WithInjectorOverride(func(i do.Injector) {
+			cfg := do.MustInvoke[config.Config](i)
+			cfg.API.MaxRequestBodyBytes = 256
+			do.Override[config.Config](i, func(_ do.Injector) (config.Config, error) {
+				return cfg, nil
+			})
+		}),
+	)
+	adminToken, err := backend.IssueAccessToken(context.Background(), "u_admin")
+	require.NoError(t, err)
+
+	ctx := context.Background()
+	queries := db.New(backend.DB())
+
+	hostID := id.New("h")
+	_, err = queries.InsertManualHost(ctx, db.InsertManualHostParams{
+		ID:          hostID,
+		DisplayName: utils.Some("manual-host-cap"),
+		Hostname:    utils.Some("manual-host-cap"),
+	})
+	require.NoError(t, err)
+	_, err = queries.ApproveHostByID(ctx, hostID)
+	require.NoError(t, err)
+
+	oversized := strings.Repeat("x", 1024)
+	recorder := backend.HTTPPostBytes(
+		fmt.Sprintf("/api/v1/hosts/%s/report", hostID),
+		[]byte(oversized),
+		apitesting.WithBearerToken(adminToken),
+	)
+	require.Equal(t, http.StatusRequestEntityTooLarge, recorder.Code)
 }

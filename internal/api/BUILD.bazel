@@ -3,6 +3,7 @@ load("@rules_go//go:def.bzl", "go_library", "go_test")
 go_library(
     name = "api",
     srcs = [
+        "bodylimit.go",
         "middleware.go",
         "routes.go",
         "server.go",
@@ -40,5 +41,6 @@ go_test(
     deps = [
         "//internal/api/webutil",
         "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
     ],
 )
