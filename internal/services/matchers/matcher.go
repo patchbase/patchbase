@@ -65,28 +65,28 @@ type advisoryData struct {
 	references          []sql.AdvisoryReference
 }
 
-func (m *matcher) loadAdvisoryDataForStreams(ctx context.Context, ids []string) (advisoryData, error) {
-	advisories, err := m.queries.ListAdvisoriesByStreamIDs(ctx, ids)
+func (m *matcher) loadAdvisoryDataForStreams(ctx context.Context, queries *sql.Queries, ids []string) (advisoryData, error) {
+	advisories, err := queries.ListAdvisoriesByStreamIDs(ctx, ids)
 	if err != nil {
 		return advisoryData{}, fmt.Errorf("list advisories by stream ids: %w", err)
 	}
 
-	links, err := m.queries.ListAdvisoryProductStreamsByStreamIDs(ctx, ids)
+	links, err := queries.ListAdvisoryProductStreamsByStreamIDs(ctx, ids)
 	if err != nil {
 		return advisoryData{}, fmt.Errorf("list advisory product streams by stream ids: %w", err)
 	}
 
-	rules, err := m.queries.ListAffectedPackageRulesByStreamIDs(ctx, ids)
+	rules, err := queries.ListAffectedPackageRulesByStreamIDs(ctx, ids)
 	if err != nil {
 		return advisoryData{}, fmt.Errorf("list affected package rules by stream ids: %w", err)
 	}
 
-	fixes, err := m.queries.ListFixedPackagesByStreamIDs(ctx, ids)
+	fixes, err := queries.ListFixedPackagesByStreamIDs(ctx, ids)
 	if err != nil {
 		return advisoryData{}, fmt.Errorf("list fixed packages by stream ids: %w", err)
 	}
 
-	references, err := m.queries.ListAdvisoryReferencesByStreamIDs(ctx, ids)
+	references, err := queries.ListAdvisoryReferencesByStreamIDs(ctx, ids)
 	if err != nil {
 		return advisoryData{}, fmt.Errorf("list advisory references by stream ids: %w", err)
 	}
@@ -171,7 +171,7 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 		}, nil
 	}
 
-	data, err := m.loadAdvisoryDataForStreams(ctx, resolvedStreamIDs)
+	data, err := m.loadAdvisoryDataForStreams(ctx, queries, resolvedStreamIDs)
 	if err != nil {
 		return MatchResult{}, err
 	}

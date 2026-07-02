@@ -5,6 +5,11 @@ Summary:        PatchBase Server
 License:        Apache-2.0
 Source0:        @@ARCHIVE_PATH@@
 
+%{!?_bindir:%global _bindir /usr/bin}
+%{!?_unitdir:%global _unitdir /usr/lib/systemd/system}
+%{!?_sysconfdir:%global _sysconfdir /etc}
+%{!?_sharedstatedir:%global _sharedstatedir /var/lib}
+
 Provides:       %{name} = %{version}
 
 %define __spec_install_post %{nil}
