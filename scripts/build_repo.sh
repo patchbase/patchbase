@@ -39,6 +39,7 @@ for EL_VER in "${EL_VERSIONS[@]}"; do
             exit 1
         fi
         cp "${rpms[@]}" "$REPO_DIR"/
+        chmod u+w "$REPO_DIR"/*.rpm
 
         echo "Signing copied RPMs in $REPO_DIR..."
         rpm --addsign "$REPO_DIR"/*.rpm
