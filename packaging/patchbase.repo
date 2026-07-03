@@ -1,0 +1,7 @@
+[patchbase]
+name=Patchbase
+baseurl=https://packages.patchbase.net/rpm/el/$releasever/$basearch/
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.patchbase.net/keys/patchbase.asc

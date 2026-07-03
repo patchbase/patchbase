@@ -63,6 +63,15 @@ jobs:
           test -s dist/repo/keys/patchbase.asc
           test -s dist/repo/keys/patchbase-archive-keyring.gpg
 
+      - name: Generate and sign RPM repository
+        env:
+          PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT: "${{ vars.PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT }}"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y createrepo-c rpm
+          export GNUPGHOME="$RELEASE_GNUPGHOME"
+          ./scripts/build_repo.sh
+
       - name: Cleanup release signing environment
         if: ${{ always() }}
         run: |
