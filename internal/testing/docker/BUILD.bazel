@@ -8,10 +8,15 @@ load("@rules_go//go:def.bzl", "go_library")
 
 go_library(
     name = "docker",
-    srcs = ["run.go"],
+    srcs = [
+        "debian.go",
+        "run.go",
+        "ubuntu.go",
+    ],
     data = [
         ":debian_dockerfile",
         ":ssh_keypair",
+        ":ubuntu_dockerfile",
     ],
     importpath = "go.patchbase.net/server/internal/testing/docker",
     tags = ["manual"],
@@ -34,6 +39,12 @@ go_library(
 filegroup(
     name = "debian_dockerfile",
     srcs = ["debian/Dockerfile"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "ubuntu_dockerfile",
+    srcs = ["ubuntu/Dockerfile"],
     visibility = ["//visibility:public"],
 )
 

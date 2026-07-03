@@ -197,23 +197,11 @@ func Start(t *testing.T, ctx context.Context, opts StartOptions) *Container {
 }
 
 // --- Distro-specific convenience wrappers ---
-
-// StartDebian brings up a Debian container with sshd running and returns
-// the host connection coordinates. If agentBinPath is non-empty the agent
-// binary is copied into /usr/local/bin/patchbase-agent inside the container
-// so the test can exec it.
 //
-// The container is automatically terminated via t.Cleanup.
-func StartDebian(t *testing.T, ctx context.Context, agentBinPath string) *Container {
-	return Start(t, ctx, StartOptions{Distro: "debian", AgentBinPath: agentBinPath})
-}
-
-// StartDebianWithOptions is the configurable Debian entry point used by
-// StartDebian and any future distro variants.
-func StartDebianWithOptions(t *testing.T, ctx context.Context, opts StartOptions) *Container {
-	opts.Distro = "debian"
-	return Start(t, ctx, opts)
-}
+// Per-distro wrappers live in debian.go, ubuntu.go, etc. New distros
+// should follow the same pattern: add Start<Distro>(t, ctx, agentBinPath)
+// and Start<Distro>WithOptions(t, ctx, opts) plus a <Distro>DockerfileDir
+// helper in a sibling file in this package.
 
 // --- Path resolution ---
 
@@ -264,12 +252,6 @@ func DistroDockerfileDir(distro string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("%s Dockerfile not found; set PATCHBASE_DOCKERFILE_DIR", distro)
-}
-
-// DebianDockerfileDir returns the path to the directory containing the
-// Debian Dockerfile. It is a convenience wrapper for DistroDockerfileDir.
-func DebianDockerfileDir() (string, error) {
-	return DistroDockerfileDir("debian")
 }
 
 // PrivateKeyDir returns the directory containing the shared test SSH

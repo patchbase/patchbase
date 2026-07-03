@@ -75,6 +75,27 @@ func DebianE2EExpectation() DistroExpectation {
 	}
 }
 
+// UbuntuE2EExpectation returns the expectation for the pinned Ubuntu 24.04
+// test image (see internal/testing/docker/ubuntu/Dockerfile).
+func UbuntuE2EExpectation() DistroExpectation {
+	return DistroExpectation{
+		Name:         "ubuntu",
+		OSFamily:     agentpb.OsFamily_OS_FAMILY_APT,
+		OSName:       "Ubuntu",
+		OSVersion:    "24.04",
+		Architecture: agentpb.Architecture_ARCHITECTURE_X86_64,
+		Package: PackageExpectation{
+			Name:    "nginx",
+			Version: "1.24.0",
+			Release: "2ubuntu7.13",
+		},
+		Repo: RepoExpectation{
+			BaseURL: "http://archive.ubuntu.com/ubuntu/",
+			Labels:  []string{"noble main", "noble"},
+		},
+	}
+}
+
 // --- Backend / admin setup ---
 
 // NewE2EBackend creates a test backend with the standard user fixture
