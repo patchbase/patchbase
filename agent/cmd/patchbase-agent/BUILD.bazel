@@ -112,6 +112,10 @@ AGENT_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
             "/etc/patchbase-agent",
             "/var/lib/patchbase-agent",
         ],
+        modes = {
+            "/etc/patchbase-agent": "0755",
+            "/var/lib/patchbase-agent": "0755",
+        },
         tags = ["manual"],
     )
     for arch in LINUX_ARCHES
@@ -166,7 +170,7 @@ AGENT_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
         priority = "optional",
         section = "admin",
         tags = ["manual"],
-        version = AGENT_VERSION,
+        version = "{}-1".format(AGENT_VERSION),
         visibility = ["//visibility:public"],
     )
     for arch in LINUX_ARCHES

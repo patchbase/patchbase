@@ -115,6 +115,10 @@ BACKEND_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
             "/etc/patchbase-server",
             "/var/lib/patchbase-server",
         ],
+        modes = {
+            "/etc/patchbase-server": "0755",
+            "/var/lib/patchbase-server": "0755",
+        },
         tags = ["manual"],
     )
     for arch in LINUX_ARCHES
@@ -169,7 +173,7 @@ BACKEND_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
         priority = "optional",
         section = "admin",
         tags = ["manual"],
-        version = BACKEND_VERSION,
+        version = "{}-1".format(BACKEND_VERSION),
         visibility = ["//visibility:public"],
     )
     for arch in LINUX_ARCHES
