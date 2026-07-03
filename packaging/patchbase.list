@@ -1,0 +1,1 @@
+deb [signed-by=/usr/share/keyrings/patchbase-archive-keyring.gpg] https://packages.patchbase.net/deb stable main

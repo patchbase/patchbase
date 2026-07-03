@@ -15,6 +15,11 @@ cat <<EOF > ~/.rpmmacros
 %__gpg_sign_cmd %{__gpg} gpg --batch --yes --pinentry-mode loopback --no-armor --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
 EOF
 
+# Ensure GPG agent allows loopback pinentry
+GNUPGHOME="${GNUPGHOME:-$HOME/.gnupg}"
+mkdir -p "$GNUPGHOME"
+echo "pinentry-mode loopback" >> "$GNUPGHOME/gpg.conf"
+
 echo "Setting up dist/repo layout..."
 
 EL_VERSIONS=(9 10)
@@ -49,6 +54,34 @@ done
 echo "Copying patchbase.repo to dist/repo/..."
 cp packaging/patchbase.repo dist/repo/
 
+# Debian Repository Generation
+echo "Setting up dist/repo/deb layout..."
+DEB_REPO_DIR="dist/repo/deb"
+mkdir -p "$DEB_REPO_DIR/conf"
+
+cat <<EOF > "$DEB_REPO_DIR/conf/distributions"
+Origin: Patchbase
+Label: Patchbase
+Codename: stable
+Architectures: amd64 arm64
+Components: main
+Description: Patchbase APT Repository
+SignWith: $GPG_KEY
+EOF
+
+echo "Including DEB packages into reprepro repository..."
+for DEB_ARCH in amd64 arm64; do
+    arch_debs=(dist/deb/*_"$DEB_ARCH".deb)
+    if [ ${#arch_debs[@]} -eq 0 ]; then
+        echo "Error: no DEB packages found for architecture $DEB_ARCH in dist/deb/" >&2
+        exit 1
+    fi
+    reprepro --basedir "$DEB_REPO_DIR" includedeb stable "${arch_debs[@]}"
+done
+
+echo "Copying patchbase.list to dist/repo/..."
+cp packaging/patchbase.list dist/repo/
+
 echo "Repository generation complete."
 
 echo "Verifying signatures..."
@@ -60,5 +93,15 @@ for EL_VER in "${EL_VERSIONS[@]}"; do
         gpg --verify "$REPO_DIR/repodata/repomd.xml.asc" "$REPO_DIR/repodata/repomd.xml"
     done
 done
+
+echo "Verifying Debian metadata..."
+TMP_LIST=$(mktemp)
+trap 'rm -f "$TMP_LIST"' EXIT
+reprepro --basedir "$DEB_REPO_DIR" list stable > "$TMP_LIST"
+cat "$TMP_LIST"
+grep -q "patchbase-server" "$TMP_LIST" || { echo "Error: patchbase-server missing from Debian repo"; exit 1; }
+grep -q "patchbase-agent" "$TMP_LIST" || { echo "Error: patchbase-agent missing from Debian repo"; exit 1; }
+gpg --verify "$DEB_REPO_DIR/dists/stable/InRelease"
+gpg --verify "$DEB_REPO_DIR/dists/stable/Release.gpg" "$DEB_REPO_DIR/dists/stable/Release"
 
 echo "All verifications passed!"
