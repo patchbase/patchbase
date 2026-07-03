@@ -125,6 +125,7 @@ BACKEND_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
         name = "patchbase-server_spec_{name}".format(name = arch["name"]),
         srcs = ["//packaging:patchbase-server.spec"],
         outs = ["patchbase-server_{name}.spec".format(name = arch["name"])],
+        # buildifier: disable=canonical-repository
         cmd = "sed 's|@@ARCHIVE_PATH@@|bazel-out/k8-fastbuild/bin/cmd/patchbase-server/archive_{name}.tar.gz|g' $(location //packaging:patchbase-server.spec) > $@".format(name = arch["name"]),
         tags = ["manual"],
     )
@@ -150,6 +151,7 @@ BACKEND_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
 [
     pkg_deb(
         name = "patchbase-server-deb-{name}".format(name = arch["name"]),
+        out = "patchbase-server_{arch}.deb".format(arch = arch["goarch"]),
         architecture = arch["goarch"],
         data = ":deb_data_{name}".format(name = arch["name"]),
         depends = [
@@ -157,7 +159,6 @@ BACKEND_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
         ],
         description = "PatchBase server is the backend service for PatchBase.",
         maintainer = "Toni Pripoae <toni@patchbase.net>",
-        out = "patchbase-server_{arch}.deb".format(arch = arch["goarch"]),
         package = "patchbase-server",
         package_file_name = "patchbase-server_{version}-1_{arch}.deb".format(
             arch = arch["goarch"],

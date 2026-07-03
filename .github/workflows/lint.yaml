@@ -1,0 +1,57 @@
+name: Lint
+on:
+  push:
+    branches:
+      - master
+      - alpha
+      - release-*
+  pull_request:
+jobs:
+  go:
+    name: Go
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Setup Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version: "1.27.0-rc.1"
+          cache: false
+      - name: Run golangci-lint
+        run: |
+          # bazel run //:golangci-lint
+          echo "golangci-lint is temporarily disabled because it does not support go 1.27 yet."
+        env:
+          GOLANGCI_LINT_CACHE: ${{ runner.temp }}/golangci_lint_cache
+
+  bazel:
+    name: Bazel
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Run Buildifier
+        run: |
+          bazel run //:buildifier_check
+
+  oxfmt:
+    name: oxfmt
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Run oxfmt
+        run: |
+          bazel test //dashboard:format_check
+
+  oxlint:
+    name: oxlint
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Run oxlint
+        run: |
+          bazel test //dashboard:lint_check

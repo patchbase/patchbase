@@ -122,6 +122,7 @@ AGENT_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
         name = "patchbase-agent_spec_{name}".format(name = arch["name"]),
         srcs = ["//packaging:patchbase-agent.spec"],
         outs = ["patchbase-agent_{name}.spec".format(name = arch["name"])],
+        # buildifier: disable=canonical-repository
         cmd = "sed 's|@@ARCHIVE_PATH@@|bazel-out/k8-fastbuild/bin/agent/cmd/patchbase-agent/archive_{name}.tar.gz|g' $(location //packaging:patchbase-agent.spec) > $@".format(name = arch["name"]),
         tags = ["manual"],
     )
@@ -147,6 +148,7 @@ AGENT_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
 [
     pkg_deb(
         name = "patchbase-agent-deb-{name}".format(name = arch["name"]),
+        out = "patchbase-agent_{arch}.deb".format(arch = arch["goarch"]),
         architecture = arch["goarch"],
         data = ":deb_data_{name}".format(name = arch["name"]),
         depends = [
@@ -154,7 +156,6 @@ AGENT_VERSION = VERSION[1:] if VERSION.startswith("v") else VERSION
         ],
         description = "PatchBase agent collects system package snapshots and reports them to the server.",
         maintainer = "Toni Pripoae <toni@patchbase.net>",
-        out = "patchbase-agent_{arch}.deb".format(arch = arch["goarch"]),
         package = "patchbase-agent",
         package_file_name = "patchbase-agent_{version}-1_{arch}.deb".format(
             arch = arch["goarch"],

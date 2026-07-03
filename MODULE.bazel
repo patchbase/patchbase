@@ -2,8 +2,10 @@ bazel_dep(name = "aspect_bazel_lib", version = "2.22.5")
 bazel_dep(name = "aspect_rules_js", version = "3.1.1")
 bazel_dep(name = "bazel_gomock", version = "0.2.0")
 bazel_dep(name = "bazel_skylib", version = "1.9.0")
+bazel_dep(name = "buildifier_prebuilt", version = "8.5.1.2")
 bazel_dep(name = "gazelle", version = "0.51.3", repo_name = "bazel_gazelle")
 bazel_dep(name = "platforms", version = "1.1.0")
+bazel_dep(name = "rules_multirun", version = "0.13.0")
 bazel_dep(name = "rules_img", version = "0.3.11")
 bazel_dep(name = "rules_go", version = "0.61.1")
 bazel_dep(name = "rules_nodejs", version = "6.7.4")
@@ -95,6 +97,9 @@ use_repo(npm, "npm")
 ###############################################################################
 sqlc = use_extension("//third_party/bzlmod:deps.bzl", "sqlc")
 use_repo(sqlc, "sqlc")
+
+golangci_lint = use_extension("//third_party/bzlmod:deps.bzl", "golangci_lint")
+use_repo(golangci_lint, "golangci_lint")
 
 ###############################################################################
 # Package / RPM

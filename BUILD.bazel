@@ -1,6 +1,7 @@
 load("@bazel_gazelle//:def.bzl", "gazelle")
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
+load("@rules_multirun//:defs.bzl", "command", "multirun")
 load("@rules_shell//shell:sh_binary.bzl", "sh_binary")
 load("//:version.bzl", "VERSION")
 load("//third_party/bazel:archs.bzl", "LINUX_ARCHES")
@@ -135,4 +136,57 @@ write_file(
 sh_binary(
     name = "coverage_report",
     srcs = [":coverage_report_sh"],
+)
+
+command(
+    name = "buildifier_check",
+    arguments = [
+        "--lint=warn",
+        "--mode=check",
+        "-r",
+        ".",
+    ],
+    command = "//third_party/buildifier",
+)
+
+command(
+    name = "buildifier_format",
+    arguments = [
+        "--lint=warn",
+        "-r",
+        ".",
+    ],
+    command = "//third_party/buildifier",
+)
+
+command(
+    name = "golangci-lint",
+    arguments = [
+        "--config=.golangci.yml",
+        "./...",
+    ],
+    command = "//third_party/golangci-lint",
+)
+
+multirun(
+    name = "lint",
+    testonly = True,
+    commands = [
+        ":buildifier_check",
+        # ":golangci-lint",
+        "//dashboard:format_check",
+        "//dashboard:lint_check",
+    ],
+    jobs = 1,
+)
+
+multirun(
+    name = "format",
+    testonly = True,
+    commands = [
+        ":buildifier_format",
+        "//dashboard:format",
+        "//dashboard:lint",
+    ],
+    jobs = 1,
 )

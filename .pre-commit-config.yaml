@@ -1,0 +1,34 @@
+repos:
+  - repo: local
+    hooks:
+      - id: lint
+        name: lint
+        entry: bazel run //:lint
+        language: system
+        files: ""
+        pass_filenames: false
+      - id: bazel-update-must-be-clean
+        name: bazel update must not modify files
+        language: system
+        pass_filenames: false
+        entry: |
+          bash -lc '
+            set -euo pipefail
+
+            # Allow staged changes (the commit), but require no *unstaged* changes
+            if ! git diff --quiet; then
+              echo "❌ You have unstaged changes. Please stage or stash them before committing."
+              git --no-pager diff --stat
+              exit 1
+            fi
+
+            bazel run //db:sqlc
+            bazel run //:gazelle
+
+            # Reject if updater changed anything in the working tree
+            if ! git diff --quiet; then
+              echo "❌ Bazel update modified files. Run it and commit those changes explicitly."
+              git --no-pager diff --stat
+              exit 1
+            fi
+          '

@@ -97,6 +97,7 @@ sh_test(
         ".oxfmtrc.json",
         ":node_modules",
     ],
+    visibility = ["//visibility:public"],
 )
 
 write_file(
@@ -121,6 +122,7 @@ sh_binary(
     data = [
         ":node_modules",
     ],
+    visibility = ["//visibility:public"],
 )
 
 write_file(
@@ -155,6 +157,7 @@ sh_test(
     ]) + [
         ":node_modules",
     ],
+    visibility = ["//visibility:public"],
 )
 
 write_file(
@@ -179,4 +182,5 @@ sh_binary(
     data = [
         ":node_modules",
     ],
+    visibility = ["//visibility:public"],
 )

@@ -57,8 +57,8 @@ go_library(
     deps = [
         "//internal/mailer",
         "//internal/services",
-        "//internal/utils",
         "//internal/sql",
+        "//internal/utils",
         "@com_github_jackc_pgx_v5//pgtype",
         "@org_uber_go_mock//gomock",
     ],
