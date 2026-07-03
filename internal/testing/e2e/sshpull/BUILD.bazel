@@ -1,0 +1,17 @@
+load("@rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "sshpull_debian_test",
+    size = "large",
+    srcs = ["sshpull_debian_test.go"],
+    data = ["//db/fixtures"],
+    gotags = ["integration_docker"],
+    tags = [
+        "integration_docker",
+        "no-sandbox",
+    ],
+    deps = [
+        "//internal/testing",
+        "//internal/testing/docker",
+    ],
+)

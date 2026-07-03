@@ -7,3 +7,8 @@ build --@rules_go//go/config:static
 
 test --test_env=TEST_DATABASE_PORT
 test --test_env=PATCHBASE_TEST_DATABASE_URL
+
+# Exclude docker-based e2e integration tests from the default `bazel test`
+# run; run them explicitly via:
+#   bazel test --test_tag_filters=integration_docker //internal/testing/e2e/...
+test --test_tag_filters=-integration_docker

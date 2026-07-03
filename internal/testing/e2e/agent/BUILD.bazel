@@ -1,0 +1,20 @@
+load("@rules_go//go:def.bzl", "go_test")
+
+go_test(
+    name = "agent_debian_test",
+    size = "large",
+    srcs = ["agent_debian_test.go"],
+    data = [
+        "//agent/cmd/patchbase-agent",
+        "//db/fixtures",
+    ],
+    gotags = ["integration_docker"],
+    tags = [
+        "integration_docker",
+        "no-sandbox",
+    ],
+    deps = [
+        "//internal/testing",
+        "//internal/testing/docker",
+    ],
+)

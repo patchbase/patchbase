@@ -1,0 +1,4 @@
+# E2E integration tests are gated behind the `integration_docker` build tag.
+# This directive makes gazelle process those tagged files so it can generate
+# the go_test targets in subdirectories.
+# gazelle:build_tags integration_docker

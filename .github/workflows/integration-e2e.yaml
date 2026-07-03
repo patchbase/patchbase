@@ -1,0 +1,30 @@
+name: Integration Tests (E2E)
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  e2e:
+    name: Docker E2E
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Start Test Database
+        uses: https://github.com/hoverkraft-tech/compose-action@11beaa1c2dae4e8ed7b1665aa074723b6cecb0e4 # v3
+        with:
+          compose-file: "./compose.test.yaml"
+
+      - name: Run E2E Integration Tests
+        run: |
+          bazel test --test_output=streamed --test_arg=-test.v --nocache_test_results \
+            --test_tag_filters=integration_docker \
+            //internal/testing/e2e/...
+
+      - name: Cleanup Environment
+        if: ${{ always() }}
+        run: docker compose -f ./compose.test.yaml down --volumes --remove-orphans

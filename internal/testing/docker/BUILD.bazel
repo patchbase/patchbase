@@ -1,0 +1,50 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+# Test-only package. The `//go:build integration_docker` build tag
+# keeps the source files out of the default `bazel build //...`
+# graph; the `# gazelle:build_tags` directive below makes gazelle
+# process the tagged files so it can generate the go_library target.
+# gazelle:build_tags integration_docker
+
+go_library(
+    name = "docker",
+    srcs = ["run.go"],
+    data = [
+        ":debian_dockerfile",
+        ":ssh_keypair",
+    ],
+    importpath = "go.patchbase.net/server/internal/testing/docker",
+    tags = ["manual"],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//internal/services",
+        "//internal/testing",
+        "@com_github_docker_docker//api/types/container",
+        "@com_github_docker_go_connections//nat",
+        "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@com_github_testcontainers_testcontainers_go//:testcontainers-go",
+        "@com_github_testcontainers_testcontainers_go//exec",
+        "@com_github_testcontainers_testcontainers_go//wait",
+    ],
+)
+
+# Distro Dockerfiles. One filegroup per distro; add new distros here.
+filegroup(
+    name = "debian_dockerfile",
+    srcs = ["debian/Dockerfile"],
+    visibility = ["//visibility:public"],
+)
+
+# Shared SSH keypair fixtures used by all distro e2e tests. Regenerated
+# via fixtures/regenerate.sh. The authorized_keys file is NOT included
+# here — the test harness injects it at runtime via WriteAuthorizedKey.
+filegroup(
+    name = "ssh_keypair",
+    srcs = [
+        "fixtures/id_ed25519",
+        "fixtures/id_ed25519.pub",
+    ],
+    visibility = ["//visibility:public"],
+)

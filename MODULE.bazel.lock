@@ -340,6 +340,26 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//third_party/bzlmod:deps.bzl%golangci_lint": {
+      "os:linux,arch:amd64": {
+        "bzlTransitiveDigest": "sDS6cVJld6i6itH3V79y8KNOgVC9MtzKsuih0HbI1Zg=",
+        "usagesDigest": "U174+fOyQpdu4Tj0tTR+0nd/6Yjf86/5rmYC82CZ4bM=",
+        "recordedInputs": [
+          "REPO_MAPPING:,bazel_tools bazel_tools"
+        ],
+        "generatedRepoSpecs": {
+          "golangci_lint": {
+            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
+            "attributes": {
+              "url": "https://github.com/golangci/golangci-lint/releases/download/v2.12.2/golangci-lint-2.12.2-linux-amd64.tar.gz",
+              "sha256": "8df580d2670fed8fa984aac0507099af8df275e665215f5c7a2ae3943893a553",
+              "strip_prefix": "golangci-lint-2.12.2-linux-amd64",
+              "build_file": "@@//third_party/golangci-lint:golangci-lint.BUILD"
+            }
+          }
+        }
+      }
+    },
     "//third_party/bzlmod:deps.bzl%sqlc": {
       "os:linux,arch:amd64": {
         "bzlTransitiveDigest": "sDS6cVJld6i6itH3V79y8KNOgVC9MtzKsuih0HbI1Zg=",
