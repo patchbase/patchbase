@@ -10,14 +10,12 @@ on:
         type: boolean
         default: true
 
-
+env:
+  TAG: "${{ github.ref_name }}"
 
 jobs:
   release:
     runs-on: ubuntu-26.04
-    env:
-      TAG: "${{ github.ref_name }}"
-      RELEASE_GNUPGHOME: "${{ runner.temp }}/patchbase-release-gnupg"
     steps:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -52,6 +50,7 @@ jobs:
           PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT: "${{ vars.PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT }}"
           PATCHBASE_PACKAGE_SIGNING_PUBLIC_KEY: "${{ vars.PATCHBASE_PACKAGE_SIGNING_PUBLIC_KEY }}"
         run: |
+          export RELEASE_GNUPGHOME="$RUNNER_TEMP/patchbase-release-gnupg"
           rm -rf "$RELEASE_GNUPGHOME"
           mkdir -p "$RELEASE_GNUPGHOME"
           chmod 700 "$RELEASE_GNUPGHOME"
@@ -86,12 +85,14 @@ jobs:
         env:
           PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT: "${{ vars.PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT }}"
         run: |
+          export RELEASE_GNUPGHOME="$RUNNER_TEMP/patchbase-release-gnupg"
           export GNUPGHOME="$RELEASE_GNUPGHOME"
           ./scripts/build_repo.sh
 
       - name: Cleanup release signing environment
         if: ${{ always() }}
         run: |
+          export RELEASE_GNUPGHOME="$RUNNER_TEMP/patchbase-release-gnupg"
           rm -rf "$RELEASE_GNUPGHOME"
 
       - name: Safety checks before upload
