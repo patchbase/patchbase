@@ -3,6 +3,12 @@ name: release
 on:
   release:
     types: [published]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run (do not actually upload)"
+        type: boolean
+        default: true
 
 env:
   TAG: "${{ github.ref_name }}"
@@ -15,7 +21,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            curl \
+            gnupg \
+            awscli \
+            createrepo-c \
+            rpm \
+            reprepro
+
       - name: Write version file
+        if: github.event_name == 'release'
         run: |
           TAG="${{ env.TAG }}"
           VERSION=$(echo "$TAG" | sed -E 's/^v([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
@@ -67,8 +85,6 @@ jobs:
         env:
           PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT: "${{ vars.PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT }}"
         run: |
-          sudo apt-get update
-          sudo apt-get install -y createrepo-c rpm reprepro
           export GNUPGHOME="$RELEASE_GNUPGHOME"
           ./scripts/build_repo.sh
 
@@ -76,3 +92,52 @@ jobs:
         if: ${{ always() }}
         run: |
           rm -rf "$RELEASE_GNUPGHOME"
+
+      - name: Safety checks before upload
+        run: |
+          echo "Running safety checks..."
+
+          # Fail if private key patterns or temporary GPG files are found under dist/repo/
+          if grep -qR "BEGIN PGP PRIVATE KEY BLOCK" dist/repo; then
+            echo "Error: Private key found in dist/repo"
+            exit 1
+          fi
+
+          # Fail if RPM repomd.xml signatures are missing
+          for repomd in $(find dist/repo/rpm -name "repomd.xml"); do
+            if [ ! -f "${repomd}.asc" ]; then
+              echo "Error: RPM signature missing for $repomd"
+              exit 1
+            fi
+          done
+
+          # Fail if DEB InRelease or Release.gpg is missing
+          if [ ! -f dist/repo/deb/dists/stable/InRelease ] && [ ! -f dist/repo/deb/dists/stable/Release.gpg ]; then
+            echo "Error: DEB InRelease and Release.gpg missing"
+            exit 1
+          fi
+
+          # Fail if unsigned RPMs are present
+          for pkg in $(find dist/repo/rpm -name "*.rpm"); do
+            if rpm -qpi "$pkg" | grep -Ei "Signature\s*:\s*(none|None)"; then
+              echo "Error: Unsigned RPM found: $pkg"
+              exit 1
+            fi
+          done
+
+          echo "All safety checks passed."
+
+      - name: Upload to Cloudflare R2
+        env:
+          R2_ENDPOINT: "${{ secrets.R2_ENDPOINT }}"
+          R2_BUCKET: "${{ secrets.R2_BUCKET }}"
+          AWS_ACCESS_KEY_ID: "${{ secrets.R2_ACCESS_KEY_ID }}"
+          AWS_SECRET_ACCESS_KEY: "${{ secrets.R2_SECRET_ACCESS_KEY }}"
+        run: |
+          # Use aws s3 sync for idempotency and efficiency
+          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+            echo "Running in dry-run mode..."
+            aws s3 sync --dryrun --endpoint-url "$R2_ENDPOINT" dist/repo/ "s3://$R2_BUCKET/"
+          else
+            aws s3 sync --endpoint-url "$R2_ENDPOINT" dist/repo/ "s3://$R2_BUCKET/"
+          fi
