@@ -1,0 +1,69 @@
+name: release
+
+on:
+  release:
+    types: [published]
+
+env:
+  TAG: "${{ github.ref_name }}"
+  RELEASE_GNUPGHOME: "${{ runner.temp }}/patchbase-release-gnupg"
+
+jobs:
+  release:
+    runs-on: ubuntu-26.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+
+      - name: Write version file
+        run: |
+          TAG="${{ env.TAG }}"
+          VERSION=$(echo "$TAG" | sed -E 's/^v([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+          echo "VERSION = \"$VERSION\"" > version.bzl
+
+      - name: Build
+        run: bazel build //...
+
+      - name: Package dist
+        run: bazel run //:dist
+
+      - name: Prepare release signing artifacts
+        env:
+          PATCHBASE_PACKAGE_SIGNING_KEY: "${{ secrets.PATCHBASE_PACKAGE_SIGNING_KEY }}"
+          PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT: "${{ vars.PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT }}"
+          PATCHBASE_PACKAGE_SIGNING_PUBLIC_KEY: "${{ vars.PATCHBASE_PACKAGE_SIGNING_PUBLIC_KEY }}"
+        run: |
+          rm -rf "$RELEASE_GNUPGHOME"
+          mkdir -p "$RELEASE_GNUPGHOME"
+          chmod 700 "$RELEASE_GNUPGHOME"
+          export GNUPGHOME="$RELEASE_GNUPGHOME"
+
+          key_file="$RUNNER_TEMP/patchbase-package-signing-subkey-private.asc"
+          trap 'rm -f "$key_file"' EXIT
+
+          printf '%s' "$PATCHBASE_PACKAGE_SIGNING_KEY" > "$key_file"
+          gpg --batch --import "$key_file"
+          gpg --batch --list-keys --with-fingerprint
+          gpg --batch --list-secret-keys --with-fingerprint
+
+          imported_fpr="$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^fpr:/ {print $10; exit}')"
+          expected_fpr="$(printf '%s' "$PATCHBASE_PACKAGE_SIGNING_KEY_FINGERPRINT" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')"
+          imported_fpr="$(printf '%s' "$imported_fpr" | tr -d '[:space:]' | tr '[:lower:]' '[:upper:]')"
+
+          test -n "$expected_fpr"
+          test -n "$imported_fpr"
+          test "$expected_fpr" = "$imported_fpr"
+
+          mkdir -p dist/repo/keys
+          printf '%s' "$PATCHBASE_PACKAGE_SIGNING_PUBLIC_KEY" > dist/repo/keys/patchbase.asc
+          gpg --batch --yes --dearmor \
+            --output dist/repo/keys/patchbase-archive-keyring.gpg \
+            dist/repo/keys/patchbase.asc
+
+          test -s dist/repo/keys/patchbase.asc
+          test -s dist/repo/keys/patchbase-archive-keyring.gpg
+
+      - name: Cleanup release signing environment
+        if: ${{ always() }}
+        run: |
+          rm -rf "$RELEASE_GNUPGHOME"
