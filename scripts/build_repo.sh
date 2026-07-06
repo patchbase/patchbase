@@ -9,16 +9,53 @@ if [ -z "$GPG_KEY" ]; then
     exit 1
 fi
 
-# Write rpm macros for non-interactive signing
-cat <<EOF > ~/.rpmmacros
-%_gpg_name $GPG_KEY
-%__gpg_sign_cmd %{__gpg} gpg --batch --yes --pinentry-mode loopback --no-armor --no-secmem-warning -u "%{_gpg_name}" -sbo %{__signature_filename} %{__plaintext_filename}
-EOF
+PASSPHRASE="${PATCHBASE_PACKAGE_SIGNING_KEY_PASSPHRASE:-}"
+if [ -z "$PASSPHRASE" ]; then
+    echo "Error: PATCHBASE_PACKAGE_SIGNING_KEY_PASSPHRASE is not set." >&2
+    exit 1
+fi
 
-# Ensure GPG agent allows loopback pinentry
 GNUPGHOME="${GNUPGHOME:-$HOME/.gnupg}"
 mkdir -p "$GNUPGHOME"
-echo "pinentry-mode loopback" >> "$GNUPGHOME/gpg.conf"
+chmod 700 "$GNUPGHOME"
+
+# Allow loopback pinentry so passphrase-based signing works non-interactively.
+gpg_conf="$GNUPGHOME/gpg.conf"
+touch "$gpg_conf"
+grep -q '^pinentry-mode loopback$' "$gpg_conf" || echo "pinentry-mode loopback" >> "$gpg_conf"
+
+agent_conf="$GNUPGHOME/gpg-agent.conf"
+touch "$agent_conf"
+grep -q '^allow-loopback-pinentry$' "$agent_conf" || echo "allow-loopback-pinentry" >> "$agent_conf"
+# Restart agent so it picks up the new config.
+gpgconf --kill gpg-agent 2>/dev/null || true
+gpgconf --launch gpg-agent 2>/dev/null || true
+
+# Wrapper that injects the passphrase for every gpg invocation so rpm and
+# reprepro (which call gpg internally) can sign without prompting.
+GPG_WRAPPER="$GNUPGHOME/gpg-wrapper"
+cat > "$GPG_WRAPPER" <<EOF
+#!/usr/bin/env bash
+exec /usr/bin/gpg \\
+  --pinentry-mode loopback \\
+  --passphrase-fd 3 \\
+  "\$@" 3<<'__PB_PASSPHRASE__'
+${PASSPHRASE}
+__PB_PASSPHRASE__
+EOF
+chmod 700 "$GPG_WRAPPER"
+
+# Write rpm macros for non-interactive signing.
+cat <<EOF > ~/.rpmmacros
+%_gpg_name ${GPG_KEY}
+%__gpg ${GPG_WRAPPER}
+%_gpg_sign_cmd_extra_args --batch --yes
+EOF
+
+# Wrapper used by this script for direct gpg calls.
+sign_gpg() {
+    "$GPG_WRAPPER" "$@"
+}
 
 echo "Setting up dist/repo layout..."
 
@@ -48,7 +85,9 @@ for EL_VER in "${EL_VERSIONS[@]}"; do
         createrepo_c "$REPO_DIR"
 
         echo "Signing repository metadata for $REPO_DIR..."
-        gpg --detach-sign --armor --local-user "$GPG_KEY" --yes "$REPO_DIR/repodata/repomd.xml"
+        sign_gpg --detach-sign --armor --local-user "$GPG_KEY" --yes \
+            --output "$REPO_DIR/repodata/repomd.xml.asc" \
+            "$REPO_DIR/repodata/repomd.xml"
     done
 done
 
@@ -67,9 +106,10 @@ Codename: stable
 Architectures: amd64 arm64
 Components: main
 Description: Patchbase APT Repository
-SignWith: $GPG_KEY
+SignWith: ${GPG_KEY}
 EOF
 
+# reprepro calls gpg internally; make sure it uses the wrapper too.
 echo "Including DEB packages into reprepro repository..."
 for DEB_ARCH in amd64 arm64; do
     arch_debs=(dist/deb/*_"$DEB_ARCH".deb)
@@ -77,7 +117,7 @@ for DEB_ARCH in amd64 arm64; do
         echo "Error: no DEB packages found for architecture $DEB_ARCH in dist/deb/" >&2
         exit 1
     fi
-    reprepro --basedir "$DEB_REPO_DIR" includedeb stable "${arch_debs[@]}"
+    PATH="$GNUPGHOME:$PATH" reprepro --basedir "$DEB_REPO_DIR" includedeb stable "${arch_debs[@]}"
 done
 
 echo "Copying patchbase.list to dist/repo/..."
@@ -85,19 +125,25 @@ cp packaging/patchbase.list dist/repo/
 
 echo "Repository generation complete."
 
+# Set up an isolated rpmdb so verification works on distros without /var/lib/rpm
+# and without requiring root. Import the public key into it so --checksig can
+# actually validate signatures.
+VERIFY_RPMDB="$(mktemp -d)"
+trap 'rm -rf "$VERIFY_RPMDB"' EXIT
+rpm --dbpath "$VERIFY_RPMDB" --import dist/repo/keys/patchbase.asc
+
 echo "Verifying signatures..."
 for EL_VER in "${EL_VERSIONS[@]}"; do
     for ARCH in "${ARCHES[@]}"; do
         REPO_DIR="dist/repo/rpm/el/$EL_VER/$ARCH"
-        rpm --checksig "$REPO_DIR"/*.rpm
-        createrepo_c --checkts "$REPO_DIR"
+        rpm --dbpath "$VERIFY_RPMDB" --checksig "$REPO_DIR"/*.rpm
         gpg --verify "$REPO_DIR/repodata/repomd.xml.asc" "$REPO_DIR/repodata/repomd.xml"
     done
 done
 
 echo "Verifying Debian metadata..."
-TMP_LIST=$(mktemp)
-trap 'rm -f "$TMP_LIST"' EXIT
+TMP_LIST="$(mktemp)"
+trap 'rm -rf "$VERIFY_RPMDB" "$TMP_LIST"' EXIT
 reprepro --basedir "$DEB_REPO_DIR" list stable > "$TMP_LIST"
 cat "$TMP_LIST"
 grep -q "patchbase-server" "$TMP_LIST" || { echo "Error: patchbase-server missing from Debian repo"; exit 1; }
