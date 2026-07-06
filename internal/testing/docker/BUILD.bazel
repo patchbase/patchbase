@@ -10,11 +10,13 @@ go_library(
     name = "docker",
     srcs = [
         "debian.go",
+        "rocky.go",
         "run.go",
         "ubuntu.go",
     ],
     data = [
         ":debian_dockerfile",
+        ":rocky_dockerfile",
         ":ssh_keypair",
         ":ubuntu_dockerfile",
     ],
@@ -39,6 +41,12 @@ go_library(
 filegroup(
     name = "debian_dockerfile",
     srcs = ["debian/Dockerfile"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "rocky_dockerfile",
+    srcs = ["rocky/Dockerfile"],
     visibility = ["//visibility:public"],
 )
 

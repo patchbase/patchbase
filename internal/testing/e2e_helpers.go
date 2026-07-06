@@ -96,6 +96,31 @@ func UbuntuE2EExpectation() DistroExpectation {
 	}
 }
 
+// RockyE2EExpectation returns the expectation for the pinned Rocky Linux 9.7
+// test image (see internal/testing/docker/rocky/Dockerfile). The nginx NEVRA
+// pins to the 1.20.1 base package (epoch 2) shipped outside the AppStream
+// module streams in the 9.7 vault. Vendor is asserted separately via the
+// snapshot's package list (Rocky signs all packages with "Rocky Enterprise
+// Software Foundation").
+func RockyE2EExpectation() DistroExpectation {
+	return DistroExpectation{
+		Name:         "rocky",
+		OSFamily:     agentpb.OsFamily_OS_FAMILY_RPM,
+		OSName:       "Rocky Linux",
+		OSVersion:    "9.7",
+		Architecture: agentpb.Architecture_ARCHITECTURE_X86_64,
+		Package: PackageExpectation{
+			Name:    "nginx",
+			Version: "1.20.1",
+			Release: "24.el9",
+		},
+		Repo: RepoExpectation{
+			BaseURL: "https://dl.rockylinux.org/vault/rocky/9.7/BaseOS/x86_64/os/",
+			Labels:  []string{"Rocky Linux 9.7 - BaseOS", "Rocky Linux 9.7 - AppStream"},
+		},
+	}
+}
+
 // --- Backend / admin setup ---
 
 // NewE2EBackend creates a test backend with the standard user fixture
