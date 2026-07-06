@@ -9,12 +9,14 @@ load("@rules_go//go:def.bzl", "go_library")
 go_library(
     name = "docker",
     srcs = [
+        "alma.go",
         "debian.go",
         "rocky.go",
         "run.go",
         "ubuntu.go",
     ],
     data = [
+        ":alma_dockerfile",
         ":debian_dockerfile",
         ":rocky_dockerfile",
         ":ssh_keypair",
@@ -38,6 +40,12 @@ go_library(
 )
 
 # Distro Dockerfiles. One filegroup per distro; add new distros here.
+filegroup(
+    name = "alma_dockerfile",
+    srcs = ["alma/Dockerfile"],
+    visibility = ["//visibility:public"],
+)
+
 filegroup(
     name = "debian_dockerfile",
     srcs = ["debian/Dockerfile"],

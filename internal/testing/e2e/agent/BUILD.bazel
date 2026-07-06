@@ -56,3 +56,22 @@ go_test(
         "//internal/testing/docker",
     ],
 )
+
+go_test(
+    name = "agent_alma_test",
+    size = "large",
+    srcs = ["agent_alma_test.go"],
+    data = [
+        "//agent/cmd/patchbase-agent",
+        "//db/fixtures",
+    ],
+    gotags = ["integration_docker"],
+    tags = [
+        "integration_docker",
+        "no-sandbox",
+    ],
+    deps = [
+        "//internal/testing",
+        "//internal/testing/docker",
+    ],
+)

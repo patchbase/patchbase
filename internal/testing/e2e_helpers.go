@@ -121,6 +121,31 @@ func RockyE2EExpectation() DistroExpectation {
 	}
 }
 
+// AlmaE2EExpectation returns the expectation for the pinned AlmaLinux 9.7
+// test image (see internal/testing/docker/alma/Dockerfile). The nginx NEVRA
+// pins to the 1.20.1 base package (epoch 2) shipped outside the AppStream
+// module streams in the 9.7 vault, with Alma's `.alma.1` rebuild suffix.
+// Vendor is asserted separately via the snapshot's package list (Alma signs
+// all packages with "AlmaLinux").
+func AlmaE2EExpectation() DistroExpectation {
+	return DistroExpectation{
+		Name:         "alma",
+		OSFamily:     agentpb.OsFamily_OS_FAMILY_RPM,
+		OSName:       "AlmaLinux",
+		OSVersion:    "9.7",
+		Architecture: agentpb.Architecture_ARCHITECTURE_X86_64,
+		Package: PackageExpectation{
+			Name:    "nginx",
+			Version: "1.20.1",
+			Release: "24.el9_7.1.alma.1",
+		},
+		Repo: RepoExpectation{
+			BaseURL: "https://repo.almalinux.org/vault/9.7/BaseOS/x86_64/os/",
+			Labels:  []string{"AlmaLinux 9.7 - BaseOS", "AlmaLinux 9.7 - AppStream"},
+		},
+	}
+}
+
 // --- Backend / admin setup ---
 
 // NewE2EBackend creates a test backend with the standard user fixture
