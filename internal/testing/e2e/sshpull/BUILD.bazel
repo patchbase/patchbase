@@ -63,3 +63,35 @@ go_test(
         "//internal/testing/docker",
     ],
 )
+
+go_test(
+    name = "sshpull_rhel9_test",
+    size = "large",
+    srcs = ["sshpull_rhel9_test.go"],
+    data = ["//db/fixtures"],
+    gotags = ["integration_docker"],
+    tags = [
+        "integration_docker",
+        "no-sandbox",
+    ],
+    deps = [
+        "//internal/testing",
+        "//internal/testing/docker",
+    ],
+)
+
+go_test(
+    name = "sshpull_rhel10_test",
+    size = "large",
+    srcs = ["sshpull_rhel10_test.go"],
+    data = ["//db/fixtures"],
+    gotags = ["integration_docker"],
+    tags = [
+        "integration_docker",
+        "no-sandbox",
+    ],
+    deps = [
+        "//internal/testing",
+        "//internal/testing/docker",
+    ],
+)

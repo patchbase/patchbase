@@ -75,3 +75,41 @@ go_test(
         "//internal/testing/docker",
     ],
 )
+
+go_test(
+    name = "agent_rhel9_test",
+    size = "large",
+    srcs = ["agent_rhel9_test.go"],
+    data = [
+        "//agent/cmd/patchbase-agent",
+        "//db/fixtures",
+    ],
+    gotags = ["integration_docker"],
+    tags = [
+        "integration_docker",
+        "no-sandbox",
+    ],
+    deps = [
+        "//internal/testing",
+        "//internal/testing/docker",
+    ],
+)
+
+go_test(
+    name = "agent_rhel10_test",
+    size = "large",
+    srcs = ["agent_rhel10_test.go"],
+    data = [
+        "//agent/cmd/patchbase-agent",
+        "//db/fixtures",
+    ],
+    gotags = ["integration_docker"],
+    tags = [
+        "integration_docker",
+        "no-sandbox",
+    ],
+    deps = [
+        "//internal/testing",
+        "//internal/testing/docker",
+    ],
+)

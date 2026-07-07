@@ -146,6 +146,67 @@ func AlmaE2EExpectation() DistroExpectation {
 	}
 }
 
+// RHEL9E2EExpectation returns the expectation for the pinned Red Hat UBI
+// 9.3 test image (see internal/testing/docker/rhel9/Dockerfile). The nginx
+// NEVRA pins to the 1.20.1 base package (epoch 2). Vendor is asserted
+// separately via the snapshot's package list (Red Hat signs packages with
+// "Red Hat, Inc.").
+//
+// The UBI repo baseurls contain $basearch which the collector's
+// firstLiteralURL filter drops, so we match repos by label (the repo name
+// string) rather than BaseURL.
+func RHEL9E2EExpectation() DistroExpectation {
+	return DistroExpectation{
+		Name:         "rhel9",
+		OSFamily:     agentpb.OsFamily_OS_FAMILY_RPM,
+		OSName:       "Red Hat Enterprise Linux",
+		OSVersion:    "9.3",
+		Architecture: agentpb.Architecture_ARCHITECTURE_X86_64,
+		Package: PackageExpectation{
+			Name:    "nginx",
+			Version: "1.20.1",
+			Release: "28.el9_8.3",
+		},
+		Repo: RepoExpectation{
+			Labels: []string{
+				"Red Hat Universal Base Image 9 (RPMs) - BaseOS",
+				"Red Hat Universal Base Image 9 (RPMs) - AppStream",
+			},
+		},
+	}
+}
+
+// RHEL10E2EExpectation returns the expectation for the pinned Red Hat UBI
+// 10.0 test image (see internal/testing/docker/rhel10/Dockerfile). RHEL 10
+// no longer ships the base nginx 1.20.1 package; we pin to the 1.26.3
+// AppStream default instead (epoch 2). Vendor is asserted separately via
+// the snapshot's package list (Red Hat signs packages with
+// "Red Hat, Inc.").
+//
+// RHEL 10 uses a different repo-id naming scheme
+// (ubi-10-for-$basearch-baseos-rpms) but the repo name/label is stable, so
+// we match by label.
+func RHEL10E2EExpectation() DistroExpectation {
+	return DistroExpectation{
+		Name:         "rhel10",
+		OSFamily:     agentpb.OsFamily_OS_FAMILY_RPM,
+		OSName:       "Red Hat Enterprise Linux",
+		OSVersion:    "10.0",
+		Architecture: agentpb.Architecture_ARCHITECTURE_X86_64,
+		Package: PackageExpectation{
+			Name:    "nginx",
+			Version: "1.26.3",
+			Release: "6.el10_2.4",
+		},
+		Repo: RepoExpectation{
+			Labels: []string{
+				"Red Hat Universal Base Image 10 (RPMs) - BaseOS",
+				"Red Hat Universal Base Image 10 (RPMs) - AppStream",
+			},
+		},
+	}
+}
+
 // --- Backend / admin setup ---
 
 // NewE2EBackend creates a test backend with the standard user fixture

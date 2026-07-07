@@ -11,6 +11,8 @@ go_library(
     srcs = [
         "alma.go",
         "debian.go",
+        "rhel10.go",
+        "rhel9.go",
         "rocky.go",
         "run.go",
         "ubuntu.go",
@@ -18,6 +20,8 @@ go_library(
     data = [
         ":alma_dockerfile",
         ":debian_dockerfile",
+        ":rhel10_dockerfile",
+        ":rhel9_dockerfile",
         ":rocky_dockerfile",
         ":ssh_keypair",
         ":ubuntu_dockerfile",
@@ -49,6 +53,18 @@ filegroup(
 filegroup(
     name = "debian_dockerfile",
     srcs = ["debian/Dockerfile"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "rhel9_dockerfile",
+    srcs = ["rhel9/Dockerfile"],
+    visibility = ["//visibility:public"],
+)
+
+filegroup(
+    name = "rhel10_dockerfile",
+    srcs = ["rhel10/Dockerfile"],
     visibility = ["//visibility:public"],
 )
 
