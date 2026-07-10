@@ -40,7 +40,6 @@ jobs:
       - name: Write version file
         if: github.event_name == 'release'
         run: |
-          TAG="${{ env.TAG }}"
           VERSION=$(echo "$TAG" | sed -E 's/^v([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
           echo "VERSION = \"$VERSION\"" > version.bzl
 
@@ -143,9 +142,10 @@ jobs:
           R2_BUCKET: "${{ secrets.R2_BUCKET }}"
           AWS_ACCESS_KEY_ID: "${{ secrets.R2_ACCESS_KEY_ID }}"
           AWS_SECRET_ACCESS_KEY: "${{ secrets.R2_SECRET_ACCESS_KEY }}"
+          DRY_RUN: "${{ inputs.dry_run }}"
         run: |
           # Use aws s3 sync for idempotency and efficiency
-          if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+          if [ "$DRY_RUN" == "true" ]; then
             echo "Running in dry-run mode..."
             aws s3 sync --dryrun --endpoint-url "$R2_ENDPOINT" dist/repo/ "s3://$R2_BUCKET/"
           else
