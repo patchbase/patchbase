@@ -9,7 +9,7 @@ const config: Config = {
   tagline: 'Self-hosted vulnerability and patch management for Linux servers',
   favicon: 'img/favicon.ico',
 
-  url: 'https://patchbase.net',
+  url: 'https://docs.patchbase.net',
   baseUrl: '/',
 
   organizationName: 'patchbase',
