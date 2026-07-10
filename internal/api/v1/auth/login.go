@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/samber/do/v2"
-	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/services"
 )
 

@@ -79,14 +79,15 @@ func NewBackend(t *gotesting.T, opts ...Option) *Backend {
 	cfg := config.Config{
 		SkipValidation: true,
 		API: config.API{
-			JWTSecretKey:      defaultJWTSecretKey,
-			ListenAddress:     config.DefaultAPIListenAddress,
-			Port:              config.DefaultAPIPort,
-			ReadTimeout:       config.DefaultReadTimeout,
-			ReadHeaderTimeout: config.DefaultReadHeaderTimeout,
-			WriteTimeout:      config.DefaultWriteTimeout,
-			ShutdownTimeout:   config.DefaultShutdownTimeout,
-			RequestLogLevel:   "debug",
+			JWTSecretKey:        defaultJWTSecretKey,
+			ListenAddress:       config.DefaultAPIListenAddress,
+			Port:                config.DefaultAPIPort,
+			ReadTimeout:         config.DefaultReadTimeout,
+			ReadHeaderTimeout:   config.DefaultReadHeaderTimeout,
+			WriteTimeout:        config.DefaultWriteTimeout,
+			ShutdownTimeout:     config.DefaultShutdownTimeout,
+			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
+			RequestLogLevel:     "debug",
 		},
 		Database: config.Database{
 			URL:      options.databaseURL,

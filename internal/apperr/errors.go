@@ -23,6 +23,7 @@ func New(httpStatus int, code, message string) *Error {
 		HTTPStatus: httpStatus,
 		Code:       code,
 		Message:    message,
+		Details:    nil,
 	}
 }
 

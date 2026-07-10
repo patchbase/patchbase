@@ -7,8 +7,8 @@ import (
 
 	"github.com/samber/do/v2"
 	agent "go.patchbase.net/proto/agent"
-	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/services"
 )
 

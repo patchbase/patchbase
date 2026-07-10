@@ -6,10 +6,10 @@ import (
 )
 
 type RegistrationToken struct {
-	ID              string             `json:"id"`
-	Name            string             `json:"name"`
-	CreatedByUserID string             `json:"created_by_user_id"`
-	CreatedAt       string             `json:"created_at"`
+	ID              string               `json:"id"`
+	Name            string               `json:"name"`
+	CreatedByUserID string               `json:"created_by_user_id"`
+	CreatedAt       string               `json:"created_at"`
 	RevokedAt       utils.Option[string] `json:"revoked_at"`
 	LastUsedAt      utils.Option[string] `json:"last_used_at"`
 }

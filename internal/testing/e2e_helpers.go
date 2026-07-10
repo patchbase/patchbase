@@ -168,6 +168,7 @@ func RHEL9E2EExpectation() DistroExpectation {
 			Release: "28.el9_8.4",
 		},
 		Repo: RepoExpectation{
+			BaseURL: "",
 			Labels: []string{
 				"Red Hat Universal Base Image 9 (RPMs) - BaseOS",
 				"Red Hat Universal Base Image 9 (RPMs) - AppStream",
@@ -199,6 +200,7 @@ func RHEL10E2EExpectation() DistroExpectation {
 			Release: "6.el10_2.5",
 		},
 		Repo: RepoExpectation{
+			BaseURL: "",
 			Labels: []string{
 				"Red Hat Universal Base Image 10 (RPMs) - BaseOS",
 				"Red Hat Universal Base Image 10 (RPMs) - AppStream",
@@ -336,7 +338,7 @@ func FetchSnapshotPayload(t gotesting.TB, backend *Backend, hostID string) []byt
 func FetchParsedSnapshot(t gotesting.TB, backend *Backend, hostID string) *agentpb.AgentSnapshot {
 	t.Helper()
 	payload := FetchSnapshotPayload(t, backend, hostID)
-	parsed := &agentpb.AgentSnapshot{}
+	parsed := &agentpb.AgentSnapshot{} // nolint: exhaustruct
 	require.NoError(t, proto.Unmarshal(payload, parsed))
 	return parsed
 }

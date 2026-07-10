@@ -101,7 +101,7 @@ func newActiveTopics(initial []string) *activeTopics {
 	for _, t := range initial {
 		m[t] = struct{}{}
 	}
-	return &activeTopics{topics: m}
+	return &activeTopics{topics: m, mu: sync.RWMutex{}}
 }
 
 func (a *activeTopics) has(topic string) bool {
@@ -151,19 +151,19 @@ func (h *localHub) HandleWS(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithCancel(r.Context())
 	defer cancel()
 
-	client := &wsClient{conn: conn}
+	client := &wsClient{conn: conn, writeMu: sync.Mutex{}}
 
 	// read auth message
 	authCtx, authCancel := context.WithTimeout(ctx, authTimeout)
 	user, err := h.readAuth(authCtx, conn)
 	authCancel()
 	if err != nil {
-		_ = client.writeJSON(ctx, serverMessage{Type: "error", Message: "unauthorized"})
+		_ = client.writeJSON(ctx, serverMessage{Type: "error", Message: "unauthorized", Data: nil, HostID: ""})
 		conn.Close(websocket.StatusPolicyViolation, "unauthorized")
 		return
 	}
 
-	_ = client.writeJSON(ctx, serverMessage{Type: "auth_ok"})
+	_ = client.writeJSON(ctx, serverMessage{Type: "auth_ok", Message: "", Data: nil, HostID: ""})
 
 	// read subscription message
 	subCtx, subCancel := context.WithTimeout(ctx, authTimeout)
@@ -265,7 +265,8 @@ func (h *localHub) eventLoop(ctx context.Context, client *wsClient, sub *events.
 			}
 			h.handleEvent(ctx, client, ev, &mu, debouncers, active)
 		case <-ticker.C:
-			if err := client.writeJSON(ctx, serverMessage{Type: "ping"}); err != nil {
+			msg := serverMessage{Type: "ping", Message: "", Data: nil, HostID: ""}
+			if err := client.writeJSON(ctx, msg); err != nil {
 				h.logger.Debug("ws ping failed, disconnecting", "error", err)
 				return
 			}
@@ -327,8 +328,10 @@ func (h *localHub) handleEvent(
 			msgType = "host_deleted"
 		}
 		if err := client.writeJSON(ctx, serverMessage{
-			Type:   msgType,
-			HostID: hostID,
+			Type:    msgType,
+			HostID:  hostID,
+			Message: "",
+			Data:    nil,
 		}); err != nil {
 			h.logger.Debug("ws write failed", "error", err)
 		}
@@ -342,8 +345,10 @@ func (h *localHub) pushHosts(ctx context.Context, client *wsClient) {
 		return
 	}
 	if err := client.writeJSON(ctx, serverMessage{
-		Type: "hosts",
-		Data: entities.NewHosts(hosts),
+		Type:    "hosts",
+		Data:    entities.NewHosts(hosts),
+		HostID:  "",
+		Message: "",
 	}); err != nil {
 		h.logger.Debug("ws write hosts failed", "error", err)
 	}
@@ -361,8 +366,10 @@ func (h *localHub) pushAdvisories(ctx context.Context, client *wsClient) {
 		return
 	}
 	if err := client.writeJSON(ctx, serverMessage{
-		Type: "advisories",
-		Data: advisoriesData{Scopes: scopes, Overview: overview},
+		Type:    "advisories",
+		Data:    advisoriesData{Scopes: scopes, Overview: overview},
+		HostID:  "",
+		Message: "",
 	}); err != nil {
 		h.logger.Debug("ws write advisories failed", "error", err)
 	}
@@ -383,16 +390,16 @@ func (h *localHub) readLoop(ctx context.Context, client *wsClient, sub *events.S
 		}
 		var msg clientMessage
 		if err := json.Unmarshal(data, &msg); err == nil {
-		if (msg.Type == "subscribe" || msg.Type == "unsubscribe") && len(msg.Topics) > 0 {
-			if msg.Type == "subscribe" {
-				active.add(msg.Topics)
-			} else {
-				active.remove(msg.Topics)
+			if (msg.Type == "subscribe" || msg.Type == "unsubscribe") && len(msg.Topics) > 0 {
+				if msg.Type == "subscribe" {
+					active.add(msg.Topics)
+				} else {
+					active.remove(msg.Topics)
+				}
+				newTopics := updateTopics(sub.Topics, msg.Type, msg.Topics)
+				h.broker.Update(sub, newTopics)
+				h.logger.Debug("ws dynamic topic update", "type", msg.Type, "topics", msg.Topics)
 			}
-			newTopics := updateTopics(sub.Topics, msg.Type, msg.Topics)
-			h.broker.Update(sub, newTopics)
-			h.logger.Debug("ws dynamic topic update", "type", msg.Type, "topics", msg.Topics)
-		}
 		}
 	}
 }
@@ -402,14 +409,16 @@ func updateTopics(current []string, action string, delta []string) []string {
 	for _, t := range current {
 		m[t] = true
 	}
-	if action == "subscribe" {
+	switch action {
+	case "subscribe":
 		for _, t := range delta {
 			m[t] = true
 		}
-	} else if action == "unsubscribe" {
+	case "unsubscribe":
 		for _, t := range delta {
 			delete(m, t)
 		}
+	default:
 	}
 	var res []string
 	for t := range m {

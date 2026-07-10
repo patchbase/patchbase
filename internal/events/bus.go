@@ -48,6 +48,8 @@ func NewBroker() Broker {
 	return &localBroker{
 		subscribers: make(map[string]map[uint64]chan Event),
 		channels:    make(map[uint64]chan Event),
+		mu:          sync.RWMutex{},
+		nextID:      atomic.Uint64{},
 	}
 }
 
@@ -101,9 +103,7 @@ func (b *localBroker) Update(sub *Subscriber, topics []string) {
 	// Remove from old topics
 	for _, topic := range sub.Topics {
 		if subs, ok := b.subscribers[topic]; ok {
-			if _, exists := subs[sub.ID]; exists {
-				delete(subs, sub.ID)
-			}
+			delete(subs, sub.ID)
 			if len(subs) == 0 {
 				delete(b.subscribers, topic)
 			}

@@ -399,7 +399,7 @@ func TestHostPackages_GroupingEdgeCases(t *testing.T) {
 	require.NoError(t, err)
 	_, err = backend.DB().Exec(ctx, `
 		INSERT INTO advisory_references (id, advisory_id, ref_type, ref_value, url)
-		VALUES 
+		VALUES
 			('ref1', 'USN-1000-1', 'cve', 'CVE-2026-10001', 'https://cve.org/10001'),
 			('ref2', 'USN-1000-1', 'cve', 'CVE-2026-10002', 'https://cve.org/10002')
 	`)
@@ -408,7 +408,7 @@ func TestHostPackages_GroupingEdgeCases(t *testing.T) {
 	// Advisory 2 & 3: Multiple advisories for same package, equal severities (critical) to test deterministic order
 	_, err = backend.DB().Exec(ctx, `
 		INSERT INTO advisories (id, source_system, raw_source_id, vendor, advisory_type, severity, summary, evidence_tier, is_security, updated_at)
-		VALUES 
+		VALUES
 			('USN-2000-2', 'ubuntu_usn_api', '2000-2', 'ubuntu', 'security', 'critical', 'Critical 2', 'vendor_db', true, '2026-05-21T10:00:00Z'),
 			('USN-2000-1', 'ubuntu_usn_api', '2000-1', 'ubuntu', 'security', 'critical', 'Critical 1', 'vendor_db', true, '2026-05-21T10:00:00Z')
 	`)
@@ -520,7 +520,6 @@ func TestHostPackages_GroupingEdgeCases(t *testing.T) {
 
 	var groups []map[string]any
 	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &groups))
-	
 
 	// Assertions based on edge cases
 	require.Len(t, groups, 3)

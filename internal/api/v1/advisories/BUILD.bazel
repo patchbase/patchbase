@@ -3,7 +3,6 @@ load("//third_party/bazel:go_rules.bzl", "go_api_library", "integration_test")
 go_api_library(
     name = "advisories",
     srcs = [
-        "advisories.go",
         "get.go",
         "overview.go",
         "scopes.go",
