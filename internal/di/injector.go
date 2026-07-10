@@ -9,12 +9,14 @@ import (
 	"go.patchbase.net/server/internal/api"
 	"go.patchbase.net/server/internal/api/auth"
 	"go.patchbase.net/server/internal/config"
+	"go.patchbase.net/server/internal/events"
 	"go.patchbase.net/server/internal/mailer"
 	"go.patchbase.net/server/internal/queue"
 	"go.patchbase.net/server/internal/services"
 	"go.patchbase.net/server/internal/services/matchers"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/utils"
+	"go.patchbase.net/server/internal/ws"
 )
 
 func New(ctx context.Context, cfg config.Config) do.Injector {
@@ -26,6 +28,9 @@ func New(ctx context.Context, cfg config.Config) do.Injector {
 	do.ProvideValue[utils.RandomStringGenerator](injector, utils.NewRandomStringGenerator())
 	do.Provide[utils.Crypto](injector, utils.NewCrypto)
 	do.Provide[*http.ServeMux](injector, api.NewMux)
+
+	// events
+	do.ProvideValue[events.Broker](injector, events.NewBroker())
 
 	// database
 	do.Provide(injector, sql.NewPGXPool)
@@ -44,5 +49,6 @@ func New(ctx context.Context, cfg config.Config) do.Injector {
 
 	// api
 	do.Provide[auth.Auth](injector, auth.New)
+	do.Provide[ws.Hub](injector, ws.NewHub)
 	return injector
 }

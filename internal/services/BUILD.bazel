@@ -15,6 +15,7 @@ go_library(
     deps = [
         "//internal/apperr",
         "//internal/config",
+        "//internal/events",
         "//internal/services/matchers",
         "//internal/sql",
         "//internal/sql/id",

@@ -6,9 +6,9 @@
 	import { listAdvisoryScopes, triggerAdvisorySync, getAdvisoryOverview } from '$lib/api/advisories.js';
 	import { relativeTime, formatBytes } from '$lib/format';
 	import type { AdvisoryScopeStatus, AdvisoryOverview } from '$lib/api/advisories.js';
+	import { advisoryScopes, advisoryOverview, advisoriesConnected } from '$lib/stores/advisories';
+	import { createPollingFallback } from '$lib/ws/fallback';
 
-	let scopes = $state<AdvisoryScopeStatus[]>([]);
-	let overview = $state<AdvisoryOverview | null>(null);
 	let loading = $state(true);
 	let error = $state('');
 	let syncingScopes = $state<Record<string, boolean>>({});
@@ -23,8 +23,8 @@
 				listAdvisoryScopes(),
 				getAdvisoryOverview()
 			]);
-			scopes = newScopes;
-			overview = newOverview;
+			advisoryScopes.set(newScopes);
+			advisoryOverview.set(newOverview);
 		} catch (err) {
 			if (!silent) {
 				error = err instanceof Error ? err.message : 'Failed to load advisories.';
@@ -39,14 +39,27 @@
 	}
 
 	onMount(() => {
-		void loadAdvisories();
+		if ($advisoryScopes.length === 0 && $advisoryOverview === null) {
+			void loadAdvisories();
+		} else {
+			loading = false;
+		}
 
-		const interval = setInterval(() => {
-			void loadAdvisories(true);
-		}, 5000);
+		let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+		const fallback = createPollingFallback(() => loadAdvisories(true), 5000);
+		const unsubConnected = advisoriesConnected.subscribe((connected) => {
+			if (!connected) {
+				fallbackTimer = setTimeout(() => { fallback.start(); }, 10000);
+			} else {
+				clearTimeout(fallbackTimer);
+				fallback.stop();
+			}
+		});
 
 		return () => {
-			clearInterval(interval);
+			unsubConnected();
+			clearTimeout(fallbackTimer);
+			fallback.stop();
 		};
 	});
 
@@ -55,10 +68,13 @@
 		try {
 			await triggerAdvisorySync(scopeKey);
 			// Local status update for instant visual feedback
-			const idx = scopes.findIndex((s) => s.scope_key === scopeKey);
-			if (idx !== -1) {
-				scopes[idx] = { ...scopes[idx], status: 'running' };
-			}
+			advisoryScopes.update(scopes => {
+				const idx = scopes.findIndex((s) => s.scope_key === scopeKey);
+				if (idx !== -1) {
+					scopes[idx] = { ...scopes[idx], status: 'running' };
+				}
+				return scopes;
+			});
 			await loadAdvisories(true);
 		} catch (err) {
 			alert(err instanceof Error ? err.message : 'Failed to trigger sync.');
@@ -67,12 +83,12 @@
 		}
 	}
 
-	let activeHosts = $derived(scopes.reduce((sum, s) => sum + s.host_usage_count, 0));
+	let activeHosts = $derived($advisoryScopes.reduce((sum, s) => sum + s.host_usage_count, 0));
 
 	let stats = $derived([
-		{ label: 'Total Advisories', value: overview?.total_advisories ?? 0, color: 'accent' },
-		{ label: 'Demanded Scopes', value: overview?.total_scopes ?? 0, color: 'blue' },
-		{ label: 'Synced Scopes', value: overview?.synced_scopes ?? 0, color: 'green' },
+		{ label: 'Total Advisories', value: $advisoryOverview?.total_advisories ?? 0, color: 'accent' },
+		{ label: 'Demanded Scopes', value: $advisoryOverview?.total_scopes ?? 0, color: 'blue' },
+		{ label: 'Synced Scopes', value: $advisoryOverview?.synced_scopes ?? 0, color: 'green' },
 		{ label: 'Active Hosts', value: activeHosts, color: 'purple' }
 	]);
 </script>
@@ -96,7 +112,7 @@
 				<p>Loading advisories...</p>
 			</div>
 		{:else}
-			{#if scopes.length === 0}
+			{#if $advisoryScopes.length === 0}
 				<div class="empty-state">
 					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-database">
 						<ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
@@ -122,7 +138,7 @@
 						</tr>
 					</thead>
 					<tbody>
-						{#each scopes as scope (scope.scope_key)}
+						{#each $advisoryScopes as scope (scope.scope_key)}
 							<tr>
 								<td class="mono" style="font-weight: 600; color: var(--text-primary);">{scope.scope_key}</td>
 								<td>

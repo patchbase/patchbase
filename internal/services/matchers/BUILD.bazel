@@ -11,6 +11,7 @@ go_library(
     importpath = "go.patchbase.net/server/internal/services/matchers",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/events",
         "//internal/sql",
         "//internal/sql/id",
         "//internal/utils",

@@ -12,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/do/v2"
 	agentpb "go.patchbase.net/proto/agent"
+	"go.patchbase.net/server/internal/events"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/sql/id"
 	"go.patchbase.net/server/internal/utils"
@@ -35,6 +36,7 @@ type matcher struct {
 	logger  *slog.Logger
 	pool    *pgxpool.Pool
 	queries sql.Querier
+	broker  events.Broker
 }
 
 func NewMatcher(i do.Injector) (Matcher, error) {
@@ -50,10 +52,15 @@ func NewMatcher(i do.Injector) (Matcher, error) {
 	if err != nil {
 		return nil, err
 	}
+	broker, err := do.Invoke[events.Broker](i)
+	if err != nil {
+		return nil, err
+	}
 	return &matcher{
 		logger:  logger.With("source", "MatcherService"),
 		pool:    pool,
 		queries: queries,
+		broker:  broker,
 	}, nil
 }
 
@@ -162,6 +169,8 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 			return MatchResult{}, fmt.Errorf("commit matcher transaction: %w", err)
 		}
 
+		m.broker.Publish(events.NewHostMatchedEvent(hostID))
+
 		return MatchResult{
 			HostID:            hostID,
 			SnapshotID:        snapshotID,
@@ -236,6 +245,8 @@ func (m *matcher) MatchSnapshot(ctx context.Context, hostID string, snapshotID s
 		"match_ms", time.Since(startedAt).Milliseconds(),
 	)
 
+	m.broker.Publish(events.NewHostMatchedEvent(hostID))
+
 	return MatchResult{
 		HostID:            hostID,
 		SnapshotID:        snapshotID,
@@ -260,6 +271,8 @@ func (m *matcher) MatchHostsForScope(ctx context.Context, scopeKey string) error
 			m.logger.WarnContext(ctx, "failed to rematch host after scope sync", "host_id", host.ID, "snapshot_id", snapshotID, "error", err)
 		}
 	}
+
+	m.broker.Publish(events.NewHostsUpdatedEvent())
 
 	return nil
 }

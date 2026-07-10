@@ -23,6 +23,7 @@ import (
 	"github.com/spf13/afero"
 	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/config"
+	"go.patchbase.net/server/internal/events"
 	"go.patchbase.net/server/internal/services/matchers"
 	db "go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/utils"
@@ -77,6 +78,7 @@ type advisorySyncService struct {
 	httpClient         *http.Client
 	injector           do.Injector
 	periodicJobManager PeriodicJobManager
+	broker             events.Broker
 }
 
 func NewAdvisorySync(i do.Injector) (AdvisorySyncService, error) {
@@ -96,6 +98,10 @@ func NewAdvisorySync(i do.Injector) (AdvisorySyncService, error) {
 	if err != nil {
 		return nil, err
 	}
+	broker, err := do.Invoke[events.Broker](i)
+	if err != nil {
+		return nil, err
+	}
 
 	return &advisorySyncService{
 		config:             cfg,
@@ -105,6 +111,7 @@ func NewAdvisorySync(i do.Injector) (AdvisorySyncService, error) {
 		httpClient:         &http.Client{Timeout: 2 * time.Minute},
 		injector:           i,
 		periodicJobManager: periodicJobManager,
+		broker:             broker,
 	}, nil
 }
 
@@ -209,6 +216,7 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 			Status:    "failed",
 			LastError: utils.Some(errMsg),
 		})
+		s.broker.Publish(events.NewAdvisoriesUpdatedEvent())
 		return syncErr
 	}
 
@@ -296,6 +304,7 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 		if err != nil {
 			return handleFailure(fmt.Errorf("failed to save synced scope metadata: %w", err))
 		}
+		s.broker.Publish(events.NewAdvisoriesUpdatedEvent())
 		return nil
 	}
 
@@ -427,6 +436,8 @@ func (s *advisorySyncService) SyncScope(ctx context.Context, scopeKey string) er
 	if err != nil {
 		return handleFailure(fmt.Errorf("failed to save synced scope metadata: %w", err))
 	}
+
+	s.broker.Publish(events.NewAdvisoriesUpdatedEvent())
 
 	return nil
 }

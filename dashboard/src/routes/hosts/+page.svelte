@@ -9,10 +9,11 @@
 	import { relativeTime } from '$lib/format';
 	import type { Host } from '$lib/types';
 
+	import { createPollingFallback } from '$lib/ws/fallback';
+	import { hosts, hostsConnected } from '$lib/stores/hosts';
+
 	type ViewMode = 'grid' | 'list';
 	const viewModeStorageKey = 'patchbase_hosts_view_mode';
-
-	let hosts = $state<Host[]>([]);
 	let loading = $state(true);
 	let error = $state('');
 	let viewMode = $state<ViewMode>('grid');
@@ -41,9 +42,8 @@
 		}
 		try {
 			const newHosts = await listHosts();
-			if (JSON.stringify(hosts) !== JSON.stringify(newHosts)) {
-				hosts = newHosts;
-			}
+			// Since we use the store now, we can update it directly
+			hosts.set(newHosts);
 		} catch (err) {
 			if (!silent) {
 				error = err instanceof Error ? err.message : 'Failed to load hosts.';
@@ -62,11 +62,23 @@
 		if (saved === 'grid' || saved === 'list') {
 			viewMode = saved;
 		}
-		void loadHosts();
 
-		const interval = setInterval(() => {
-			void loadHosts(true);
-		}, 5000);
+		if ($hosts.length === 0) {
+			void loadHosts();
+		} else {
+			loading = false;
+		}
+
+		let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+		const fallback = createPollingFallback(() => loadHosts(true), 5000);
+		const unsubConnected = hostsConnected.subscribe((connected) => {
+			if (!connected) {
+				fallbackTimer = setTimeout(() => { fallback.start(); }, 10000);
+			} else {
+				clearTimeout(fallbackTimer);
+				fallback.stop();
+			}
+		});
 
 		const onDocumentClick = (event: MouseEvent): void => {
 			const target = event.target as HTMLElement | null;
@@ -78,7 +90,9 @@
 
 		document.addEventListener('click', onDocumentClick);
 		return () => {
-			clearInterval(interval);
+			unsubConnected();
+			clearTimeout(fallbackTimer);
+			fallback.stop();
 			document.removeEventListener('click', onDocumentClick);
 		};
 	});
@@ -97,12 +111,12 @@
 		return host.display_name || host.hostname || host.id;
 	}
 
-	let needAttention = $derived(hosts.filter((h) => h.overall_action !== 'none').length);
-	let rebootQueue = $derived(hosts.filter((h) => h.needs_reboot > 0).length);
-	let totalUpdates = $derived(hosts.reduce((sum, h) => sum + h.available_updates, 0));
+	let needAttention = $derived($hosts.filter((h) => h.overall_action !== 'none').length);
+	let rebootQueue = $derived($hosts.filter((h) => h.needs_reboot > 0).length);
+	let totalUpdates = $derived($hosts.reduce((sum, h) => sum + h.available_updates, 0));
 
 	let stats = $derived([
-		{ label: 'Total Hosts', value: hosts.length, color: 'accent' },
+		{ label: 'Total Hosts', value: $hosts.length, color: 'accent' },
 		{ label: 'Need Attention', value: needAttention, color: 'red' },
 		{ label: 'Reboot Queue', value: rebootQueue, color: 'orange' },
 		{ label: 'Pending Updates', value: totalUpdates, color: 'blue' },
@@ -136,7 +150,7 @@
 	};
 
 	let sortedHosts = $derived(
-		[...hosts].sort((a, b) => {
+		[...$hosts].sort((a, b) => {
 			if (!sortField) {
 				if ((b.critical_count || 0) !== (a.critical_count || 0)) {
 					return (b.critical_count || 0) - (a.critical_count || 0);
@@ -265,7 +279,7 @@
 											{host}
 											class="host-actions-item host-actions-item-danger"
 											onDelete={() => {
-												hosts = hosts.filter((item) => item.id !== host.id);
+												hosts.update(items => items.filter((item) => item.id !== host.id));
 												openActionsHostID = null;
 											}}
 											onError={(err) => {
@@ -420,7 +434,7 @@
 											{host}
 											class="host-actions-item host-actions-item-danger"
 											onDelete={() => {
-												hosts = hosts.filter((item) => item.id !== host.id);
+												hosts.update(items => items.filter((item) => item.id !== host.id));
 												openActionsHostID = null;
 											}}
 											onError={(err) => {

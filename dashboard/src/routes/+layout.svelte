@@ -3,6 +3,9 @@
 	import '../app.css';
 	import { getSetupStatus } from '$lib/api/auth.js';
 	import { getSession } from '$lib/auth/session.js';
+	import { initGlobalWsClient, closeGlobalWsClient, globalWsClient } from '$lib/ws/client';
+	import { hosts, hostsConnected } from '$lib/stores/hosts';
+	import { advisoryScopes, advisoryOverview, advisoriesConnected } from '$lib/stores/advisories';
 	import { onMount } from 'svelte';
 	import type { Snippet } from 'svelte';
 
@@ -106,10 +109,39 @@
 
 		const onSessionChanged = (): void => {
 			void enforceRouteGuard();
+			manageWebSocket();
 		};
 		const onPopState = (): void => {
 			void enforceRouteGuard();
 		};
+
+		function manageWebSocket() {
+			const session = getSession();
+			if (!session?.accessToken) {
+				closeGlobalWsClient();
+				hosts.set([]);
+				advisoryScopes.set([]);
+				advisoryOverview.set(null);
+			} else {
+				if (!globalWsClient || globalWsClient.getToken() !== session.accessToken) {
+					initGlobalWsClient(session.accessToken);
+					globalWsClient!.onConnectionChange = (connected) => {
+						hostsConnected.set(connected);
+						advisoriesConnected.set(connected);
+					};
+					globalWsClient!.on((msg) => {
+						if (msg.type === 'hosts') hosts.set(msg.data);
+						if (msg.type === 'advisories') {
+							advisoryScopes.set(msg.data.scopes);
+							advisoryOverview.set(msg.data.overview);
+						}
+					});
+				}
+			}
+		}
+
+		// Init websocket on mount if session exists
+		manageWebSocket();
 
 		window.addEventListener(sessionChangedEvent, onSessionChanged);
 		window.addEventListener('popstate', onPopState);
@@ -117,6 +149,7 @@
 		return () => {
 			unmounted = true;
 			stopSetupStatusPolling();
+			closeGlobalWsClient();
 			window.removeEventListener(sessionChangedEvent, onSessionChanged);
 			window.removeEventListener('popstate', onPopState);
 		};

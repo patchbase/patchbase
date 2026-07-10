@@ -1,0 +1,22 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "events",
+    srcs = [
+        "bus.go",
+        "events.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/events",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "bus_test",
+    size = "small",
+    srcs = ["bus_test.go"],
+    embed = [":events"],
+    deps = [
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

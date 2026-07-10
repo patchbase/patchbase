@@ -197,3 +197,14 @@ export interface HostKernelPosture {
   active_kernel: KernelRiskView;
   latest_installed: KernelRiskView;
 }
+
+import type { AdvisoryScopeStatus, AdvisoryOverview } from "$lib/api/advisories";
+
+export type WSMessage =
+  | { type: "auth_ok" }
+  | { type: "error"; message: string }
+  | { type: "hosts"; data: Host[] }
+  | { type: "advisories"; data: { scopes: AdvisoryScopeStatus[]; overview: AdvisoryOverview } }
+  | { type: "host_updated"; host_id: string }
+  | { type: "host_deleted"; host_id: string }
+  | { type: "ping" };

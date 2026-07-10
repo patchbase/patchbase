@@ -13,6 +13,7 @@ import (
 	"github.com/samber/do/v2"
 	agentpb "go.patchbase.net/proto/agent"
 	"go.patchbase.net/server/internal/apperr"
+	"go.patchbase.net/server/internal/events"
 	"go.patchbase.net/server/internal/services/matchers"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/sql/id"
@@ -87,6 +88,7 @@ type hosts struct {
 	advisoriesService  AdvisorySyncService
 	matcher            matchers.Matcher
 	settingsService    Settings
+	broker             events.Broker
 }
 
 type CreatedRegistrationToken struct {
@@ -217,6 +219,11 @@ func NewHosts(i do.Injector) (Hosts, error) {
 		return nil, fmt.Errorf("failed to get settings service: %w", err)
 	}
 
+	broker, err := do.Invoke[events.Broker](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get events broker: %w", err)
+	}
+
 	return &hosts{
 		pool:               pool,
 		sql:                queries,
@@ -228,6 +235,7 @@ func NewHosts(i do.Injector) (Hosts, error) {
 		advisoriesService:  advisoriesService,
 		matcher:            matcher,
 		settingsService:    settingsService,
+		broker:             broker,
 	}, nil
 }
 
@@ -355,6 +363,8 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 	if err := tx.Commit(ctx); err != nil {
 		return nil, fmt.Errorf("commit register agent host transaction: %w", err)
 	}
+
+	s.broker.Publish(events.NewHostsUpdatedEvent())
 
 	return &agentpb.RegisterHostResponse{
 		HostId:          host.ID,
@@ -527,6 +537,9 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 		utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", host.ID, "snapshot_id", snapshotRow.ID, "error", err)
 	}
 
+	s.broker.Publish(events.NewHostsUpdatedEvent())
+	s.broker.Publish(events.NewHostSnapshotEvent(host.ID))
+
 	return &agentpb.SyncResponse{
 		Accepted:           true,
 		HostId:             host.ID,
@@ -552,6 +565,7 @@ func (s *hosts) ApproveHost(ctx context.Context, hostID string) (HostInfo, error
 	if err != nil {
 		return HostInfo{}, fmt.Errorf("approve host: %w", err)
 	}
+	s.broker.Publish(events.NewHostsUpdatedEvent())
 	return mapHost(host, nil), nil
 }
 
@@ -626,6 +640,8 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 	if err := tx.Commit(ctx); err != nil {
 		return CreateSSHHostResult{}, fmt.Errorf("commit create ssh host transaction: %w", err)
 	}
+
+	s.broker.Publish(events.NewHostsUpdatedEvent())
 
 	return CreateSSHHostResult{
 		HostID:          host.Host.ID,
@@ -751,6 +767,9 @@ func (s *hosts) DeleteHost(ctx context.Context, hostID string) error {
 		utils.GetLogger(ctx).
 			ErrorContext(ctx, "failed to remove periodic SSH pull job after host deletion", "host_id", trimmedHostID, "error", err)
 	}
+
+	s.broker.Publish(events.NewHostsUpdatedEvent())
+	s.broker.Publish(events.NewHostDeletedEvent(trimmedHostID))
 
 	return nil
 }
@@ -1067,6 +1086,8 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 			return fmt.Errorf("commit job results update transaction: %w", err)
 		}
 
+		s.broker.Publish(events.NewHostSnapshotEvent(hostID))
+
 		// Resolve and update advisory scope key (post-commit, outside the transaction using s.sql)
 		if status == "success" && res != nil {
 			scopeKey, err := s.advisoriesService.ResolveScopeKey(ctx, res.OSFamily, res.OSName, res.OSVersion, res.OSMajor, res.Architecture)
@@ -1096,6 +1117,8 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 				utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", hostID, "snapshot_id", snapshotID, "error", err)
 			}
 		}
+
+		s.broker.Publish(events.NewHostsUpdatedEvent())
 
 		return nil
 	}
@@ -1256,6 +1279,8 @@ func (s *hosts) CreateManualHost(ctx context.Context, displayName string, hostna
 		return HostInfo{}, fmt.Errorf("commit create manual host transaction: %w", err)
 	}
 
+	s.broker.Publish(events.NewHostsUpdatedEvent())
+
 	return mapHost(host, nil), nil
 }
 
@@ -1364,6 +1389,9 @@ func (s *hosts) IngestManualReport(ctx context.Context, hostID string, reportCon
 	if _, err := s.matcher.MatchSnapshot(ctx, hostID, snapshotID); err != nil {
 		utils.GetLogger(ctx).Warn("matching snapshot failed", "host_id", hostID, "snapshot_id", snapshotID, "error", err)
 	}
+
+	s.broker.Publish(events.NewHostsUpdatedEvent())
+	s.broker.Publish(events.NewHostSnapshotEvent(hostID))
 
 	return nil
 }

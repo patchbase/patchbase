@@ -1,0 +1,44 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "ws",
+    srcs = [
+        "errors.go",
+        "hub.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/ws",
+    visibility = ["//:__subpackages__"],
+    deps = [
+        "//internal/api/v1/entities",
+        "//internal/events",
+        "//internal/services",
+        "//internal/sql",
+        "@com_github_coder_websocket//:websocket",
+        "@com_github_samber_do_v2//:do",
+    ],
+)
+
+go_test(
+    name = "active_topics_test",
+    size = "small",
+    srcs = ["active_topics_test.go"],
+    embed = [":ws"],
+    deps = ["@com_github_stretchr_testify//assert"],
+)
+
+go_test(
+    name = "hub_test",
+    size = "small",
+    srcs = ["hub_test.go"],
+    embed = [":ws"],
+    deps = [
+        "//internal/apperr",
+        "//internal/events",
+        "//internal/services",
+        "//internal/sql",
+        "//proto/agent",
+        "@com_github_coder_websocket//:websocket",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

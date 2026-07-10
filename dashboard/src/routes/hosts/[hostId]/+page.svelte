@@ -18,6 +18,9 @@
 	import { formatTime, formatDuration } from '$lib/format';
 	import { goto } from '$app/navigation';
 	import type { Host, HostKernelPosture, HostSnapshot, HostPullJob, MatcherDecisionGroup } from '$lib/types';
+	import { globalWsClient } from '$lib/ws/client';
+	import { hostsConnected } from '$lib/stores/hosts';
+	import { createPollingFallback } from '$lib/ws/fallback';
 
 	interface Props {
 		params: { hostId: string };
@@ -231,10 +234,37 @@
 
 	onMount(() => {
 		void loadData();
-		const interval = setInterval(() => {
-			void loadData(true);
-		}, 5000);
-		return () => clearInterval(interval);
+
+		globalWsClient?.subscribe(["host:" + params.hostId]);
+
+		const unsub = globalWsClient?.on((msg) => {
+			if ((msg.type === "host_updated" || msg.type === "host_deleted") && msg.host_id === params.hostId) {
+				if (msg.type === "host_deleted") {
+					void goto("/hosts");
+					return;
+				}
+				void loadData(true);
+			}
+		});
+
+		let fallbackTimer: ReturnType<typeof setTimeout> | undefined;
+		const fallback = createPollingFallback(() => loadData(true), 5000);
+		const unsubConnected = hostsConnected.subscribe((connected) => {
+			if (!connected) {
+				fallbackTimer = setTimeout(() => { fallback.start(); }, 10000);
+			} else {
+				clearTimeout(fallbackTimer);
+				fallback.stop();
+			}
+		});
+
+		return () => {
+			unsub?.();
+			unsubConnected();
+			clearTimeout(fallbackTimer);
+			fallback.stop();
+			globalWsClient?.unsubscribe(["host:" + params.hostId]);
+		};
 	});
 </script>
 
@@ -323,14 +353,14 @@
 				<p class="form-hint" style="margin-bottom: 16px; color: var(--text-secondary); font-size: 13px; max-width: 600px;">
 					Run the collector script on the host to gather package and system data, then select the generated report text file to update this host's status.
 				</p>
-				
+
 				<div class="upload-container" style="display: flex; flex-direction: column; gap: 12px; max-width: 500px;">
 					{#if uploadError}
 						<div class="upload-error" style="color: var(--red); font-size: 13px; background: var(--red-bg); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--red);">
 							{uploadError}
 						</div>
 					{/if}
-					
+
 					{#if uploadSuccess}
 						<div class="upload-success" style="color: var(--green); font-size: 13px; background: var(--green-bg); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--green);">
 							Report uploaded and processed successfully!
