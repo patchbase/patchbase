@@ -26,6 +26,7 @@
 	let tokens = $state<RegistrationTokenInfo[]>([]);
 	let tokenName = $state('');
 	let newestToken = $state('');
+	let currentOrigin = $state('https://your-server');
 	let error = $state('');
 	let pendingHosts = $state<Host[]>([]);
 
@@ -172,6 +173,7 @@
 	$effect(() => {
 		void refreshTokens();
 		void loadSettings();
+		currentOrigin = window.location.origin;
 	});
 
 	async function createToken(): Promise<void> {
@@ -261,6 +263,7 @@
 		<div class="detail-card" style="margin-bottom:16px">
 			<h3>Create Registration Token</h3>
 			<p class="form-hint">Registration tokens are used only for enrollment. After registration, the agent stores only the issued host access token.</p>
+			<p class="form-hint" style="margin-bottom: 16px;">To install the agent from an RPM/DEB repository, see the <a href="https://docs.patchbase.net/installation/rpm-packages" target="_blank" rel="noopener noreferrer">RPM</a> or <a href="https://docs.patchbase.net/installation/deb-packages" target="_blank" rel="noopener noreferrer">DEB</a> installation documentation.</p>
 			<div class="token-create-row">
 				<input class="form-input" placeholder="Token name" bind:value={tokenName} />
 				<button class="btn btn-primary btn-sm token-create-button" type="button" onclick={() => void createToken()}>Create token</button>
@@ -269,7 +272,7 @@
 				<div style="margin-top:12px">
 					<p class="form-hint">Copy this token now (shown only once):</p>
 					<pre class="mono" style="padding:10px;border:1px solid var(--border);border-radius:8px;overflow:auto">{newestToken}</pre>
-					<p class="form-hint">Enrollment example: <span class="mono">patchbase-agent enroll https://your-server {newestToken}</span></p>
+					<p class="form-hint">Enrollment example: <span class="mono">patchbase-agent enroll {currentOrigin} {newestToken}</span></p>
 				</div>
 			{/if}
 		</div>
