@@ -1,42 +1,51 @@
-# sv
+# PatchBase Dashboard
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+SvelteKit frontend for PatchBase, served as static files embedded in the Go server binary.
 
-## Creating a project
+## Stack
 
-If you're seeing this, you've probably already done this step. Congrats!
+- [SvelteKit](https://svelte.dev/docs/kit) with [adapter-static](https://svelte.dev/docs/kit/adapter-static)
+- [Vite](https://vite.dev/) for dev server and builds
+- [oxlint](https://oxc.rs/docs/guide/usage/lint) for linting
+- [oxfmt](https://oxc.rs/docs/guide/usage/format) for formatting
+- [pnpm](https://pnpm.io/) as the package manager
 
-```sh
-# create a new project
-npx sv create my-app
+## Development
+
+```bash
+pnpm install
+pnpm run dev
 ```
 
-To recreate this project with the same configuration:
-
-```sh
-# recreate this project
-npx sv@0.15.3 create --template minimal --types ts --no-install web
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
-
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+The dev server expects the PatchBase API at `http://localhost:5199`. See the main README for instructions on starting the server.
 
 ## Building
 
-To create a production version of your app:
+The dashboard is built via Bazel, which installs dependencies and produces a static bundle that gets embedded into the server binary via `embed.go`:
 
-```sh
-npm run build
+```bash
+bazel build //dashboard:dashboard
 ```
 
-You can preview the production build with `npm run preview`.
+## Linting and formatting
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+These are also wired up as Bazel targets used by CI:
+
+```bash
+bazel test //dashboard:lint_check    # check
+bazel run   //dashboard:lint         # auto-fix
+
+bazel test //dashboard:format_check  # check
+bazel run   //dashboard:format       # format in-place
+```
+
+## Project layout
+
+```
+src/
+  routes/     SvelteKit file-based routes (pages)
+  lib/        Shared components and utilities
+  app.html    Root HTML template
+  app.css     Global styles
+embed.go      Go embed directive that bundles the build output
+```
