@@ -12,3 +12,9 @@ test --test_env=PATCHBASE_TEST_DATABASE_URL
 # run; run them explicitly via:
 #   bazel test --test_tag_filters=integration_docker //internal/testing/e2e/...
 test --test_tag_filters=-integration_docker
+
+# Disable Android SDK auto-discovery since we do not use it,
+# which avoids breaking rules_android issues in GitHub Actions
+common --repo_env=ANDROID_HOME=
+common --repo_env=ANDROID_NDK_HOME=
+common --repo_env=ANDROID_SDK_ROOT=
