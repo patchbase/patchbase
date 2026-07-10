@@ -96,6 +96,16 @@ npm.npm_translate_lock(
 )
 use_repo(npm, "npm")
 
+npm.npm_translate_lock(
+    name = "npm_docs",
+    lifecycle_hooks = {
+        "*": [],
+    },
+    npmrc = "//docs:.npmrc",
+    pnpm_lock = "//docs:pnpm-lock.yaml",
+)
+use_repo(npm, "npm_docs")
+
 ###############################################################################
 # Development dependencies
 ###############################################################################

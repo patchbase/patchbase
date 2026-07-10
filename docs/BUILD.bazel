@@ -1,0 +1,49 @@
+load("@aspect_rules_js//js:defs.bzl", "js_binary", "js_run_binary")
+load("@npm_docs//:defs.bzl", "npm_link_all_packages")
+load(":defs.bzl", "exec_filegroup")
+
+npm_link_all_packages(
+    name = "node_modules",
+)
+
+js_binary(
+    name = "docs_build_tool",
+    data = [":node_modules"],
+    entry_point = "tools/bazel_build.mjs",
+)
+
+js_run_binary(
+    name = "build_docs",
+    srcs = glob([
+        "installation/**",
+        "onboarding/**",
+        "guides/**",
+        "configuration/**",
+        "cli/**",
+        "api/**",
+        "architecture/**",
+        "development/**",
+        "static/**",
+        "src/**",
+    ]) + [
+        ".npmrc",
+        "contributing.md",
+        "docusaurus.config.ts",
+        "faq.md",
+        "introduction.md",
+        "package.json",
+        "pnpm-lock.yaml",
+        "tools/bazel_build.mjs",
+        "tsconfig.json",
+        ":node_modules",
+    ],
+    chdir = package_name(),
+    execution_requirements = {"no-sandbox": "1"},
+    out_dirs = ["build"],
+    tool = ":docs_build_tool",
+)
+
+exec_filegroup(
+    name = "site",
+    src = ":build_docs",
+)
