@@ -8,6 +8,7 @@ type Result[R any] struct {
 	RequestID    string
 	Body         []byte
 	Response     *R
+	ErrorCode    string
 	ErrorMessage string
 }
 

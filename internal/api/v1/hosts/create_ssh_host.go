@@ -3,13 +3,13 @@ package hosts
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 	"strings"
 
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/services"
 )
@@ -35,24 +35,19 @@ func CreateSSHHost(i do.Injector) apiauth.AuthenticatedHandler {
 
 	return func(w http.ResponseWriter, r *http.Request, authInfo apiauth.AuthInfo) {
 		if !authInfo.User.IsAdmin {
-			webutil.WriteAPIError(w, r, http.StatusForbidden, "only admins can create ssh hosts", nil)
+			webutil.WriteError(w, r, apperr.ErrForbiddenCreateSSHHost)
 			return
 		}
 
 		var req createSSHHostRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "invalid request body", nil)
+			webutil.WriteError(w, r, apperr.ErrInvalidBody)
 			return
 		}
 
 		settingsService := do.MustInvoke[services.Settings](i)
-		if status, err := req.validate(r.Context(), settingsService); err != nil {
-			if status == http.StatusInternalServerError {
-				webutil.LogError(r, "validate create ssh host request failed", err)
-				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "internal server error", nil)
-			} else {
-				webutil.WriteAPIError(w, r, status, err.Error(), nil)
-			}
+		if err := req.validate(r.Context(), settingsService); err != nil {
+			webutil.WriteError(w, r, err)
 			return
 		}
 
@@ -64,15 +59,7 @@ func CreateSSHHost(i do.Injector) apiauth.AuthenticatedHandler {
 			UniqueKeyPair:    req.UniqueKeyPair,
 		})
 		if err != nil {
-			switch {
-			case errors.Is(err, services.ErrDuplicateHostDisplayName):
-				webutil.WriteAPIError(w, r, http.StatusBadRequest, err.Error(), nil)
-			case errors.Is(err, services.ErrDuplicateSSHPullHostname):
-				webutil.WriteAPIError(w, r, http.StatusBadRequest, err.Error(), nil)
-			default:
-				webutil.LogError(r, "create ssh host failed", err)
-				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to create ssh host", nil)
-			}
+			webutil.WriteError(w, r, err)
 			return
 		}
 
@@ -86,33 +73,33 @@ func CreateSSHHost(i do.Injector) apiauth.AuthenticatedHandler {
 	}
 }
 
-func (req *createSSHHostRequest) validate(ctx context.Context, settingsService services.Settings) (int, error) {
+func (req *createSSHHostRequest) validate(ctx context.Context, settingsService services.Settings) error {
 	req.DisplayName = strings.TrimSpace(req.DisplayName)
 	if req.DisplayName == "" {
-		return http.StatusBadRequest, errors.New("display name is required")
+		return apperr.ErrDisplayNameRequired
 	}
 
 	req.Hostname = strings.TrimSpace(req.Hostname)
 	if req.Hostname == "" {
-		return http.StatusBadRequest, errors.New("hostname is required")
+		return apperr.ErrHostnameRequired
 	}
 
 	req.SSHUser = strings.TrimSpace(req.SSHUser)
 	if req.SSHUser == "" {
 		defaultUser, err := settingsService.GetDefaultSSHPullUser(ctx)
 		if err != nil {
-			return http.StatusInternalServerError, fmt.Errorf("failed to get default ssh user: %w", err)
+			return fmt.Errorf("failed to get default ssh user: %w", err)
 		}
 		if defaultUser != "" {
 			req.SSHUser = defaultUser
 		} else {
-			return http.StatusBadRequest, errors.New("ssh user is required")
+			return apperr.ErrSSHUserRequired
 		}
 	}
 
 	if req.FrequencyMinutes < 0 {
-		return http.StatusBadRequest, errors.New("invalid frequency")
+		return apperr.ErrInvalidFrequency
 	}
 
-	return 0, nil
+	return nil
 }

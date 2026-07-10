@@ -7,6 +7,7 @@ import (
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
 	"go.patchbase.net/server/internal/api/v1/entities"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/services"
 )
@@ -20,20 +21,19 @@ func CreateToken(i do.Injector) apiauth.AuthenticatedHandler {
 
 	return func(w http.ResponseWriter, r *http.Request, authInfo apiauth.AuthInfo) {
 		if !authInfo.User.IsAdmin {
-			webutil.WriteAPIError(w, r, http.StatusForbidden, "only admins can create registration tokens", nil)
+			webutil.WriteError(w, r, apperr.ErrForbiddenCreateToken)
 			return
 		}
 
 		var req createTokenRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "invalid request body", nil)
+			webutil.WriteError(w, r, apperr.ErrInvalidBody)
 			return
 		}
 
 		created, err := hosts.CreateRegistrationToken(r.Context(), authInfo.User.ID, req.Name)
 		if err != nil {
-			webutil.LogError(r, "create registration token failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to create registration token", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 

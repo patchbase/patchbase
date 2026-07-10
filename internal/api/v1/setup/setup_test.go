@@ -66,7 +66,7 @@ func TestCompleteMalformedJSON(t *testing.T) {
 
 	recorder := backend.HTTPPost("/api/v1/setup/complete", `{invalid}`, apitesting.WithBearerToken(token))
 	assert.Equal(t, http.StatusBadRequest, recorder.Code)
-	assert.JSONEq(t, `{"error":"invalid request body"}`, recorder.Body.String())
+	assert.JSONEq(t, `{"code":"invalid_request_body","message":"invalid request body"}`, recorder.Body.String())
 }
 
 func TestCompleteValidationErrors(t *testing.T) {
@@ -151,7 +151,7 @@ func TestCompleteEmailAlreadyInUse(t *testing.T) {
 		"password":"very-secure-pass"
 	}`, apitesting.WithBearerToken(token))
 	assert.Equal(t, http.StatusConflict, recorder.Code)
-	assert.JSONEq(t, `{"error":"email is already in use"}`, recorder.Body.String())
+	assert.JSONEq(t, `{"code":"email_already_in_use","message":"email is already in use"}`, recorder.Body.String())
 }
 
 func TestCompleteAlreadyCompleted(t *testing.T) {
@@ -181,7 +181,7 @@ func TestCompleteAlreadyCompleted(t *testing.T) {
 		"password":"very-secure-pass"
 	}`, apitesting.WithBearerToken(newToken))
 	assert.Equal(t, http.StatusConflict, recorderDup.Code)
-	assert.JSONEq(t, `{"error":"initial setup already completed"}`, recorderDup.Body.String())
+	assert.JSONEq(t, `{"code":"initial_setup_already_complete","message":"initial setup already completed"}`, recorderDup.Body.String())
 }
 
 func TestCompleteUnauthorized(t *testing.T) {
@@ -212,5 +212,5 @@ func TestCompleteForbiddenNonAdmin(t *testing.T) {
 		"password":"very-secure-pass"
 	}`, apitesting.WithBearerToken(token))
 	assert.Equal(t, http.StatusForbidden, recorder.Code)
-	assert.JSONEq(t, `{"error":"only admins can complete setup"}`, recorder.Body.String())
+	assert.JSONEq(t, `{"code":"forbidden_complete_setup","message":"only admins can complete setup"}`, recorder.Body.String())
 }

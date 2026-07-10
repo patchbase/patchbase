@@ -15,6 +15,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	agentpb "go.patchbase.net/proto/agent"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/services"
 	db "go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/sql/id"
@@ -736,7 +737,7 @@ func TestHosts_UniqueConstraints(t *testing.T) {
 
 	// Try to create second host with same display name
 	_, err = hostsService.CreateManualHost(ctx, "unique-name-1", "unique-host-2")
-	assert.ErrorIs(t, err, services.ErrDuplicateHostDisplayName)
+	assert.ErrorIs(t, err, apperr.ErrDuplicateHostDisplayName)
 
 	// Create first SSH host
 	_, err = hostsService.CreateSSHHost(ctx, services.CreateSSHHostInput{
@@ -754,7 +755,7 @@ func TestHosts_UniqueConstraints(t *testing.T) {
 		SSHUser:          "root",
 		FrequencyMinutes: 60,
 	})
-	assert.ErrorIs(t, err, services.ErrDuplicateHostDisplayName)
+	assert.ErrorIs(t, err, apperr.ErrDuplicateHostDisplayName)
 
 	// Try to create second SSH host with same pull hostname
 	_, err = hostsService.CreateSSHHost(ctx, services.CreateSSHHostInput{
@@ -763,5 +764,5 @@ func TestHosts_UniqueConstraints(t *testing.T) {
 		SSHUser:          "root",
 		FrequencyMinutes: 60,
 	})
-	assert.ErrorIs(t, err, services.ErrDuplicateSSHPullHostname)
+	assert.ErrorIs(t, err, apperr.ErrDuplicateSSHPullHostname)
 }

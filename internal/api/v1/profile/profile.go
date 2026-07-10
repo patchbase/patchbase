@@ -2,12 +2,12 @@ package profile
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
 	"go.patchbase.net/server/internal/api/webutil"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/services"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/utils"
@@ -45,7 +45,7 @@ func UpdateProfile(i do.Injector) apiauth.AuthenticatedHandler {
 	return func(w http.ResponseWriter, r *http.Request, authInfo apiauth.AuthInfo) {
 		var req updateProfileRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "invalid request body", nil)
+			webutil.WriteError(w, r, apperr.ErrInvalidBody)
 			return
 		}
 
@@ -55,21 +55,7 @@ func UpdateProfile(i do.Injector) apiauth.AuthenticatedHandler {
 			NewPassword:     req.NewPassword,
 		})
 		if err != nil {
-			switch {
-			case errors.Is(err, services.ErrEmailRequired):
-				webutil.WriteAPIError(w, r, http.StatusBadRequest, "email is required", nil)
-			case errors.Is(err, services.ErrEmailAlreadyInUse):
-				webutil.WriteAPIError(w, r, http.StatusConflict, "email is already in use", nil)
-			case errors.Is(err, services.ErrCurrentPasswordRequired):
-				webutil.WriteAPIError(w, r, http.StatusBadRequest, "current password is required", nil)
-			case errors.Is(err, services.ErrCurrentPasswordInvalid):
-				webutil.WriteAPIError(w, r, http.StatusUnauthorized, "current password is invalid", nil)
-			case errors.Is(err, services.ErrPasswordTooShort):
-				webutil.WriteAPIError(w, r, http.StatusBadRequest, "password must be at least 12 characters", nil)
-			default:
-				webutil.LogError(r, "update profile failed", err)
-				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to update profile", nil)
-			}
+			webutil.WriteError(w, r, err)
 			return
 		}
 
@@ -78,8 +64,7 @@ func UpdateProfile(i do.Injector) apiauth.AuthenticatedHandler {
 			var err error
 			accessToken, err = authService.IssueAccessToken(r.Context(), result.User.ID)
 			if err != nil {
-				webutil.LogError(r, "issue refreshed profile token failed", err)
-				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to issue access token", nil)
+				webutil.WriteError(w, r, err)
 				return
 			}
 		}

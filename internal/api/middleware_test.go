@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 )
 
@@ -130,7 +131,7 @@ func TestMaxBodyBytesMiddleware_OversizedBodyProducesMaxBytesError(t *testing.T)
 		require.Error(t, err, "MaxBytesReader must surface a *http.MaxBytesError")
 		_, ok := errors.AsType[*http.MaxBytesError](err)
 		require.True(t, ok, "error must be *http.MaxBytesError")
-		webutil.WriteAPIError(w, r, http.StatusRequestEntityTooLarge, "request body too large", nil)
+		webutil.WriteError(w, r, apperr.ErrBodyTooLarge)
 	})
 
 	req := httptest.NewRequest(http.MethodPost, "/ingest", bytes.NewReader(bytes.Repeat([]byte("a"), 2048)))

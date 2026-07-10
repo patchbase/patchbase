@@ -25,7 +25,7 @@ FROM registry.access.redhat.com/ubi9/ubi:9.3
 # epoch 2 in RHEL 9.
 RUN dnf install -y --best --allowerasing \
       openssh-server-0:9.9p1-7.el9_8 \
-      nginx-2:1.20.1-28.el9_8.3 \
+      nginx-2:1.20.1-28.el9_8.4 \
       openssl-libs-1:3.5.5-4.el9_8 \
       curl \
  && dnf clean all

@@ -22,8 +22,20 @@ jobs:
       - name: Run E2E Integration Tests
         run: |
           bazel test --test_output=streamed --test_arg=-test.v --nocache_test_results \
-            --test_tag_filters=integration_docker \
+            --test_tag_filters=integration_docker,-rhel \
+            --build_tests_only \
             //internal/testing/e2e/...
+
+      - name: Run RHEL E2E Integration Tests
+        continue-on-error: true
+        run: |
+          bazel test --test_output=streamed --test_arg=-test.v --nocache_test_results \
+            --test_tag_filters=integration_docker,rhel \
+            --build_tests_only \
+            //internal/testing/e2e/agent:agent_rhel9_test \
+            //internal/testing/e2e/agent:agent_rhel10_test \
+            //internal/testing/e2e/sshpull:sshpull_rhel9_test \
+            //internal/testing/e2e/sshpull:sshpull_rhel10_test
 
       - name: Cleanup Environment
         if: ${{ always() }}

@@ -134,7 +134,7 @@ func TestHTTPClient_Non2xxResponse(t *testing.T) {
 		assert.Equal(t, "application/x-protobuf", r.Header.Get("Accept"))
 		w.Header().Set("X-Request-Id", "req-err")
 		w.WriteHeader(http.StatusForbidden)
-		apiErr := &agent.APIError{Error: "invalid host token"}
+		apiErr := &agent.APIError{Code: "invalid_host_access_token", Message: "invalid host token"}
 		respBytes, _ := proto.Marshal(apiErr)
 		w.Write(respBytes) // nolint:errcheck
 	}))
@@ -148,6 +148,7 @@ func TestHTTPClient_Non2xxResponse(t *testing.T) {
 	require.NotNil(t, res)
 
 	assert.Equal(t, http.StatusForbidden, res.Status)
+	assert.Equal(t, "invalid_host_access_token", res.ErrorCode)
 	assert.Equal(t, "invalid host token", res.ErrorMessage)
 	assert.Nil(t, res.Response)
 }

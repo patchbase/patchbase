@@ -76,9 +76,9 @@ func runSync(cmd *cobra.Command, args []string) error {
 	slog.Info("Sync completed", "status", result.Status, "endpoint", result.Endpoint)
 	if result.Status < 200 || result.Status >= 300 {
 		if result.RequestID != "" {
-			slog.Error("Sync rejected", "request_id", result.RequestID, "message", result.ErrorMessage)
+			slog.Error("Sync rejected", "request_id", result.RequestID, "code", result.ErrorCode, "message", result.ErrorMessage)
 		} else {
-			slog.Error("Sync rejected", "message", result.ErrorMessage)
+			slog.Error("Sync rejected", "code", result.ErrorCode, "message", result.ErrorMessage)
 		}
 	}
 	if result.Response != nil {
@@ -89,11 +89,14 @@ func runSync(cmd *cobra.Command, args []string) error {
 			"next_check_in_seconds", result.Response.NextCheckInSeconds,
 		)
 	} else if result.ErrorMessage != "" {
-		slog.Error("Sync error response", "message", result.ErrorMessage)
+		slog.Error("Sync error response", "code", result.ErrorCode, "message", result.ErrorMessage)
 	}
 
 	if result.Status < 200 || result.Status >= 300 {
-		return fmt.Errorf("sync rejected with status %d", result.Status)
+		if result.ErrorCode != "" {
+			return fmt.Errorf("sync rejected (status %d, code %s): %s", result.Status, result.ErrorCode, result.ErrorMessage)
+		}
+		return fmt.Errorf("sync rejected with status %d: %s", result.Status, result.ErrorMessage)
 	}
 
 	return nil

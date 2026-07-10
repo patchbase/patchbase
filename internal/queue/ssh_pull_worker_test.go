@@ -11,6 +11,7 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/config"
 	"go.patchbase.net/server/internal/queue"
 	"go.patchbase.net/server/internal/services"
@@ -41,7 +42,7 @@ func TestSSHPullWorker_Work_HostNotFound(t *testing.T) {
 
 	mock := &mockHosts{
 		RunSSHPullFunc: func(ctx context.Context, hostID string) error {
-			return services.ErrHostNotFound
+			return apperr.ErrHostNotFound
 		},
 	}
 	do.ProvideValue[services.Hosts](injector, mock)
@@ -55,7 +56,7 @@ func TestSSHPullWorker_Work_HostNotFound(t *testing.T) {
 
 	err = worker.Work(context.Background(), job)
 	require.Error(t, err)
-	assert.ErrorIs(t, err, services.ErrHostNotFound)
+	assert.ErrorIs(t, err, apperr.ErrHostNotFound)
 	assert.Contains(t, err.Error(), "JobCancel")
 }
 

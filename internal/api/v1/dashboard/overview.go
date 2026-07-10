@@ -15,8 +15,7 @@ func GetOverview(i do.Injector) apiauth.AuthenticatedHandler {
 	return func(w http.ResponseWriter, r *http.Request, _ apiauth.AuthInfo) {
 		overview, err := hostsService.GetDashboardOverview(r.Context())
 		if err != nil {
-			webutil.LogError(r, "get dashboard overview failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to get dashboard overview", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 

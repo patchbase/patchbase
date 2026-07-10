@@ -40,6 +40,7 @@ go_test(
     embed = [":api"],
     deps = [
         "//internal/api/webutil",
+        "//internal/apperr",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],

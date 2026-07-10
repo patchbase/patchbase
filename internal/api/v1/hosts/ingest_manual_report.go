@@ -8,6 +8,7 @@ import (
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
 	"go.patchbase.net/server/internal/api/webutil"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/services"
 )
 
@@ -20,30 +21,28 @@ func IngestManualReport(i do.Injector) apiauth.AuthenticatedHandler {
 
 	return func(w http.ResponseWriter, r *http.Request, authInfo apiauth.AuthInfo) {
 		if !authInfo.User.IsAdmin {
-			webutil.WriteAPIError(w, r, http.StatusForbidden, "only admins can upload manual reports", nil)
+			webutil.WriteError(w, r, apperr.ErrForbiddenIngestManualReport)
 			return
 		}
 
 		hostID := r.PathValue("hostID")
 		if hostID == "" {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "missing host ID", nil)
+			webutil.WriteError(w, r, apperr.ErrMissingHostID)
 			return
 		}
 
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-				webutil.WriteAPIError(w, r, http.StatusRequestEntityTooLarge, "request body too large", nil)
+				webutil.WriteError(w, r, apperr.ErrBodyTooLarge)
 				return
 			}
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "failed to read request body", nil)
+			webutil.WriteError(w, r, apperr.ErrBodyReadFailed)
 			return
 		}
 
-		err = hostsService.IngestManualReport(r.Context(), hostID, body)
-		if err != nil {
-			webutil.LogError(r, "ingest manual report failed", err)
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, err.Error(), nil)
+		if err := hostsService.IngestManualReport(r.Context(), hostID, body); err != nil {
+			webutil.WriteError(w, r, err)
 			return
 		}
 

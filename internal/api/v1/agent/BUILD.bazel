@@ -10,6 +10,7 @@ go_api_library(
     visibility = ["//:__subpackages__"],
     deps = [
         "//internal/api/webutil",
+        "//internal/apperr",
         "//internal/services",
         "//proto/agent",
         "@com_github_samber_do_v2//:do",

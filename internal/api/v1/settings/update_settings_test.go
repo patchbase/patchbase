@@ -56,7 +56,7 @@ func TestPatchSettingsMalformedJSON(t *testing.T) {
 
 	recorder := backend.HTTPPatch("/api/v1/settings", `not json`, apitesting.WithBearerToken(adminToken))
 	assert.Equal(t, http.StatusBadRequest, recorder.Code)
-	assert.Contains(t, recorder.Body.String(), `"error":"invalid request body"`)
+	assert.Contains(t, recorder.Body.String(), `"message":"invalid request body"`)
 }
 
 func TestPatchSettingsValidation(t *testing.T) {
@@ -70,13 +70,13 @@ func TestPatchSettingsValidation(t *testing.T) {
 	t.Run("default ssh pull user with only whitespace", func(t *testing.T) {
 		recorder := backend.HTTPPatch("/api/v1/settings", `{"default_ssh_pull_user": "   "}`, apitesting.WithBearerToken(adminToken))
 		assert.Equal(t, http.StatusBadRequest, recorder.Code)
-		assert.JSONEq(t, `{"error":"default ssh pull user cannot be empty"}`, recorder.Body.String())
+		assert.JSONEq(t, `{"code":"default_ssh_pull_user_empty","message":"default ssh pull user cannot be empty"}`, recorder.Body.String())
 	})
 
 	t.Run("default ssh pull user with empty string", func(t *testing.T) {
 		recorder := backend.HTTPPatch("/api/v1/settings", `{"default_ssh_pull_user": ""}`, apitesting.WithBearerToken(adminToken))
 		assert.Equal(t, http.StatusBadRequest, recorder.Code)
-		assert.JSONEq(t, `{"error":"default ssh pull user cannot be empty"}`, recorder.Body.String())
+		assert.JSONEq(t, `{"code":"default_ssh_pull_user_empty","message":"default ssh pull user cannot be empty"}`, recorder.Body.String())
 	})
 
 	t.Run("ask to copy public key with true", func(t *testing.T) {

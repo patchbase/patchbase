@@ -14,8 +14,7 @@ func Status(i do.Injector) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		status, err := settings.Status(r.Context())
 		if err != nil {
-			webutil.LogError(r, "get setup status failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to get setup status", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 

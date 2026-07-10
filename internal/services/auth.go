@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
-	"errors"
 	"fmt"
 	"time"
 
@@ -12,23 +11,13 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/do/v2"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/config"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/utils"
 )
 
 const accessTokenTTL = 24 * time.Hour
-
-var (
-	ErrInvalidCredentials          = errors.New("invalid credentials")
-	ErrUnauthorized                = errors.New("unauthorized")
-	ErrInitialSetupAlreadyComplete = errors.New("initial setup already complete")
-	ErrEmailAlreadyInUse           = errors.New("email already in use")
-	ErrEmailRequired               = errors.New("email is required")
-	ErrCurrentPasswordRequired     = errors.New("current password is required")
-	ErrCurrentPasswordInvalid      = errors.New("current password is invalid")
-	ErrPasswordTooShort            = errors.New("password must be at least 12 characters")
-)
 
 type Auth interface {
 	Login(ctx context.Context, email string, password string) (LoginResult, error)
@@ -81,13 +70,13 @@ func NewAuth(i do.Injector) (Auth, error) {
 }
 
 func (a *auth) Login(ctx context.Context, email string, password string) (LoginResult, error) {
-	user, err := sql.Required(a.sql.GetUserByEmail(ctx, normalizeEmail(email)))(ErrInvalidCredentials)
+	user, err := sql.Required(a.sql.GetUserByEmail(ctx, normalizeEmail(email)))(apperr.ErrInvalidCredentials)
 	if err != nil {
 		return LoginResult{}, fmt.Errorf("get user by email: %w", err)
 	}
 
 	if !utils.CheckPasswordHash(password, user.PasswordHash) {
-		return LoginResult{}, ErrInvalidCredentials
+		return LoginResult{}, apperr.ErrInvalidCredentials
 	}
 
 	token, err := signAccessToken(user, a.jwtSecretKey)
@@ -104,16 +93,16 @@ func (a *auth) Login(ctx context.Context, email string, password string) (LoginR
 func (a *auth) Authenticate(ctx context.Context, token string) (sql.User, error) {
 	userID, err := parseAccessTokenSubject(token)
 	if err != nil {
-		return sql.User{}, ErrUnauthorized
+		return sql.User{}, apperr.ErrUnauthorized
 	}
 
-	user, err := sql.Required(a.sql.GetUserByID(ctx, userID))(ErrUnauthorized)
+	user, err := sql.Required(a.sql.GetUserByID(ctx, userID))(apperr.ErrUnauthorized)
 	if err != nil {
 		return sql.User{}, fmt.Errorf("get user by id: %w", err)
 	}
 
 	if !verifyAccessToken(token, user, a.jwtSecretKey) {
-		return sql.User{}, ErrUnauthorized
+		return sql.User{}, apperr.ErrUnauthorized
 	}
 
 	return user, nil
@@ -141,7 +130,7 @@ func (a *auth) UpdateProfile(ctx context.Context, userID string, input UpdatePro
 	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
-	user, err := sql.Required(queries.GetUserByID(ctx, userID))(ErrUnauthorized)
+	user, err := sql.Required(queries.GetUserByID(ctx, userID))(apperr.ErrUnauthorized)
 	if err != nil {
 		return UpdateProfileResult{}, fmt.Errorf("get user by id: %w", err)
 	}
@@ -149,7 +138,7 @@ func (a *auth) UpdateProfile(ctx context.Context, userID string, input UpdatePro
 	if input.Email.IsPresent() {
 		email := normalizeEmail(input.Email.Unwrap())
 		if email == "" {
-			return UpdateProfileResult{}, ErrEmailRequired
+			return UpdateProfileResult{}, apperr.ErrEmailRequired
 		}
 
 		user, err = queries.UpdateUserEmail(ctx, sql.UpdateUserEmailParams{
@@ -158,7 +147,7 @@ func (a *auth) UpdateProfile(ctx context.Context, userID string, input UpdatePro
 		})
 		if err != nil {
 			if sql.IsUniqueViolation(err, "users_email_active_unique_idx") {
-				return UpdateProfileResult{}, ErrEmailAlreadyInUse
+				return UpdateProfileResult{}, apperr.ErrEmailAlreadyInUse
 			}
 			return UpdateProfileResult{}, fmt.Errorf("update user email: %w", err)
 		}
@@ -169,13 +158,13 @@ func (a *auth) UpdateProfile(ctx context.Context, userID string, input UpdatePro
 		newPassword := input.NewPassword.Unwrap()
 		currentPassword, ok := input.CurrentPassword.Get()
 		if !ok || currentPassword == "" {
-			return UpdateProfileResult{}, ErrCurrentPasswordRequired
+			return UpdateProfileResult{}, apperr.ErrCurrentPasswordRequired
 		}
 		if !utils.CheckPasswordHash(currentPassword, user.PasswordHash) {
-			return UpdateProfileResult{}, ErrCurrentPasswordInvalid
+			return UpdateProfileResult{}, apperr.ErrCurrentPasswordInvalid
 		}
 		if len(newPassword) < 12 {
-			return UpdateProfileResult{}, ErrPasswordTooShort
+			return UpdateProfileResult{}, apperr.ErrPasswordTooShort
 		}
 
 		passwordHash, err := utils.HashPassword(newPassword)

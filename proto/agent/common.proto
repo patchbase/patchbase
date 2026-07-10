@@ -26,5 +26,8 @@ enum VirtualizationRole {
 }
 
 message APIError {
-  string error = 1;
+  reserved 1;
+  reserved "error";
+  string code = 2;
+  string message = 3;
 }

@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/do/v2"
 	agentpb "go.patchbase.net/proto/agent"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/services/matchers"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/sql/id"
@@ -24,19 +24,6 @@ const (
 	defaultNextCheckInSeconds = int32(21600)
 	defaultSSHPullFrequency   = 360
 	sshPullHistoryLimit       = int32(10)
-)
-
-var (
-	ErrInvalidRegistrationToken = errors.New("invalid registration token")
-	ErrInvalidHostAccessToken   = errors.New("invalid host access token")
-	ErrHostNotApproved          = errors.New("host is not approved")
-	ErrHostNotFound             = errors.New("host not found")
-	ErrTokenAlreadyRevoked      = errors.New("registration token already revoked")
-	ErrInvalidSnapshotPayload   = errors.New("invalid snapshot payload")
-	ErrHostIdentityMismatch     = errors.New("snapshot host identity mismatch")
-	ErrSnapshotNotFound         = errors.New("snapshot not found")
-	ErrDuplicateHostDisplayName = errors.New("a host with this display name already exists")
-	ErrDuplicateSSHPullHostname = errors.New("an SSH host with this pull hostname already exists")
 )
 
 type SSHPullArgs struct {
@@ -289,7 +276,7 @@ func (s *hosts) ListRegistrationTokens(ctx context.Context) ([]RegistrationToken
 }
 
 func (s *hosts) RevokeRegistrationToken(ctx context.Context, tokenID string) error {
-	_, err := sql.Required(s.sql.RevokeRegistrationToken(ctx, tokenID))(ErrTokenAlreadyRevoked)
+	_, err := sql.Required(s.sql.RevokeRegistrationToken(ctx, tokenID))(apperr.ErrTokenAlreadyRevoked)
 	if err != nil {
 		return fmt.Errorf("revoke registration token: %w", err)
 	}
@@ -299,7 +286,7 @@ func (s *hosts) RevokeRegistrationToken(ctx context.Context, tokenID string) err
 func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHostRequest) (*agentpb.RegisterHostResponse, error) {
 	registrationToken := strings.TrimSpace(input.RegistrationToken)
 	if registrationToken == "" {
-		return nil, ErrInvalidRegistrationToken
+		return nil, apperr.ErrInvalidRegistrationToken
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -309,7 +296,7 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
-	regToken, err := sql.Required(queries.GetActiveRegistrationTokenByHash(ctx, utils.SHA256(registrationToken)))(ErrInvalidRegistrationToken)
+	regToken, err := sql.Required(queries.GetActiveRegistrationTokenByHash(ctx, utils.SHA256(registrationToken)))(apperr.ErrInvalidRegistrationToken)
 	if err != nil {
 		return nil, fmt.Errorf("get active registration token: %w", err)
 	}
@@ -346,7 +333,7 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 	})
 	if err != nil {
 		if sql.IsUniqueViolation(err, "hosts_display_name_unique_idx") {
-			return nil, ErrDuplicateHostDisplayName
+			return nil, apperr.ErrDuplicateHostDisplayName
 		}
 		return nil, fmt.Errorf("insert agent host: %w", err)
 	}
@@ -379,7 +366,7 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string, snapshot *agentpb.AgentSnapshot) (*agentpb.SyncResponse, error) {
 	trimmedToken := strings.TrimSpace(hostAccessToken)
 	if trimmedToken == "" {
-		return nil, ErrInvalidHostAccessToken
+		return nil, apperr.ErrInvalidHostAccessToken
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -389,22 +376,22 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
-	tokenRow, err := sql.Required(queries.GetActiveHostAccessTokenByHash(ctx, utils.SHA256(trimmedToken)))(ErrInvalidHostAccessToken)
+	tokenRow, err := sql.Required(queries.GetActiveHostAccessTokenByHash(ctx, utils.SHA256(trimmedToken)))(apperr.ErrInvalidHostAccessToken)
 	if err != nil {
 		return nil, fmt.Errorf("get active host access token: %w", err)
 	}
 
-	host, err := sql.Required(queries.GetHostByID(ctx, tokenRow.HostID))(ErrHostNotFound)
+	host, err := sql.Required(queries.GetHostByID(ctx, tokenRow.HostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return nil, fmt.Errorf("get host by id: %w", err)
 	}
 	if host.ApprovalStatus != "approved" {
-		return nil, ErrHostNotApproved
+		return nil, apperr.ErrHostNotApproved
 	}
 
 	hostPayload := snapshot.GetHost()
 	if hostPayload != nil && host.MachineID.IsPresent() && hostPayload.GetMachineId() != "" && host.MachineID.Unwrap() != hostPayload.GetMachineId() {
-		return nil, ErrHostIdentityMismatch
+		return nil, apperr.ErrHostIdentityMismatch
 	}
 
 	collectedAt := time.Now().UTC()
@@ -561,7 +548,7 @@ func (s *hosts) ListPendingHosts(ctx context.Context) ([]HostInfo, error) {
 }
 
 func (s *hosts) ApproveHost(ctx context.Context, hostID string) (HostInfo, error) {
-	host, err := sql.Required(s.sql.ApproveHostByID(ctx, hostID))(ErrHostNotFound)
+	host, err := sql.Required(s.sql.ApproveHostByID(ctx, hostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return HostInfo{}, fmt.Errorf("approve host: %w", err)
 	}
@@ -628,10 +615,10 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 	})
 	if err != nil {
 		if sql.IsUniqueViolation(err, "hosts_display_name_unique_idx") {
-			return CreateSSHHostResult{}, ErrDuplicateHostDisplayName
+			return CreateSSHHostResult{}, apperr.ErrDuplicateHostDisplayName
 		}
 		if sql.IsUniqueViolation(err, "host_ssh_pull_pull_hostname_unique_idx") {
-			return CreateSSHHostResult{}, ErrDuplicateSSHPullHostname
+			return CreateSSHHostResult{}, apperr.ErrDuplicateSSHPullHostname
 		}
 		return CreateSSHHostResult{}, fmt.Errorf("insert ssh host: %w", err)
 	}
@@ -651,7 +638,7 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 }
 
 func (s *hosts) OnboardSSHHost(ctx context.Context, hostID string) error {
-	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(ErrHostNotFound)
+	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return fmt.Errorf("get host: %w", err)
 	}
@@ -697,7 +684,7 @@ func (s *hosts) ListHosts(ctx context.Context) ([]HostInfo, error) {
 }
 
 func (s *hosts) GetHost(ctx context.Context, hostID string) (HostInfo, error) {
-	row, err := sql.Required(s.sql.GetHostWithStateByID(ctx, hostID))(ErrHostNotFound)
+	row, err := sql.Required(s.sql.GetHostWithStateByID(ctx, hostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return HostInfo{}, fmt.Errorf("get host: %w", err)
 	}
@@ -705,7 +692,7 @@ func (s *hosts) GetHost(ctx context.Context, hostID string) (HostInfo, error) {
 }
 
 func (s *hosts) GetLatestSnapshot(ctx context.Context, hostID string) (HostSnapshotInfo, error) {
-	row, err := sql.Required(s.sql.GetLatestHostSnapshotByHostID(ctx, hostID))(ErrSnapshotNotFound)
+	row, err := sql.Required(s.sql.GetLatestHostSnapshotByHostID(ctx, hostID))(apperr.ErrSnapshotNotFound)
 	if err != nil {
 		return HostSnapshotInfo{}, fmt.Errorf("get latest snapshot: %w", err)
 	}
@@ -724,7 +711,7 @@ func (s *hosts) GetLatestSnapshot(ctx context.Context, hostID string) (HostSnaps
 func (s *hosts) DeleteHost(ctx context.Context, hostID string) error {
 	trimmedHostID := strings.TrimSpace(hostID)
 	if trimmedHostID == "" {
-		return ErrHostNotFound
+		return apperr.ErrHostNotFound
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -734,7 +721,7 @@ func (s *hosts) DeleteHost(ctx context.Context, hostID string) error {
 	defer tx.Rollback(ctx) // nolint:errcheck
 
 	queries := sql.New(tx)
-	_, err = sql.Required(queries.GetHostByID(ctx, trimmedHostID))(ErrHostNotFound)
+	_, err = sql.Required(queries.GetHostByID(ctx, trimmedHostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return fmt.Errorf("get host by id: %w", err)
 	}
@@ -751,7 +738,7 @@ func (s *hosts) DeleteHost(ctx context.Context, hostID string) error {
 	if err := queries.DeleteHostSnapshotsByHostID(ctx, trimmedHostID); err != nil {
 		return fmt.Errorf("delete host snapshots: %w", err)
 	}
-	_, err = sql.Required(queries.DeleteHostByID(ctx, trimmedHostID))(ErrHostNotFound)
+	_, err = sql.Required(queries.DeleteHostByID(ctx, trimmedHostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return fmt.Errorf("delete host: %w", err)
 	}
@@ -960,7 +947,7 @@ func mapHostWithStateByID(row sql.GetHostWithStateByIDRow) HostInfo {
 }
 
 func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
-	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(ErrHostNotFound)
+	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return fmt.Errorf("get host: %w", err)
 	}
@@ -1260,7 +1247,7 @@ func (s *hosts) CreateManualHost(ctx context.Context, displayName string, hostna
 	})
 	if err != nil {
 		if sql.IsUniqueViolation(err, "hosts_display_name_unique_idx") {
-			return HostInfo{}, ErrDuplicateHostDisplayName
+			return HostInfo{}, apperr.ErrDuplicateHostDisplayName
 		}
 		return HostInfo{}, fmt.Errorf("insert manual host: %w", err)
 	}
@@ -1273,7 +1260,7 @@ func (s *hosts) CreateManualHost(ctx context.Context, displayName string, hostna
 }
 
 func (s *hosts) IngestManualReport(ctx context.Context, hostID string, reportContent []byte) error {
-	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(ErrHostNotFound)
+	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return fmt.Errorf("get host: %w", err)
 	}

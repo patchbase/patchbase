@@ -88,6 +88,7 @@ go_test(
     tags = [
         "integration_docker",
         "no-sandbox",
+        "rhel",
     ],
     deps = [
         "//internal/testing",
@@ -107,6 +108,7 @@ go_test(
     tags = [
         "integration_docker",
         "no-sandbox",
+        "rhel",
     ],
     deps = [
         "//internal/testing",

@@ -13,6 +13,7 @@ go_api_library(
     deps = [
         "//internal/api/auth",
         "//internal/api/webutil",
+        "//internal/apperr",
         "//internal/mailer",
         "//internal/services",
         "//internal/utils",

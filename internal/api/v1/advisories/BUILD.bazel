@@ -15,6 +15,7 @@ go_api_library(
         "//internal/api/auth",
         "//internal/api/v1/entities",
         "//internal/api/webutil",
+        "//internal/apperr",
         "//internal/services",
         "@com_github_samber_do_v2//:do",
     ],

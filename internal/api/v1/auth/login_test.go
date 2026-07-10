@@ -47,5 +47,5 @@ func TestLoginInvalidCredentials(t *testing.T) {
 	}`)
 
 	assert.Equal(t, http.StatusUnauthorized, recorder.Code)
-	assert.JSONEq(t, `{"error":"invalid email or password"}`, recorder.Body.String())
+	assert.JSONEq(t, `{"code":"invalid_credentials","message":"invalid email or password"}`, recorder.Body.String())
 }

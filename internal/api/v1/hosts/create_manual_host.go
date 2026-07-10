@@ -2,12 +2,12 @@ package hosts
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/services"
 )
@@ -27,32 +27,26 @@ func CreateManualHost(i do.Injector) apiauth.AuthenticatedHandler {
 
 	return func(w http.ResponseWriter, r *http.Request, authInfo apiauth.AuthInfo) {
 		if !authInfo.User.IsAdmin {
-			webutil.WriteAPIError(w, r, http.StatusForbidden, "only admins can create manual hosts", nil)
+			webutil.WriteError(w, r, apperr.ErrForbiddenCreateManualHost)
 			return
 		}
 
 		var req createManualHostRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "invalid request body", nil)
+			webutil.WriteError(w, r, apperr.ErrInvalidBody)
 			return
 		}
 
 		req.DisplayName = strings.TrimSpace(req.DisplayName)
 		req.Hostname = strings.TrimSpace(req.Hostname)
 		if req.DisplayName == "" && req.Hostname == "" {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "display name or hostname is required", nil)
+			webutil.WriteError(w, r, apperr.ErrDisplayNameOrHostnameRequired)
 			return
 		}
 
 		result, err := hostsService.CreateManualHost(r.Context(), req.DisplayName, req.Hostname)
 		if err != nil {
-			switch {
-			case errors.Is(err, services.ErrDuplicateHostDisplayName):
-				webutil.WriteAPIError(w, r, http.StatusBadRequest, err.Error(), nil)
-			default:
-				webutil.LogError(r, "create manual host failed", err)
-				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to create manual host", nil)
-			}
+			webutil.WriteError(w, r, err)
 			return
 		}
 

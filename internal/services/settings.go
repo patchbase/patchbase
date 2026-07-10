@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/samber/do/v2"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/sql"
 	"go.patchbase.net/server/internal/sql/id"
 	"go.patchbase.net/server/internal/utils"
@@ -189,19 +190,19 @@ func (s *settings) CompleteInitialSetup(ctx context.Context, userID string, inpu
 		return sql.User{}, fmt.Errorf("get initial setup status: %w", err)
 	}
 	if status.Done {
-		return sql.User{}, ErrInitialSetupAlreadyComplete
+		return sql.User{}, apperr.ErrInitialSetupAlreadyComplete
 	}
 
 	name := strings.TrimSpace(input.Name)
 	email := normalizeEmail(input.Email)
 	if name == "" {
-		return sql.User{}, fmt.Errorf("name is required")
+		return sql.User{}, apperr.ErrNameRequired
 	}
 	if email == "" {
-		return sql.User{}, fmt.Errorf("email is required")
+		return sql.User{}, apperr.ErrEmailRequired
 	}
 	if len(input.Password) < 12 {
-		return sql.User{}, fmt.Errorf("password must be at least 12 characters")
+		return sql.User{}, apperr.ErrPasswordTooShort
 	}
 
 	passwordHash, err := utils.HashPassword(input.Password)
@@ -217,7 +218,7 @@ func (s *settings) CompleteInitialSetup(ctx context.Context, userID string, inpu
 	})
 	if err != nil {
 		if sql.IsUniqueViolation(err, "users_email_active_unique_idx") {
-			return sql.User{}, ErrEmailAlreadyInUse
+			return sql.User{}, apperr.ErrEmailAlreadyInUse
 		}
 		return sql.User{}, fmt.Errorf("update bootstrap admin credentials: %w", err)
 	}

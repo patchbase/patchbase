@@ -15,8 +15,7 @@ func GetScopeStatuses(i do.Injector) apiauth.AuthenticatedHandler {
 	return func(w http.ResponseWriter, r *http.Request, _ apiauth.AuthInfo) {
 		statuses, err := advisoriesService.GetScopeStatuses(r.Context())
 		if err != nil {
-			webutil.LogError(r, "get scope statuses failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to get scope statuses", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 

@@ -29,6 +29,7 @@ go_api_library(
         "//internal/api/auth",
         "//internal/api/v1/entities",
         "//internal/api/webutil",
+        "//internal/apperr",
         "//internal/services",
         "//internal/sql",
         "//proto/agent",

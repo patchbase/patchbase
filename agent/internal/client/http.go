@@ -125,10 +125,16 @@ func httpPost[R any](c *HTTPClient, ctx context.Context, endpoint string, payloa
 
 	if resp.StatusCode >= 400 {
 		var apiErr agent.APIError
-		if err := proto.Unmarshal(respBody, &apiErr); err == nil && apiErr.Error != "" {
-			result.ErrorMessage = apiErr.Error
-		} else {
-			result.ErrorMessage = string(respBody)
+		if err := proto.Unmarshal(respBody, &apiErr); err == nil {
+			result.ErrorCode = apiErr.GetCode()
+			result.ErrorMessage = apiErr.GetMessage()
+		}
+		if result.ErrorMessage == "" {
+			if result.ErrorCode == "" {
+				result.ErrorMessage = string(respBody)
+			} else {
+				result.ErrorMessage = result.ErrorCode
+			}
 		}
 	} else {
 		var r R

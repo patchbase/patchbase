@@ -90,13 +90,13 @@ archive.ubuntu.com Enabled`
 		assert.Equal(t, "success", resp["status"])
 	})
 
-	t.Run("invalid host returns 400 or error", func(t *testing.T) {
+	t.Run("invalid host returns 404", func(t *testing.T) {
 		recorder := backend.HTTPPostBytes(
 			"/api/v1/hosts/non-existent/report",
 			payloadBytes,
 			apitesting.WithBearerToken(adminToken),
 		)
-		require.Equal(t, http.StatusBadRequest, recorder.Code)
+		require.Equal(t, http.StatusNotFound, recorder.Code)
 	})
 }
 

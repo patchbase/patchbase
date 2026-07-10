@@ -36,10 +36,10 @@ function getErrorMessage(data: unknown): string {
   if (
     typeof data === "object" &&
     data !== null &&
-    "error" in data &&
-    typeof data.error === "string"
+    "message" in data &&
+    typeof data.message === "string"
   ) {
-    return data.error;
+    return data.message;
   }
   return "Request failed";
 }

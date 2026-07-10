@@ -2,10 +2,10 @@ package auth
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/samber/do/v2"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/services"
 )
@@ -35,26 +35,19 @@ func Login(i do.Injector) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var req loginRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "invalid request body", nil)
+			webutil.WriteError(w, r, apperr.ErrInvalidBody)
 			return
 		}
 
 		result, err := authService.Login(r.Context(), req.Email, req.Password)
 		if err != nil {
-			if errors.Is(err, services.ErrInvalidCredentials) {
-				webutil.WriteAPIError(w, r, http.StatusUnauthorized, "invalid email or password", nil)
-				return
-			}
-
-			webutil.LogError(r, "login failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "login failed", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 
 		status, err := settings.Status(r.Context())
 		if err != nil {
-			webutil.LogError(r, "get setup status after login failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to determine setup status", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 

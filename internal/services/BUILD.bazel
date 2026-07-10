@@ -13,6 +13,7 @@ go_library(
     importpath = "go.patchbase.net/server/internal/services",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/apperr",
         "//internal/config",
         "//internal/services/matchers",
         "//internal/sql",
@@ -87,6 +88,7 @@ go_test(
     data = ["//db/fixtures"],
     deps = [
         ":services",
+        "//internal/apperr",
         "//internal/sql",
         "//internal/sql/id",
         "//internal/testing",

@@ -11,6 +11,7 @@ go_api_library(
     deps = [
         "//internal/api/auth",
         "//internal/api/webutil",
+        "//internal/apperr",
         "//internal/services",
         "@com_github_samber_do_v2//:do",
     ],

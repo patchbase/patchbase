@@ -57,7 +57,9 @@ func (m *APIError) validate(all bool) error {
 
 	var errors []error
 
-	// no validation rules for Error
+	// no validation rules for Code
+
+	// no validation rules for Message
 
 	if len(errors) > 0 {
 		return APIErrorMultiError(errors)

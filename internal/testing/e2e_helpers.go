@@ -165,7 +165,7 @@ func RHEL9E2EExpectation() DistroExpectation {
 		Package: PackageExpectation{
 			Name:    "nginx",
 			Version: "1.20.1",
-			Release: "28.el9_8.3",
+			Release: "28.el9_8.4",
 		},
 		Repo: RepoExpectation{
 			Labels: []string{
@@ -196,7 +196,7 @@ func RHEL10E2EExpectation() DistroExpectation {
 		Package: PackageExpectation{
 			Name:    "nginx",
 			Version: "1.26.3",
-			Release: "6.el10_2.4",
+			Release: "6.el10_2.5",
 		},
 		Repo: RepoExpectation{
 			Labels: []string{

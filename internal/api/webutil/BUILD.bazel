@@ -11,6 +11,7 @@ go_library(
     importpath = "go.patchbase.net/server/internal/api/webutil",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/apperr",
         "//internal/utils",
         "//proto/agent",
         "@org_golang_google_protobuf//proto",

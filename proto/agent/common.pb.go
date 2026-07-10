@@ -179,7 +179,8 @@ func (VirtualizationRole) EnumDescriptor() ([]byte, []int) {
 
 type APIError struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Error         string                 `protobuf:"bytes,1,opt,name=error,proto3" json:"error,omitempty"`
+	Code          string                 `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -214,9 +215,16 @@ func (*APIError) Descriptor() ([]byte, []int) {
 	return file_patchbase_agent_common_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *APIError) GetError() string {
+func (x *APIError) GetCode() string {
 	if x != nil {
-		return x.Error
+		return x.Code
+	}
+	return ""
+}
+
+func (x *APIError) GetMessage() string {
+	if x != nil {
+		return x.Message
 	}
 	return ""
 }
@@ -225,9 +233,10 @@ var File_patchbase_agent_common_proto protoreflect.FileDescriptor
 
 const file_patchbase_agent_common_proto_rawDesc = "" +
 	"\n" +
-	"\x1cpatchbase/agent/common.proto\x12\x0fpatchbase.agent\" \n" +
-	"\bAPIError\x12\x14\n" +
-	"\x05error\x18\x01 \x01(\tR\x05error*K\n" +
+	"\x1cpatchbase/agent/common.proto\x12\x0fpatchbase.agent\"E\n" +
+	"\bAPIError\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessageJ\x04\b\x01\x10\x02R\x05error*K\n" +
 	"\bOsFamily\x12\x19\n" +
 	"\x15OS_FAMILY_UNSPECIFIED\x10\x00\x12\x11\n" +
 	"\rOS_FAMILY_RPM\x10\x01\x12\x11\n" +

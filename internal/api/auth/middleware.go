@@ -1,10 +1,12 @@
 package auth
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/samber/do/v2"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/services"
 	"go.patchbase.net/server/internal/sql"
@@ -41,19 +43,17 @@ func (a *auth) Required(next AuthenticatedHandler) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		token, ok := bearerToken(r.Header.Get("Authorization"))
 		if !ok {
-			webutil.WriteAPIError(w, r, http.StatusUnauthorized, "missing bearer token", nil)
+			webutil.WriteError(w, r, apperr.ErrMissingBearer)
 			return
 		}
 
 		user, err := a.authService.Authenticate(r.Context(), token)
 		if err != nil {
-			if err == services.ErrUnauthorized {
-				webutil.WriteAPIError(w, r, http.StatusUnauthorized, "invalid access token", nil)
+			if errors.Is(err, apperr.ErrUnauthorized) {
+				webutil.WriteError(w, r, apperr.ErrUnauthorized)
 				return
 			}
-
-			webutil.LogError(r, "authenticate request failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "authentication failed", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 

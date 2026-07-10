@@ -73,7 +73,7 @@ func TestUpdateProfileEmailDuplicate(t *testing.T) {
 	recorder := backend.HTTPPatch("/api/v1/profile", `{"email":"user@patchbase.local"}`, apitesting.WithBearerToken(token))
 
 	assert.Equal(t, http.StatusConflict, recorder.Code)
-	assert.JSONEq(t, `{"error":"email is already in use"}`, recorder.Body.String())
+	assert.JSONEq(t, `{"code":"email_already_in_use","message":"email is already in use"}`, recorder.Body.String())
 }
 
 func TestUpdateProfilePasswordRequiresCurrentPassword(t *testing.T) {
@@ -86,7 +86,7 @@ func TestUpdateProfilePasswordRequiresCurrentPassword(t *testing.T) {
 
 	recorderMissing := backend.HTTPPatch("/api/v1/profile", `{"new_password":"new-secure-password"}`, apitesting.WithBearerToken(token))
 	assert.Equal(t, http.StatusBadRequest, recorderMissing.Code)
-	assert.JSONEq(t, `{"error":"current password is required"}`, recorderMissing.Body.String())
+	assert.JSONEq(t, `{"code":"current_password_required","message":"current password is required"}`, recorderMissing.Body.String())
 
 	recorderWrong := backend.HTTPPatch(
 		"/api/v1/profile",
@@ -94,7 +94,7 @@ func TestUpdateProfilePasswordRequiresCurrentPassword(t *testing.T) {
 		apitesting.WithBearerToken(token),
 	)
 	assert.Equal(t, http.StatusUnauthorized, recorderWrong.Code)
-	assert.JSONEq(t, `{"error":"current password is invalid"}`, recorderWrong.Body.String())
+	assert.JSONEq(t, `{"code":"current_password_invalid","message":"current password is invalid"}`, recorderWrong.Body.String())
 }
 
 func TestUpdateProfilePasswordReturnsFreshToken(t *testing.T) {
@@ -142,7 +142,7 @@ func TestUpdateProfileMalformedJSON(t *testing.T) {
 
 	recorder := backend.HTTPPatch("/api/v1/profile", `{broken`, apitesting.WithBearerToken(token))
 	assert.Equal(t, http.StatusBadRequest, recorder.Code)
-	assert.JSONEq(t, `{"error":"invalid request body"}`, recorder.Body.String())
+	assert.JSONEq(t, `{"code":"invalid_request_body","message":"invalid request body"}`, recorder.Body.String())
 }
 
 func TestUpdateProfileEmailValidation(t *testing.T) {
@@ -156,13 +156,13 @@ func TestUpdateProfileEmailValidation(t *testing.T) {
 	t.Run("empty email", func(t *testing.T) {
 		recorder := backend.HTTPPatch("/api/v1/profile", `{"email":""}`, apitesting.WithBearerToken(token))
 		assert.Equal(t, http.StatusBadRequest, recorder.Code)
-		assert.JSONEq(t, `{"error":"email is required"}`, recorder.Body.String())
+		assert.JSONEq(t, `{"code":"email_required","message":"email is required"}`, recorder.Body.String())
 	})
 
 	t.Run("whitespace only email", func(t *testing.T) {
 		recorder := backend.HTTPPatch("/api/v1/profile", `{"email":"   "}`, apitesting.WithBearerToken(token))
 		assert.Equal(t, http.StatusBadRequest, recorder.Code)
-		assert.JSONEq(t, `{"error":"email is required"}`, recorder.Body.String())
+		assert.JSONEq(t, `{"code":"email_required","message":"email is required"}`, recorder.Body.String())
 	})
 }
 
@@ -180,7 +180,7 @@ func TestUpdateProfilePasswordValidation(t *testing.T) {
 			"new_password":"short"
 		}`, apitesting.WithBearerToken(token))
 		assert.Equal(t, http.StatusBadRequest, recorder.Code)
-		assert.JSONEq(t, `{"error":"password must be at least 12 characters"}`, recorder.Body.String())
+		assert.JSONEq(t, `{"code":"password_too_short","message":"password must be at least 12 characters"}`, recorder.Body.String())
 	})
 
 	t.Run("empty current password", func(t *testing.T) {
@@ -189,7 +189,7 @@ func TestUpdateProfilePasswordValidation(t *testing.T) {
 			"new_password":"new-secure-password"
 		}`, apitesting.WithBearerToken(token))
 		assert.Equal(t, http.StatusBadRequest, recorder.Code)
-		assert.JSONEq(t, `{"error":"current password is required"}`, recorder.Body.String())
+		assert.JSONEq(t, `{"code":"current_password_required","message":"current password is required"}`, recorder.Body.String())
 	})
 }
 

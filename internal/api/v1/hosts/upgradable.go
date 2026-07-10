@@ -8,6 +8,7 @@ import (
 	agentpb "go.patchbase.net/proto/agent"
 	apiauth "go.patchbase.net/server/internal/api/auth"
 	"go.patchbase.net/server/internal/api/v1/entities"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/services"
 	"go.patchbase.net/server/internal/sql"
@@ -21,29 +22,22 @@ func GetUpgradablePackages(i do.Injector) apiauth.AuthenticatedHandler {
 	return func(w http.ResponseWriter, r *http.Request, _ apiauth.AuthInfo) {
 		hostID := r.PathValue("hostID")
 		if hostID == "" {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "missing host id", nil)
+			webutil.WriteError(w, r, apperr.ErrMissingHostID)
 			return
 		}
 
-		_, err := hostsService.GetHost(r.Context(), hostID)
-		if err != nil {
-			if errors.Is(err, services.ErrHostNotFound) {
-				webutil.WriteAPIError(w, r, http.StatusNotFound, "host not found", nil)
-			} else {
-				webutil.LogError(r, "get host failed", err)
-				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to get host", nil)
-			}
+		if _, err := hostsService.GetHost(r.Context(), hostID); err != nil {
+			webutil.WriteError(w, r, err)
 			return
 		}
 
 		snapshot, err := hostsService.GetLatestSnapshot(r.Context(), hostID)
 		if err != nil {
-			if errors.Is(err, services.ErrSnapshotNotFound) {
+			if errors.Is(err, apperr.ErrSnapshotNotFound) {
 				webutil.WriteJSON(w, http.StatusOK, []entities.DecisionGroup{})
 				return
 			}
-			webutil.LogError(r, "get latest host snapshot failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to get latest snapshot", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 
@@ -59,8 +53,7 @@ func GetUpgradablePackages(i do.Injector) apiauth.AuthenticatedHandler {
 
 		rows, err := queries.ListDecisionPageRowsBySnapshot(r.Context(), snapshot.ID)
 		if err != nil {
-			webutil.LogError(r, "list decision page rows failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to load decisions", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 

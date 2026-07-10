@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 
+	"go.patchbase.net/server/internal/apperr"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -22,10 +23,10 @@ func ValidateNoAuth[T any](fn ValidatedNoAuthFN[T]) http.HandlerFunc {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
 			if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-				WriteAPIError(w, r, http.StatusRequestEntityTooLarge, "request body too large", nil)
+				WriteError(w, r, apperr.ErrBodyTooLarge)
 				return
 			}
-			WriteAPIError(w, r, http.StatusBadRequest, "read request body failed", nil)
+			WriteError(w, r, apperr.ErrBodyReadFailed)
 			return
 		}
 
@@ -35,12 +36,12 @@ func ValidateNoAuth[T any](fn ValidatedNoAuthFN[T]) http.HandlerFunc {
 		}
 
 		if err := proto.Unmarshal(body, pm); err != nil {
-			WriteAPIError(w, r, http.StatusBadRequest, "invalid request body", nil)
+			WriteError(w, r, apperr.ErrInvalidBody)
 			return
 		}
 
 		if err := pm.ValidateAll(); err != nil {
-			WriteAPIError(w, r, http.StatusBadRequest, "invalid request parameters", err)
+			WriteError(w, r, apperr.WithDetails(apperr.ErrInvalidParams, err))
 			return
 		}
 

@@ -1,11 +1,11 @@
 package hosts
 
 import (
-	"errors"
 	"net/http"
 
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/services"
 )
@@ -15,25 +15,18 @@ func OnboardSSH(i do.Injector) apiauth.AuthenticatedHandler {
 
 	return func(w http.ResponseWriter, r *http.Request, authInfo apiauth.AuthInfo) {
 		if !authInfo.User.IsAdmin {
-			webutil.WriteAPIError(w, r, http.StatusForbidden, "only admins can onboard ssh hosts", nil)
+			webutil.WriteError(w, r, apperr.ErrForbiddenOnboardSSHHost)
 			return
 		}
 
 		hostID := r.PathValue("hostID")
 		if hostID == "" {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "missing host id", nil)
+			webutil.WriteError(w, r, apperr.ErrMissingHostID)
 			return
 		}
 
-		err := hostsService.OnboardSSHHost(r.Context(), hostID)
-		if err != nil {
-			switch {
-			case errors.Is(err, services.ErrHostNotFound):
-				webutil.WriteAPIError(w, r, http.StatusNotFound, "host not found", nil)
-			default:
-				webutil.LogError(r, "onboard ssh host failed", err)
-				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to onboard ssh host", nil)
-			}
+		if err := hostsService.OnboardSSHHost(r.Context(), hostID); err != nil {
+			webutil.WriteError(w, r, err)
 			return
 		}
 

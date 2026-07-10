@@ -7,6 +7,7 @@ import (
 
 	"github.com/samber/do/v2"
 	agent "go.patchbase.net/proto/agent"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/services"
 )
@@ -18,24 +19,18 @@ func Snapshots(i do.Injector) http.HandlerFunc {
 		token, ok := bearerToken(r.Header.Get("Authorization"))
 		if !ok {
 			w.Header().Set("WWW-Authenticate", `Bearer realm="patchbase-agent"`)
-			webutil.WriteAPIError(w, r, http.StatusUnauthorized, "missing bearer token", nil)
+			webutil.WriteError(w, r, apperr.ErrMissingBearer)
 			return
 		}
 
 		result, err := hosts.IngestAgentSnapshot(r.Context(), token, req)
 		if err != nil {
-			switch {
-			case errors.Is(err, services.ErrInvalidHostAccessToken), errors.Is(err, services.ErrHostNotFound):
+			if errors.Is(err, apperr.ErrInvalidHostAccessToken) ||
+				errors.Is(err, apperr.ErrHostNotFound) ||
+				errors.Is(err, apperr.ErrMissingBearer) {
 				w.Header().Set("WWW-Authenticate", `Bearer realm="patchbase-agent"`)
-				webutil.WriteAPIError(w, r, http.StatusUnauthorized, "invalid or missing host", nil)
-			case errors.Is(err, services.ErrHostNotApproved):
-				webutil.WriteAPIError(w, r, http.StatusForbidden, "host pending approval", nil)
-			case errors.Is(err, services.ErrInvalidSnapshotPayload), errors.Is(err, services.ErrHostIdentityMismatch):
-				webutil.WriteAPIError(w, r, http.StatusBadRequest, "invalid snapshot payload or identity mismatch", nil)
-			default:
-				webutil.LogError(r, "ingest agent snapshot failed", err)
-				webutil.WriteAPIError(w, r, http.StatusInternalServerError, "snapshot ingest failed", nil)
 			}
+			webutil.WriteError(w, r, err)
 			return
 		}
 

@@ -10,6 +10,7 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/auth"
 	"go.patchbase.net/server/internal/services"
 	"go.patchbase.net/server/internal/sql"
@@ -62,7 +63,7 @@ func TestAuthMiddleware_MissingHeader(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
-	assert.JSONEq(t, `{"error":"missing bearer token"}`, rec.Body.String())
+	assert.JSONEq(t, `{"code":"missing_bearer_token","message":"missing bearer token"}`, rec.Body.String())
 	assert.False(t, nextCalled)
 }
 
@@ -79,7 +80,7 @@ func TestAuthMiddleware_MalformedHeaderNoBearer(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
-	assert.JSONEq(t, `{"error":"missing bearer token"}`, rec.Body.String())
+	assert.JSONEq(t, `{"code":"missing_bearer_token","message":"missing bearer token"}`, rec.Body.String())
 	assert.False(t, nextCalled)
 }
 
@@ -96,14 +97,14 @@ func TestAuthMiddleware_MalformedHeaderJustBearer(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
-	assert.JSONEq(t, `{"error":"missing bearer token"}`, rec.Body.String())
+	assert.JSONEq(t, `{"code":"missing_bearer_token","message":"missing bearer token"}`, rec.Body.String())
 	assert.False(t, nextCalled)
 }
 
 func TestAuthMiddleware_InvalidToken(t *testing.T) {
 	nextCalled := false
 	authMock := func(ctx context.Context, token string) (sql.User, error) {
-		return sql.User{}, services.ErrUnauthorized
+		return sql.User{}, apperr.ErrUnauthorized
 	}
 	handler := setupMiddleware(t, authMock, func(w http.ResponseWriter, r *http.Request, authInfo auth.AuthInfo) {
 		nextCalled = true
@@ -116,7 +117,7 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusUnauthorized, rec.Code)
-	assert.JSONEq(t, `{"error":"invalid access token"}`, rec.Body.String())
+	assert.JSONEq(t, `{"code":"unauthorized","message":"invalid access token"}`, rec.Body.String())
 	assert.False(t, nextCalled)
 }
 
@@ -136,7 +137,7 @@ func TestAuthMiddleware_InternalError(t *testing.T) {
 	handler.ServeHTTP(rec, req)
 
 	assert.Equal(t, http.StatusInternalServerError, rec.Code)
-	assert.JSONEq(t, `{"error":"internal server error"}`, rec.Body.String())
+	assert.JSONEq(t, `{"code":"internal_error","message":"internal server error"}`, rec.Body.String())
 	assert.False(t, nextCalled)
 }
 

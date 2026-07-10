@@ -35,7 +35,7 @@ func TestHosts_UniqueConstraints_API(t *testing.T) {
 		`{"display_name":"api-ssh-host-1","hostname":"api-ssh-2.example.com","ssh_user":"root","frequency_minutes":60}`,
 		apitesting.WithBearerToken(adminToken),
 	)
-	require.Equal(t, http.StatusBadRequest, rec2.Code)
+	require.Equal(t, http.StatusConflict, rec2.Code)
 	assert.Contains(t, rec2.Body.String(), "a host with this display name already exists")
 
 	// 3. Try to create second SSH host with same pull hostname
@@ -44,7 +44,7 @@ func TestHosts_UniqueConstraints_API(t *testing.T) {
 		`{"display_name":"api-ssh-host-2","hostname":"api-ssh-1.example.com","ssh_user":"root","frequency_minutes":60}`,
 		apitesting.WithBearerToken(adminToken),
 	)
-	require.Equal(t, http.StatusBadRequest, rec3.Code)
+	require.Equal(t, http.StatusConflict, rec3.Code)
 	assert.Contains(t, rec3.Body.String(), "an SSH host with this pull hostname already exists")
 
 	// Test unique manual hosts
@@ -62,7 +62,7 @@ func TestHosts_UniqueConstraints_API(t *testing.T) {
 		`{"display_name":"api-manual-host-1","hostname":"api-manual-2.example.com"}`,
 		apitesting.WithBearerToken(adminToken),
 	)
-	require.Equal(t, http.StatusBadRequest, rec5.Code)
+	require.Equal(t, http.StatusConflict, rec5.Code)
 	assert.Contains(t, rec5.Body.String(), "a host with this display name already exists")
 }
 
@@ -143,7 +143,7 @@ _PB_METADATA_OS_VERSION=9.3
 		reportContent,
 		apitesting.WithBearerToken(adminToken),
 	)
-	require.Equal(t, http.StatusBadRequest, rec7.Code)
+	require.Equal(t, http.StatusNotFound, rec7.Code)
 
 	// Ingest manual report - invalid payload
 	rec8 := backend.HTTPPost(

@@ -1,0 +1,11 @@
+load("@rules_go//go:def.bzl", "go_library")
+
+go_library(
+    name = "apperr",
+    srcs = [
+        "errors.go",
+        "sentinels.go",
+    ],
+    importpath = "go.patchbase.net/server/internal/apperr",
+    visibility = ["//:__subpackages__"],
+)

@@ -16,8 +16,7 @@ func ListHosts(i do.Injector) apiauth.AuthenticatedHandler {
 	return func(w http.ResponseWriter, r *http.Request, _ apiauth.AuthInfo) {
 		hosts, err := hostsService.ListHosts(r.Context())
 		if err != nil {
-			webutil.LogError(r, "list hosts failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to list hosts", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 

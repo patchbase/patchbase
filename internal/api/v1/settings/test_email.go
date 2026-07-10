@@ -7,6 +7,7 @@ import (
 
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/mailer"
 	"go.patchbase.net/server/internal/services"
@@ -22,31 +23,30 @@ func TestEmail(i do.Injector) apiauth.AuthenticatedHandler {
 
 	return func(w http.ResponseWriter, r *http.Request, authInfo apiauth.AuthInfo) {
 		if !authInfo.User.IsAdmin {
-			webutil.WriteAPIError(w, r, http.StatusForbidden, "only admins can test email", nil)
+			webutil.WriteError(w, r, apperr.ErrForbiddenTestEmail)
 			return
 		}
 
 		var req testEmailRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "invalid request body", err)
+			webutil.WriteError(w, r, apperr.WithDetails(apperr.ErrInvalidBody, err))
 			return
 		}
 
 		req.To = strings.TrimSpace(req.To)
 		if req.To == "" {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "to address is required", nil)
+			webutil.WriteError(w, r, apperr.ErrToAddressRequired)
 			return
 		}
 
 		smtpSettings, err := settingsService.GetSMTPSettings(r.Context())
 		if err != nil {
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to get smtp settings", err)
+			webutil.WriteError(w, r, err)
 			return
 		}
 
 		if err := emailService.TestConnection(r.Context(), smtpSettings, req.To); err != nil {
-			webutil.LogError(r, "failed to send test email", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to send test email", err)
+			webutil.WriteError(w, r, err)
 			return
 		}
 

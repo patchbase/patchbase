@@ -13,6 +13,7 @@ go_library(
     importpath = "go.patchbase.net/server/internal/queue",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/apperr",
         "//internal/config",
         "//internal/mailer",
         "//internal/services",
@@ -32,6 +33,7 @@ go_test(
     srcs = ["ssh_pull_worker_test.go"],
     deps = [
         ":queue",
+        "//internal/apperr",
         "//internal/config",
         "//internal/services",
         "@com_github_riverqueue_river//:river",

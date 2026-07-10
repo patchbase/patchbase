@@ -2,11 +2,11 @@ package setup
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"github.com/samber/do/v2"
 	apiauth "go.patchbase.net/server/internal/api/auth"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/services"
 )
@@ -23,13 +23,13 @@ func Complete(i do.Injector) apiauth.AuthenticatedHandler {
 
 	return func(w http.ResponseWriter, r *http.Request, authInfo apiauth.AuthInfo) {
 		if !authInfo.User.IsAdmin {
-			webutil.WriteAPIError(w, r, http.StatusForbidden, "only admins can complete setup", nil)
+			webutil.WriteError(w, r, apperr.ErrForbiddenCompleteSetup)
 			return
 		}
 
 		var req completeRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			webutil.WriteAPIError(w, r, http.StatusBadRequest, "invalid request body", nil)
+			webutil.WriteError(w, r, apperr.ErrInvalidBody)
 			return
 		}
 
@@ -39,22 +39,13 @@ func Complete(i do.Injector) apiauth.AuthenticatedHandler {
 			Password: req.Password,
 		})
 		if err != nil {
-			switch {
-			case errors.Is(err, services.ErrInitialSetupAlreadyComplete):
-				webutil.WriteAPIError(w, r, http.StatusConflict, "initial setup already completed", nil)
-			case errors.Is(err, services.ErrEmailAlreadyInUse):
-				webutil.WriteAPIError(w, r, http.StatusConflict, "email is already in use", nil)
-			default:
-				webutil.LogError(r, "complete setup failed", err)
-				webutil.WriteAPIError(w, r, http.StatusBadRequest, "complete setup failed", nil)
-			}
+			webutil.WriteError(w, r, err)
 			return
 		}
 
 		accessToken, err := authService.IssueAccessToken(r.Context(), updatedUser.ID)
 		if err != nil {
-			webutil.LogError(r, "issue refreshed setup token failed", err)
-			webutil.WriteAPIError(w, r, http.StatusInternalServerError, "failed to issue access token", nil)
+			webutil.WriteError(w, r, err)
 			return
 		}
 

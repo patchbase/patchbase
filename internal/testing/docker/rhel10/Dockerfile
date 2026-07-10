@@ -27,7 +27,7 @@ FROM registry.access.redhat.com/ubi10/ubi:10.0
 # bump the version strings. nginx is shipped at epoch 2 in RHEL 10.
 RUN dnf install -y --best --allowerasing \
       openssh-server-0:9.9p1-23.el10_2 \
-      nginx-2:1.26.3-6.el10_2.4 \
+      nginx-2:1.26.3-6.el10_2.5 \
       openssl-libs-1:3.5.5-4.el10_2 \
       curl \
  && dnf clean all

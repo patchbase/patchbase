@@ -8,6 +8,7 @@ import (
 
 	"github.com/riverqueue/river"
 	"github.com/samber/do/v2"
+	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/config"
 	"go.patchbase.net/server/internal/services"
 )
@@ -61,7 +62,7 @@ func (w *SSHPullWorker) Work(ctx context.Context, job *river.Job[services.SSHPul
 	if err := hostsService.RunSSHPull(ctx, job.Args.HostID); err != nil {
 		w.logger.ErrorContext(ctx, "ssh pull job failed", "host_id", job.Args.HostID, "error", err)
 
-		if errors.Is(err, services.ErrHostNotFound) {
+		if errors.Is(err, apperr.ErrHostNotFound) {
 			return river.JobCancel(err)
 		}
 
