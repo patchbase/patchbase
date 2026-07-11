@@ -8,7 +8,7 @@ Type=simple
 ExecStart=/usr/bin/patchbase-server serve
 Restart=on-failure
 RestartSec=5s
-WorkingDirectory=/var/lib/patchbase-server
+StateDirectory=patchbase-server
 
 [Install]
 WantedBy=multi-user.target

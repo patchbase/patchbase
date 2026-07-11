@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/bin/patchbase-agent sync
-WorkingDirectory=/var/lib/patchbase-agent
+StateDirectory=patchbase-agent
 
 [Install]
 WantedBy=multi-user.target
