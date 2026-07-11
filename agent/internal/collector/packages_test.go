@@ -211,15 +211,46 @@ func TestCollectUpgradablePackagesRPM(t *testing.T) {
 	assert.Equal(t, int32(1), pkgs[1].Epoch)
 }
 
+func TestCollectUpgradablePackagesRPMWithExitCode100(t *testing.T) {
+	runner := staticRunner{
+		outputWithErr: map[string][]byte{
+			"dnf|-q|--cacheonly|check-update": []byte("curl.x86_64 7.61.1-22.el8 updates\nopenssl-libs.x86_64 1:1.1.1k-14.el8_6 baseos\n"),
+		},
+	}
+
+	pkgs, err := CollectUpgradablePackages(context.Background(), runner, agent.OsFamily_OS_FAMILY_RPM)
+	require.NoError(t, err)
+	require.Len(t, pkgs, 2)
+	assert.Equal(t, "curl", pkgs[0].Name)
+	assert.Equal(t, "openssl-libs", pkgs[1].Name)
+}
+
+func TestCollectAvailablePackageUpdateCountRPMWithExitCode100(t *testing.T) {
+	runner := staticRunner{
+		outputWithErr: map[string][]byte{
+			"dnf|-q|--cacheonly|check-update": []byte("curl.x86_64 7.61.1-22.el8 updates\nopenssl-libs.x86_64 1:1.1.1k-14.el8_6 baseos\n"),
+		},
+	}
+
+	count, err := CollectAvailablePackageUpdateCount(context.Background(), runner, agent.OsFamily_OS_FAMILY_RPM)
+	require.NoError(t, err)
+	assert.Equal(t, int32(2), count)
+}
+
 type staticRunner struct {
 	resultByCommand map[string][]byte
 	errByCommand    map[string]error
+	outputWithErr   map[string][]byte
 }
 
 func (r staticRunner) Run(_ context.Context, name string, args ...string) ([]byte, error) {
 	key := name
 	for _, arg := range args {
 		key += "|" + strings.ReplaceAll(arg, "\n", "\\n")
+	}
+
+	if output, ok := r.outputWithErr[key]; ok {
+		return output, errors.New("exit status 100")
 	}
 
 	if err := r.errByCommand[key]; err != nil {

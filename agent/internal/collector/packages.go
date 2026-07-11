@@ -240,10 +240,7 @@ func CollectUpgradablePackages(ctx context.Context, runner ExecRunner, osFamily 
 }
 
 func collectUpgradableRPMPackages(ctx context.Context, runner ExecRunner) ([]*agent.Package, error) {
-	output, err := runner.Run(ctx, "dnf", "-q", "--cacheonly", "check-update")
-	if err != nil {
-		return nil, nil
-	}
+	output, _ := runner.Run(ctx, "dnf", "-q", "--cacheonly", "check-update")
 
 	items := make([]*agent.Package, 0)
 	scanner := bufio.NewScanner(strings.NewReader(string(output)))
@@ -284,11 +281,7 @@ func collectUpgradableAPTPackages(ctx context.Context, runner ExecRunner) ([]*ag
 }
 
 func collectAvailableRPMPackageUpdateCount(ctx context.Context, runner ExecRunner) (int32, error) {
-	output, err := runner.Run(ctx, "dnf", "-q", "--cacheonly", "check-update")
-	if err != nil {
-		return 0, nil
-	}
-
+	output, _ := runner.Run(ctx, "dnf", "-q", "--cacheonly", "check-update")
 	return countPackageUpdates(string(output)), nil
 }
 

@@ -160,9 +160,7 @@ func runningRPMKernelNEVRA(ctx context.Context, runner ExecRunner, unameRelease 
 		line = strings.TrimSpace(line[:idx])
 	}
 
-	if strings.HasPrefix(line, "0:") {
-		line = strings.TrimPrefix(line, "0:")
-	}
+	line = strings.TrimPrefix(line, "0:")
 
 	return line, nil
 }
@@ -203,8 +201,8 @@ func (realExecRunner) Run(ctx context.Context, name string, args ...string) ([]b
 	cmd := exec.CommandContext(ctx, name, args...)
 	output, err := cmd.Output()
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return exitErr.Stderr, err
+		if _, ok := err.(*exec.ExitError); ok {
+			return output, err
 		}
 		return nil, err
 	}
