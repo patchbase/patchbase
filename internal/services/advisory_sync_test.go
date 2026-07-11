@@ -50,6 +50,15 @@ func TestAdvisorySync_ResolveScopeKey(t *testing.T) {
 			expected:  "ubuntu:noble",
 		},
 		{
+			name:      "Ubuntu Resolute",
+			osFamily:  "debian",
+			osName:    "Ubuntu",
+			osVersion: "26.04",
+			osMajor:   26,
+			arch:      "x86_64",
+			expected:  "ubuntu:resolute",
+		},
+		{
 			name:      "Ubuntu Jammy",
 			osFamily:  "debian",
 			osName:    "Ubuntu",

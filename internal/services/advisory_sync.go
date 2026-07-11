@@ -135,6 +135,7 @@ type ScopeDetail struct {
 var defaultScopeMappings = []config.ScopeMapping{
 	{Match: config.MatchRules{OSName: "Ubuntu", OSVersion: "22.04"}, Scope: "ubuntu:jammy"},           // nolint: exhaustruct
 	{Match: config.MatchRules{OSName: "Ubuntu", OSVersion: "24.04"}, Scope: "ubuntu:noble"},           // nolint: exhaustruct
+	{Match: config.MatchRules{OSName: "Ubuntu", OSVersion: "26.04"}, Scope: "ubuntu:resolute"},        // nolint: exhaustruct
 	{Match: config.MatchRules{OSName: "Debian GNU/Linux", OSMajor: 12}, Scope: "debian:bookworm-dsa"}, // nolint: exhaustruct
 	{Match: config.MatchRules{OSName: "Debian GNU/Linux", OSMajor: 13}, Scope: "debian:trixie-dsa"},   // nolint: exhaustruct
 	{Match: config.MatchRules{OSName: "Rocky Linux", OSMajor: 9}, Scope: "rocky:9"},                   // nolint: exhaustruct
