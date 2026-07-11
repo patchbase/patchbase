@@ -84,4 +84,10 @@ Then enroll the agent with a registration token you create from the dashboard:
 sudo patchbase-agent enroll http://<server-ip>:5199 pb_reg_<your-token>
 ```
 
+Enable the systemd timer so the agent syncs automatically:
+
+```bash
+sudo systemctl enable --now patchbase-agent.timer
+```
+
 See the [agent onboarding guide](../onboarding/agent-mode) for full instructions.
