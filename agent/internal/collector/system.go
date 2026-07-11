@@ -135,7 +135,7 @@ func RunningKernelNEVRA(ctx context.Context, runner ExecRunner, osFamily agent.O
 	case agent.OsFamily_OS_FAMILY_RPM:
 		return runningRPMKernelNEVRA(ctx, runner, unameRelease)
 	case agent.OsFamily_OS_FAMILY_APT:
-		return fmt.Sprintf("0:%s", unameRelease), nil
+		return unameRelease, nil
 	default:
 		return "", fmt.Errorf("unsupported os family: %s", osFamily.String())
 	}
@@ -148,16 +148,20 @@ func runningRPMKernelNEVRA(ctx context.Context, runner ExecRunner, unameRelease 
 		"--queryformat", "%{EPOCHNUM}:%{VERSION}-%{RELEASE}.%{ARCH}\n",
 	)
 	if err != nil {
-		return fmt.Sprintf("0:%s", unameRelease), nil
+		return unameRelease, nil
 	}
 
 	line := strings.TrimSpace(string(output))
 	if line == "" {
-		return fmt.Sprintf("0:%s", unameRelease), nil
+		return unameRelease, nil
 	}
 
 	if idx := strings.Index(line, "\n"); idx >= 0 {
 		line = strings.TrimSpace(line[:idx])
+	}
+
+	if strings.HasPrefix(line, "0:") {
+		line = strings.TrimPrefix(line, "0:")
 	}
 
 	return line, nil
