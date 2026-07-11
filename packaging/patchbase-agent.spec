@@ -35,10 +35,23 @@ install -d %{buildroot}%{_sysconfdir}/patchbase-agent
 install -d %{buildroot}%{_sharedstatedir}/patchbase-agent
 
 %post
-%systemd_post patchbase-agent.service patchbase-agent.timer
+if [ $1 -eq 1 ] ; then
+    # Initial installation
+    systemctl preset patchbase-agent.service patchbase-agent.timer >/dev/null 2>&1 || :
+fi
 
 %preun
-%systemd_preun patchbase-agent.service patchbase-agent.timer
+if [ $1 -eq 0 ] ; then
+    # Package removal
+    systemctl --no-reload disable --now patchbase-agent.service patchbase-agent.timer > /dev/null 2>&1 || :
+fi
+
+%postun
+systemctl daemon-reload >/dev/null 2>&1 || :
+if [ $1 -ge 1 ] ; then
+    # Package upgrade
+    systemctl try-restart patchbase-agent.service patchbase-agent.timer >/dev/null 2>&1 || :
+fi
 
 %files
 %{_bindir}/patchbase-agent
