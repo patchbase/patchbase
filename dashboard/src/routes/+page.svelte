@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts">
 	import AppLayout from '$lib/components/AppLayout.svelte';
 	import StatsRow from '$lib/components/StatsRow.svelte';

@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 export function formatTime(iso: string | null | undefined): string {
   if (!iso) return "-";
   const date = new Date(iso);

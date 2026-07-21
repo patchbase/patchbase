@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 import {themes as prismThemes} from 'prism-react-renderer';
 import type {Config} from '@docusaurus/types';
 import type * as Preset from '@docusaurus/preset-classic';

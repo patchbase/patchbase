@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts">
 	import { getVersion } from '$lib/api/version.js';
 	import type { Snippet } from 'svelte';

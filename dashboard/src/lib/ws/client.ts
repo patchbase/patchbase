@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 import type { WSMessage } from "$lib/types";
 import { clearSession } from "$lib/auth/session";
 
