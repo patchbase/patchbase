@@ -14,6 +14,7 @@ linters:
     - exhaustruct
     - forbidigo
     - goconst
+    - goheader
     - goprintffuncname
     - gosec
     - govet
@@ -44,6 +45,13 @@ linters:
         - .+/ssh\.ClientConfig$
         - .+/pgx(/v5)?\.TxOptions$
         - .+/jwt(/v5)?\.RegisteredClaims$
+    goheader:
+      values:
+        regexp:
+          copyright-holder: Configure Labs SRL
+      template: |-
+        SPDX-FileCopyrightText: {{ copyright-holder }}
+        SPDX-License-Identifier: AGPL-3.0-only
     forbidigo:
       forbid:
         - pattern: pgx\.ErrNoRows
