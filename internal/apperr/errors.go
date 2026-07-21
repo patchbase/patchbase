@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 package apperr
 
 // Error is a typed sentinel carrying the HTTP status, machine-readable

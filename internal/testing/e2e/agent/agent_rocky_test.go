@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 //go:build integration_docker
 
 // Rocky variant of TestAgentE2E_Debian. See agent_debian_test.go for the

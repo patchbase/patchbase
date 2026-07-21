@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 //go:build integration_docker
 
 // Red Hat UBI 10 variant of TestAgentE2E_Debian. See agent_debian_test.go

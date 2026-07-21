@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 package utils
 
 // Map applies the function fn to each element of the input slice in and returns a new slice containing the results.
