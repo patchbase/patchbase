@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 // Package migrations owns schema evolution for the PatchBase database.
 // Migrations are embedded into the binary and applied via `patchbase-server migrate` before the server starts.
 package migrations

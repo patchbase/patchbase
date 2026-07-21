@@ -1,3 +1,5 @@
+// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+// SPDX-License-Identifier: AGPL-3.0-only
 //go:build integration_docker
 
 // Package dockertest provides a small testcontainers-go helper for the
