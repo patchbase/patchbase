@@ -59,4 +59,4 @@ If you find a bug, please open an issue with:
 
 ## License
 
-PatchBase is licensed under the [Apache License 2.0](https://github.com/patchbase/patchbase/blob/main/LICENSE). By contributing, you agree that your contributions will be licensed under the same license.
+PatchBase is licensed under the [GNU AGPL-3.0](https://github.com/patchbase/patchbase/blob/main/LICENSE). By contributing, you agree that your contributions will be licensed under the same license.
