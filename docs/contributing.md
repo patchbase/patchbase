@@ -59,4 +59,4 @@ If you find a bug, please open an issue with:
 
 ## License
 
-PatchBase is licensed under the [GNU AGPL-3.0](https://github.com/patchbase/patchbase/blob/main/LICENSE). By contributing, you agree that your contributions will be licensed under the same license.
+PatchBase's open-source releases are licensed under the [GNU AGPL-3.0](https://github.com/patchbase/patchbase/blob/main/LICENSE). To have a pull request accepted, you must accept the Contributor License Agreement through CLA Assistant. The CLA grants Configure Labs SRL the rights to use, modify, distribute, sublicense, and relicense contributions, including for commercial, Cloud, and Pro offerings.
