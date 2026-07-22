@@ -78,3 +78,10 @@ func TimestamptzFromTime(t time.Time) pgtype.Timestamptz {
 		InfinityModifier: pgtype.Finite,
 	}
 }
+
+func NewTimeOption(ts pgtype.Timestamptz) utils.Option[time.Time] {
+	if !ts.Valid {
+		return utils.None[time.Time]()
+	}
+	return utils.Some(ts.Time.UTC())
+}

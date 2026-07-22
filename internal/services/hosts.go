@@ -45,6 +45,7 @@ type Hosts interface {
 	IngestAgentSnapshot(ctx context.Context, hostAccessToken string, payload *agentpb.AgentSnapshot) (*agentpb.SyncResponse, error)
 	ListPendingHosts(ctx context.Context) ([]HostInfo, error)
 	ApproveHost(ctx context.Context, actor ActorRef, hostID string) (HostInfo, error)
+	UpdateHost(ctx context.Context, actor ActorRef, hostID string, input UpdateHostInput) (HostInfo, error)
 	DeleteHost(ctx context.Context, actor ActorRef, hostID string) error
 	CreateSSHHost(ctx context.Context, actor ActorRef, input CreateSSHHostInput) (CreateSSHHostResult, error)
 	OnboardSSHHost(ctx context.Context, actor ActorRef, hostID string) error
@@ -122,65 +123,81 @@ type CreatedRegistrationToken struct {
 }
 
 type RegistrationTokenInfo struct {
-	ID         string     `json:"id"`
-	Name       string     `json:"name"`
-	CreatedBy  string     `json:"created_by_user_id"`
-	CreatedAt  time.Time  `json:"created_at"`
-	RevokedAt  *time.Time `json:"revoked_at"`
-	LastUsedAt *time.Time `json:"last_used_at"`
+	ID         string                  `json:"id"`
+	Name       string                  `json:"name"`
+	CreatedBy  string                  `json:"created_by_user_id"`
+	CreatedAt  time.Time               `json:"created_at"`
+	RevokedAt  utils.Option[time.Time] `json:"revoked_at"`
+	LastUsedAt utils.Option[time.Time] `json:"last_used_at"`
+}
+
+type SSHPullConfiguration struct {
+	Hostname          string `json:"pull_hostname"`
+	SSHUser           string `json:"pull_ssh_user"`
+	FrequencyMinutes  int32  `json:"pull_frequency_minutes"`
+	Onboarded         bool   `json:"onboarded"`
+	UsesUniqueKeyPair bool   `json:"uses_unique_key_pair"`
 }
 
 type HostInfo struct {
-	ID                  string     `json:"id"`
-	OnboardingMode      string     `json:"onboarding_mode"`
-	ApprovalStatus      string     `json:"approval_status"`
-	DisplayName         string     `json:"display_name"`
-	Hostname            string     `json:"hostname"`
-	IPAddress           string     `json:"ip_address"`
-	OSFamily            string     `json:"os_family"`
-	OSName              string     `json:"os_name"`
-	OSMajor             int32      `json:"os_major"`
-	OSVersion           string     `json:"os_version"`
-	Architecture        string     `json:"architecture"`
-	Status              string     `json:"status"`
-	OverallAction       string     `json:"overall_action"`
-	CriticalCount       int32      `json:"critical_count"`
-	ImportantCount      int32      `json:"important_count"`
-	ModerateCount       int32      `json:"moderate_count"`
-	ActionableCount     int32      `json:"actionable_count"`
-	AvailableUpdates    int32      `json:"available_updates"`
-	NeedsReboot         int32      `json:"needs_reboot"`
-	NeedsRestart        int32      `json:"needs_restart"`
-	NoFix               int32      `json:"no_fix"`
-	Unknown             int32      `json:"unknown"`
-	LastSeenAt          *time.Time `json:"last_seen_at"`
-	LastAdvisoryCheckAt *time.Time `json:"last_advisory_check_at"`
-	StateUpdatedAt      *time.Time `json:"state_updated_at"`
-	PullLastRunAt       *time.Time `json:"pull_last_run_at"`
-	PullLastRunStatus   string     `json:"pull_last_run_status"`
-	PullLastRunError    string     `json:"pull_last_run_error"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  string                             `json:"id"`
+	OnboardingMode      string                             `json:"onboarding_mode"`
+	ApprovalStatus      string                             `json:"approval_status"`
+	DisplayName         string                             `json:"display_name"`
+	Hostname            string                             `json:"hostname"`
+	IPAddress           string                             `json:"ip_address"`
+	OSFamily            string                             `json:"os_family"`
+	OSName              string                             `json:"os_name"`
+	OSMajor             int32                              `json:"os_major"`
+	OSVersion           string                             `json:"os_version"`
+	Architecture        string                             `json:"architecture"`
+	Status              string                             `json:"status"`
+	OverallAction       string                             `json:"overall_action"`
+	CriticalCount       int32                              `json:"critical_count"`
+	ImportantCount      int32                              `json:"important_count"`
+	ModerateCount       int32                              `json:"moderate_count"`
+	ActionableCount     int32                              `json:"actionable_count"`
+	AvailableUpdates    int32                              `json:"available_updates"`
+	NeedsReboot         int32                              `json:"needs_reboot"`
+	NeedsRestart        int32                              `json:"needs_restart"`
+	NoFix               int32                              `json:"no_fix"`
+	Unknown             int32                              `json:"unknown"`
+	LastSeenAt          utils.Option[time.Time]            `json:"last_seen_at"`
+	LastAdvisoryCheckAt utils.Option[time.Time]            `json:"last_advisory_check_at"`
+	StateUpdatedAt      utils.Option[time.Time]            `json:"state_updated_at"`
+	PullLastRunAt       utils.Option[time.Time]            `json:"pull_last_run_at"`
+	PullLastRunStatus   string                             `json:"pull_last_run_status"`
+	PullLastRunError    string                             `json:"pull_last_run_error"`
+	Configuration       utils.Option[SSHPullConfiguration] `json:"configuration,omitempty"`
+	CreatedAt           time.Time                          `json:"created_at"`
+	UpdatedAt           time.Time                          `json:"updated_at"`
 }
 
 type HostSnapshotInfo struct {
-	ID                 string     `json:"id"`
-	HostID             string     `json:"host_id"`
-	CollectedAt        time.Time  `json:"collected_at"`
-	ReceivedAt         time.Time  `json:"received_at"`
-	RunningKernelNevra string     `json:"running_kernel_nevra"`
-	BootTime           *time.Time `json:"boot_time"`
-	HasProcessData     bool       `json:"has_process_data"`
-	Payload            []byte     `json:"payload"`
+	ID                 string                  `json:"id"`
+	HostID             string                  `json:"host_id"`
+	CollectedAt        time.Time               `json:"collected_at"`
+	ReceivedAt         time.Time               `json:"received_at"`
+	RunningKernelNevra string                  `json:"running_kernel_nevra"`
+	BootTime           utils.Option[time.Time] `json:"boot_time"`
+	HasProcessData     bool                    `json:"has_process_data"`
+	Payload            []byte                  `json:"payload"`
 }
 
 type HostSSHPullJobInfo struct {
-	ID          string     `json:"id"`
-	HostID      string     `json:"host_id"`
-	Status      string     `json:"status"`
-	StartedAt   time.Time  `json:"started_at"`
-	CompletedAt *time.Time `json:"completed_at"`
-	Error       *string    `json:"error"`
+	ID          string                  `json:"id"`
+	HostID      string                  `json:"host_id"`
+	Status      string                  `json:"status"`
+	StartedAt   time.Time               `json:"started_at"`
+	CompletedAt utils.Option[time.Time] `json:"completed_at"`
+	Error       utils.Option[string]    `json:"error"`
+}
+
+type UpdateHostInput struct {
+	DisplayName          utils.Option[string]
+	PullHostname         utils.Option[string]
+	PullSSHUser          utils.Option[string]
+	PullFrequencyMinutes utils.Option[int32]
 }
 
 type CreateSSHHostInput struct {
@@ -325,8 +342,8 @@ func (s *hosts) ListRegistrationTokens(ctx context.Context) ([]RegistrationToken
 			Name:       row.Name,
 			CreatedBy:  row.CreatedByUserID,
 			CreatedAt:  row.CreatedAt.Time.UTC(),
-			RevokedAt:  toTimePtr(row.RevokedAt),
-			LastUsedAt: toTimePtr(row.LastUsedAt),
+			RevokedAt:  sql.NewTimeOption(row.RevokedAt),
+			LastUsedAt: sql.NewTimeOption(row.LastUsedAt),
 		})
 	}
 	return items, nil
@@ -375,29 +392,20 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 	hostname := strings.TrimSpace(input.Hostname)
 	machineID := strings.TrimSpace(input.MachineId)
 	ipAddress := strings.TrimSpace(input.Metadata.IpAddress)
-	osName := strings.TrimSpace(input.Metadata.OsName)
-	if osName == "" {
-		osName = "Unknown"
-	}
-	osVersion := strings.TrimSpace(input.Metadata.OsVersion)
-	if osVersion == "" {
-		osVersion = "unknown"
-	}
+	osName := utils.NonZeroOption(strings.TrimSpace(input.Metadata.OsName)).UnwrapOr("Unknown")
+	osVersion := utils.NonZeroOption(strings.TrimSpace(input.Metadata.OsVersion)).UnwrapOr("unknown")
 	architecture := normalizeRegistrationArchitecture(strings.TrimSpace(input.Metadata.Architecture))
 	if architecture == "" {
 		architecture = "unknown"
 	}
-	displayName := utils.None[string]()
-	if hostname != "" {
-		displayName = utils.Some(hostname)
-	}
+	displayName := utils.NonZeroOption(hostname)
 
 	host, err := queries.InsertAgentHost(ctx, sql.InsertAgentHostParams{
 		ID:           id.New("h"),
 		DisplayName:  displayName,
-		MachineID:    optionString(machineID),
-		Hostname:     optionString(hostname),
-		IpAddress:    optionString(ipAddress),
+		MachineID:    utils.NonZeroOption(machineID),
+		Hostname:     utils.NonZeroOption(hostname),
+		IpAddress:    utils.NonZeroOption(ipAddress),
 		OsName:       osName,
 		OsVersion:    osVersion,
 		Architecture: architecture,
@@ -551,16 +559,16 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 
 	_, err = queries.UpdateHostFromSnapshot(ctx, sql.UpdateHostFromSnapshotParams{
 		ID:             host.ID,
-		MachineID:      optionString(machineID),
-		Hostname:       optionString(hostname),
-		IpAddress:      optionString(ipAddress),
+		MachineID:      utils.NonZeroOption(machineID).FlatMap(utils.EmptySpaceString),
+		Hostname:       utils.NonZeroOption(hostname).FlatMap(utils.EmptySpaceString),
+		IpAddress:      utils.NonZeroOption(ipAddress).FlatMap(utils.EmptySpaceString),
 		OsFamily:       osFamily,
 		OsName:         osName,
 		OsMajor:        osMajor,
 		OsVersion:      osVersion,
 		Architecture:   architecture,
 		LastSeenAt:     sql.TimestamptzFromTime(collectedAt),
-		LastSnapshotID: optionString(snapshotRow.ID),
+		LastSnapshotID: utils.NonZeroOption(snapshotRow.ID).FlatMap(utils.EmptySpaceString),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("update host from snapshot: %w", err)
@@ -609,7 +617,7 @@ func (s *hosts) IngestAgentSnapshot(ctx context.Context, hostAccessToken string,
 		if registerErr == nil {
 			err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
 				ID:               host.ID,
-				AdvisoryScopeKey: optionString(scopeKey),
+				AdvisoryScopeKey: utils.NonZeroOption(scopeKey),
 			})
 			if err != nil {
 				utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
@@ -664,27 +672,136 @@ func (s *hosts) ApproveHost(ctx context.Context, actor ActorRef, hostID string) 
 	return mapHost(host, nil), nil
 }
 
+func (s *hosts) UpdateHost(ctx context.Context, actor ActorRef, hostID string, input UpdateHostInput) (HostInfo, error) {
+	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return HostInfo{}, fmt.Errorf("begin update host transaction: %w", err)
+	}
+	defer tx.Rollback(ctx) // nolint:errcheck
+
+	queries := sql.New(tx)
+	host, err := sql.Required(queries.GetHostByID(ctx, hostID))(apperr.ErrHostNotFound)
+	if err != nil {
+		return HostInfo{}, fmt.Errorf("get host by id: %w", err)
+	}
+	if err := queries.LockHost(ctx, hostID); err != nil {
+		return HostInfo{}, fmt.Errorf("lock host: %w", err)
+	}
+
+	hasSSHFields := input.PullHostname.IsPresent() || input.PullSSHUser.IsPresent() || input.PullFrequencyMinutes.IsPresent()
+	if hasSSHFields && host.OnboardingMode != "ssh" {
+		return HostInfo{}, apperr.ErrSSHFieldsForNonSSH
+	}
+
+	metadata := make(map[string]any)
+	if displayName, ok := input.DisplayName.Get(); ok {
+		_, err = queries.UpdateHostDisplayName(ctx, sql.UpdateHostDisplayNameParams{ID: hostID, DisplayName: utils.Some(displayName)})
+		if err != nil {
+			if sql.IsUniqueViolation(err, "hosts_display_name_unique_idx") {
+				return HostInfo{}, apperr.ErrDuplicateHostDisplayName
+			}
+			return HostInfo{}, fmt.Errorf("update host display name: %w", err)
+		}
+		metadata["display_name"] = map[string]any{
+			"from": host.DisplayName.UnwrapOr(""),
+			"to":   displayName,
+		}
+	}
+
+	oldFrequency := int32(defaultSSHPullFrequency)
+	shouldReschedule := false
+	if hasSSHFields {
+		config, configErr := queries.GetSSHPullConfigByHostID(ctx, hostID)
+		if configErr != nil {
+			return HostInfo{}, fmt.Errorf("get ssh pull config: %w", configErr)
+		}
+		if config.PullFrequencyMinutes != nil {
+			oldFrequency = *config.PullFrequencyMinutes
+		}
+		shouldReschedule = input.PullFrequencyMinutes.IsPresent() && config.Onboarded
+		if input.PullHostname.IsPresent() {
+			metadata["pull_hostname"] = map[string]any{
+				"from": config.PullHostname,
+				"to":   input.PullHostname.Unwrap(),
+			}
+		}
+		if input.PullSSHUser.IsPresent() {
+			metadata["pull_ssh_user"] = map[string]any{
+				"from": config.PullSshUser.UnwrapOr(""),
+				"to":   input.PullSSHUser.Unwrap(),
+			}
+		}
+		var frequency *int32
+		if input.PullFrequencyMinutes.IsPresent() {
+			value := input.PullFrequencyMinutes.Unwrap()
+			if value < 5 {
+				return HostInfo{}, apperr.ErrInvalidFrequency
+			}
+			frequency = &value
+			metadata["pull_frequency_minutes"] = map[string]any{"from": config.PullFrequencyMinutes, "to": value}
+		}
+		_, err = queries.UpdateSSHPullConfig(ctx, sql.UpdateSSHPullConfigParams{
+			PullHostname:         input.PullHostname,
+			PullSshUser:          input.PullSSHUser,
+			PullFrequencyMinutes: frequency,
+			HostID:               hostID,
+		})
+		if err != nil {
+			if sql.IsUniqueViolation(err, "host_ssh_pull_pull_hostname_unique_idx") {
+				return HostInfo{}, apperr.ErrDuplicateSSHPullHostname
+			}
+			return HostInfo{}, fmt.Errorf("update ssh pull config: %w", err)
+		}
+	}
+
+	if shouldReschedule {
+		newFrequency := input.PullFrequencyMinutes.Unwrap()
+		if err := s.periodicJobManager.AddSSHPullJob(ctx, hostID, newFrequency, false); err != nil {
+			if restoreErr := s.periodicJobManager.AddSSHPullJob(ctx, hostID, oldFrequency, false); restoreErr != nil {
+				return HostInfo{}, fmt.Errorf("reschedule ssh pull job: %w; restore previous schedule: %v", err, restoreErr)
+			}
+			return HostInfo{}, fmt.Errorf("reschedule ssh pull job: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		if shouldReschedule {
+			if restoreErr := s.periodicJobManager.AddSSHPullJob(ctx, hostID, oldFrequency, false); restoreErr != nil {
+				return HostInfo{}, fmt.Errorf("commit update host transaction: %w; restore previous schedule: %v", err, restoreErr)
+			}
+		}
+		return HostInfo{}, fmt.Errorf("commit update host transaction: %w", err)
+	}
+
+	updated, err := s.GetHost(ctx, hostID)
+	if err != nil {
+		return HostInfo{}, err
+	}
+	s.broker.Publish(events.NewHostsUpdatedEvent())
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionHostUpdate,
+		TargetType: auditLogTargetTypeHost,
+		TargetID:   hostID,
+		Metadata:   metadata,
+		IPAddress:  actor.IP,
+		UserAgent:  actor.UserAgent,
+	})
+	return updated, nil
+}
+
 func (s *hosts) CreateSSHHost(ctx context.Context, actor ActorRef, input CreateSSHHostInput) (CreateSSHHostResult, error) {
-	hostname := strings.TrimSpace(input.Hostname)
-	sshUser := strings.TrimSpace(input.SSHUser)
-	if hostname == "" {
-		return CreateSSHHostResult{}, fmt.Errorf("hostname is required")
-	}
-	if sshUser == "" {
-		return CreateSSHHostResult{}, fmt.Errorf("ssh user is required")
-	}
 	frequency := input.FrequencyMinutes
 	if frequency <= 0 {
 		frequency = defaultSSHPullFrequency
 	}
 
-	var publicKey string
+	var responsePublicKey string
 	var dbPublicKey, dbPrivateKey utils.Option[string]
 
 	if input.UniqueKeyPair {
-		var privateKey string
-		var err error
-		publicKey, privateKey, err = utils.GenerateSSHKeyPair()
+		publicKey, privateKey, err := utils.GenerateSSHKeyPair()
 		if err != nil {
 			return CreateSSHHostResult{}, fmt.Errorf("generate ssh key pair: %w", err)
 		}
@@ -692,16 +809,15 @@ func (s *hosts) CreateSSHHost(ctx context.Context, actor ActorRef, input CreateS
 		if err != nil {
 			return CreateSSHHostResult{}, fmt.Errorf("encrypt private key: %w", err)
 		}
-		dbPublicKey = optionString(publicKey)
-		dbPrivateKey = optionString(encryptedPrivateKey)
+		dbPublicKey = utils.Some(publicKey)
+		dbPrivateKey = utils.Some(encryptedPrivateKey)
+		responsePublicKey = publicKey
 	} else {
 		globalKey, err := s.settingsService.GetGlobalSSHKeyPair(ctx)
 		if err != nil {
 			return CreateSSHHostResult{}, fmt.Errorf("get global ssh key: %w", err)
 		}
-		publicKey = globalKey.PublicKey
-		dbPublicKey = utils.None[string]()
-		dbPrivateKey = utils.None[string]()
+		responsePublicKey = globalKey.PublicKey
 	}
 
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -714,10 +830,10 @@ func (s *hosts) CreateSSHHost(ctx context.Context, actor ActorRef, input CreateS
 
 	host, err := queries.InsertSSHHost(ctx, sql.InsertSSHHostParams{
 		ID:                   id.New("h"),
-		DisplayName:          optionString(strings.TrimSpace(input.DisplayName)),
-		Hostname:             optionString(hostname),
+		DisplayName:          utils.Some(input.DisplayName),
+		Hostname:             utils.Some(input.Hostname),
 		IpAddress:            utils.None[string](),
-		PullSshUser:          optionString(sshUser),
+		PullSshUser:          utils.Some(input.SSHUser),
 		PullFrequencyMinutes: &frequency,
 		PullPublicKey:        dbPublicKey,
 		PullPrivateKey:       dbPrivateKey,
@@ -746,8 +862,8 @@ func (s *hosts) CreateSSHHost(ctx context.Context, actor ActorRef, input CreateS
 		Metadata: map[string]any{
 			"onboarding_mode": "ssh",
 			"display_name":    input.DisplayName,
-			"hostname":        hostname,
-			"ssh_user":        sshUser,
+			"hostname":        input.Hostname,
+			"ssh_user":        input.SSHUser,
 			"unique_key_pair": input.UniqueKeyPair,
 		},
 		IPAddress: actor.IP,
@@ -756,7 +872,7 @@ func (s *hosts) CreateSSHHost(ctx context.Context, actor ActorRef, input CreateS
 
 	return CreateSSHHostResult{
 		HostID:          host.Host.ID,
-		PublicKey:       publicKey,
+		PublicKey:       responsePublicKey,
 		ApprovalStatus:  host.Host.ApprovalStatus,
 		LastRunStatus:   "",
 		LastRunError:    "",
@@ -812,11 +928,7 @@ func (s *hosts) ListHosts(ctx context.Context) ([]HostInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("list hosts: %w", err)
 	}
-	items := make([]HostInfo, 0, len(rows))
-	for _, row := range rows {
-		items = append(items, mapHostWithState(row))
-	}
-	return items, nil
+	return utils.Map(rows, mapHostWithState), nil
 }
 
 func (s *hosts) GetHost(ctx context.Context, hostID string) (HostInfo, error) {
@@ -838,7 +950,7 @@ func (s *hosts) GetLatestSnapshot(ctx context.Context, hostID string) (HostSnaps
 		CollectedAt:        row.CollectedAt.Time.UTC(),
 		ReceivedAt:         row.ReceivedAt.Time.UTC(),
 		RunningKernelNevra: row.RunningKernelNevra,
-		BootTime:           toTimePtr(row.BootTime),
+		BootTime:           sql.NewTimeOption(row.BootTime),
 		HasProcessData:     row.HasProcessData,
 		Payload:            row.Payload,
 	}, nil
@@ -930,14 +1042,6 @@ func normalizeArchitecture(value agentpb.Architecture) string {
 	}
 }
 
-func optionString(value string) utils.Option[string] {
-	trimmed := strings.TrimSpace(value)
-	if trimmed == "" {
-		return utils.None[string]()
-	}
-	return utils.Some(trimmed)
-}
-
 func normalizeRegistrationArchitecture(value string) string {
 	switch strings.ToLower(value) {
 	case "amd64", "x86_64":
@@ -949,26 +1053,10 @@ func normalizeRegistrationArchitecture(value string) string {
 	}
 }
 
-func toTimePtr(ts pgtype.Timestamptz) *time.Time {
-	if !ts.Valid {
-		return nil
-	}
-	value := ts.Time.UTC()
-	return &value
-}
-
 func mapHost(host sql.Host, state *sql.HostCurrentState) HostInfo {
-	overallAction := "none"
-	criticalCount := int32(0)
-	importantCount := int32(0)
-	moderateCount := int32(0)
-	actionableCount := int32(0)
-	availableUpdates := int32(0)
-	needsReboot := int32(0)
-	needsRestart := int32(0)
-	noFix := int32(0)
-	unknown := int32(0)
-	var stateUpdatedAt *time.Time
+	var overallAction = "none"
+	var criticalCount, importantCount, moderateCount, actionableCount, availableUpdates, needsReboot, needsRestart, noFix, unknown int32
+	var stateUpdatedAt = utils.None[time.Time]()
 	if state != nil {
 		overallAction = state.OverallAction
 		criticalCount = state.CriticalCount
@@ -980,7 +1068,7 @@ func mapHost(host sql.Host, state *sql.HostCurrentState) HostInfo {
 		needsRestart = state.NeedsRestart
 		noFix = state.NoFix
 		unknown = state.Unknown
-		stateUpdatedAt = toTimePtr(state.UpdatedAt)
+		stateUpdatedAt = sql.NewTimeOption(state.UpdatedAt)
 	}
 
 	createdAt := host.CreatedAt.Time.UTC()
@@ -1008,12 +1096,13 @@ func mapHost(host sql.Host, state *sql.HostCurrentState) HostInfo {
 		NeedsRestart:        needsRestart,
 		NoFix:               noFix,
 		Unknown:             unknown,
-		LastSeenAt:          toTimePtr(host.LastSeenAt),
-		LastAdvisoryCheckAt: toTimePtr(host.LastAdvisoryCheckAt),
+		LastSeenAt:          sql.NewTimeOption(host.LastSeenAt),
+		LastAdvisoryCheckAt: sql.NewTimeOption(host.LastAdvisoryCheckAt),
 		StateUpdatedAt:      stateUpdatedAt,
-		PullLastRunAt:       nil,
+		PullLastRunAt:       utils.None[time.Time](),
 		PullLastRunStatus:   "",
 		PullLastRunError:    "",
+		Configuration:       utils.None[SSHPullConfiguration](),
 		CreatedAt:           createdAt,
 		UpdatedAt:           updatedAt,
 	}
@@ -1022,6 +1111,20 @@ func mapHost(host sql.Host, state *sql.HostCurrentState) HostInfo {
 func mapHostWithState(row sql.ListHostsWithStateRow) HostInfo {
 	createdAt := row.Host.CreatedAt.Time.UTC()
 	updatedAt := row.Host.UpdatedAt.Time.UTC()
+	configuration := utils.None[SSHPullConfiguration]()
+	if row.Host.OnboardingMode == "ssh" {
+		frequency := int32(defaultSSHPullFrequency)
+		if row.PullFrequencyMinutes != nil {
+			frequency = *row.PullFrequencyMinutes
+		}
+		configuration = utils.Some(SSHPullConfiguration{
+			Hostname:          row.PullHostname.UnwrapOr(""),
+			SSHUser:           row.PullSshUser.UnwrapOr(""),
+			FrequencyMinutes:  frequency,
+			Onboarded:         row.Onboarded != nil && *row.Onboarded,
+			UsesUniqueKeyPair: row.UsesUniqueKeyPair,
+		})
+	}
 	return HostInfo{
 		ID:                  row.Host.ID,
 		OnboardingMode:      row.Host.OnboardingMode,
@@ -1045,12 +1148,13 @@ func mapHostWithState(row sql.ListHostsWithStateRow) HostInfo {
 		NeedsRestart:        row.NeedsRestart,
 		NoFix:               row.NoFix,
 		Unknown:             row.Unknown,
-		LastSeenAt:          toTimePtr(row.Host.LastSeenAt),
-		LastAdvisoryCheckAt: toTimePtr(row.Host.LastAdvisoryCheckAt),
-		StateUpdatedAt:      toTimePtr(row.StateUpdatedAt),
-		PullLastRunAt:       toTimePtr(row.PullLastRunAt),
+		LastSeenAt:          sql.NewTimeOption(row.Host.LastSeenAt),
+		LastAdvisoryCheckAt: sql.NewTimeOption(row.Host.LastAdvisoryCheckAt),
+		StateUpdatedAt:      sql.NewTimeOption(row.StateUpdatedAt),
+		PullLastRunAt:       sql.NewTimeOption(row.PullLastRunAt),
 		PullLastRunStatus:   row.PullLastRunStatus.UnwrapOr(""),
 		PullLastRunError:    row.PullLastRunError.UnwrapOr(""),
+		Configuration:       configuration,
 		CreatedAt:           createdAt,
 		UpdatedAt:           updatedAt,
 	}
@@ -1059,6 +1163,20 @@ func mapHostWithState(row sql.ListHostsWithStateRow) HostInfo {
 func mapHostWithStateByID(row sql.GetHostWithStateByIDRow) HostInfo {
 	createdAt := row.Host.CreatedAt.Time.UTC()
 	updatedAt := row.Host.UpdatedAt.Time.UTC()
+	configuration := utils.None[SSHPullConfiguration]()
+	if row.Host.OnboardingMode == "ssh" {
+		frequency := int32(defaultSSHPullFrequency)
+		if row.PullFrequencyMinutes != nil {
+			frequency = *row.PullFrequencyMinutes
+		}
+		configuration = utils.Some(SSHPullConfiguration{
+			Hostname:          row.PullHostname.UnwrapOr(""),
+			SSHUser:           row.PullSshUser.UnwrapOr(""),
+			FrequencyMinutes:  frequency,
+			Onboarded:         row.Onboarded != nil && *row.Onboarded,
+			UsesUniqueKeyPair: row.UsesUniqueKeyPair,
+		})
+	}
 	return HostInfo{
 		ID:                  row.Host.ID,
 		OnboardingMode:      row.Host.OnboardingMode,
@@ -1082,12 +1200,13 @@ func mapHostWithStateByID(row sql.GetHostWithStateByIDRow) HostInfo {
 		NeedsRestart:        row.NeedsRestart,
 		NoFix:               row.NoFix,
 		Unknown:             row.Unknown,
-		LastSeenAt:          toTimePtr(row.Host.LastSeenAt),
-		LastAdvisoryCheckAt: toTimePtr(row.Host.LastAdvisoryCheckAt),
-		StateUpdatedAt:      toTimePtr(row.StateUpdatedAt),
-		PullLastRunAt:       toTimePtr(row.PullLastRunAt),
+		LastSeenAt:          sql.NewTimeOption(row.Host.LastSeenAt),
+		LastAdvisoryCheckAt: sql.NewTimeOption(row.Host.LastAdvisoryCheckAt),
+		StateUpdatedAt:      sql.NewTimeOption(row.StateUpdatedAt),
+		PullLastRunAt:       sql.NewTimeOption(row.PullLastRunAt),
 		PullLastRunStatus:   row.PullLastRunStatus.UnwrapOr(""),
 		PullLastRunError:    row.PullLastRunError.UnwrapOr(""),
+		Configuration:       configuration,
 		CreatedAt:           createdAt,
 		UpdatedAt:           updatedAt,
 	}
@@ -1188,9 +1307,9 @@ func (s *hosts) RunSSHPull(ctx context.Context, actor ActorRef, hostID string) e
 				LastSnapshotID:    utils.Some(snapshotID),
 				PullLastRunStatus: statusOpt,
 				PullLastRunError:  errOpt,
-				MachineID:         optionString(res.MachineID),
-				Hostname:          optionString(res.Hostname),
-				IpAddress:         optionString(res.IPAddress),
+				MachineID:         utils.NonZeroOption(res.MachineID),
+				Hostname:          utils.NonZeroOption(res.Hostname),
+				IpAddress:         utils.NonZeroOption(res.IPAddress),
 				OsFamily:          res.OSFamily,
 				OsName:            res.OSName,
 				OsMajor:           res.OSMajor,
@@ -1256,7 +1375,7 @@ func (s *hosts) RunSSHPull(ctx context.Context, actor ActorRef, hostID string) e
 				if registerErr == nil {
 					err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
 						ID:               hostID,
-						AdvisoryScopeKey: optionString(scopeKey),
+						AdvisoryScopeKey: utils.NonZeroOption(scopeKey),
 					})
 					if err != nil {
 						utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)
@@ -1351,24 +1470,13 @@ func (s *hosts) ListSSHPullJobs(ctx context.Context, hostID string) ([]HostSSHPu
 
 	jobs := make([]HostSSHPullJobInfo, 0, len(rows))
 	for _, row := range rows {
-		var compAt *time.Time
-		if row.CompletedAt.Valid {
-			t := row.CompletedAt.Time.UTC()
-			compAt = &t
-		}
-		var errStr *string
-		if row.Error.IsPresent() {
-			val := row.Error.Unwrap()
-			errStr = &val
-		}
-
 		jobs = append(jobs, HostSSHPullJobInfo{
 			ID:          row.ID,
 			HostID:      row.HostID,
 			Status:      row.Status,
 			StartedAt:   row.StartedAt.Time.UTC(),
-			CompletedAt: compAt,
-			Error:       errStr,
+			CompletedAt: sql.NewTimeOption(row.CompletedAt),
+			Error:       row.Error,
 		})
 	}
 	return jobs, nil
@@ -1413,12 +1521,6 @@ func (s *hosts) GetCollectorScript(osFamily string) (string, error) {
 }
 
 func (s *hosts) CreateManualHost(ctx context.Context, actor ActorRef, displayName string, hostname string) (HostInfo, error) {
-	displayName = strings.TrimSpace(displayName)
-	hostname = strings.TrimSpace(hostname)
-	if displayName == "" && hostname == "" {
-		return HostInfo{}, fmt.Errorf("display name or hostname is required")
-	}
-
 	tx, err := s.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return HostInfo{}, fmt.Errorf("begin create manual host transaction: %w", err)
@@ -1429,8 +1531,8 @@ func (s *hosts) CreateManualHost(ctx context.Context, actor ActorRef, displayNam
 
 	host, err := queries.InsertManualHost(ctx, sql.InsertManualHostParams{
 		ID:          id.New("h"),
-		DisplayName: optionString(displayName),
-		Hostname:    optionString(hostname),
+		DisplayName: utils.NonZeroOption(displayName),
+		Hostname:    utils.NonZeroOption(hostname),
 	})
 	if err != nil {
 		if sql.IsUniqueViolation(err, "hosts_display_name_unique_idx") {
@@ -1504,16 +1606,16 @@ func (s *hosts) IngestManualReport(ctx context.Context, actor ActorRef, hostID s
 
 	_, err = queries.UpdateHostFromSnapshot(ctx, sql.UpdateHostFromSnapshotParams{
 		ID:             hostID,
-		MachineID:      optionString(res.MachineID),
-		Hostname:       optionString(res.Hostname),
-		IpAddress:      optionString(res.IPAddress),
+		MachineID:      utils.NonZeroOption(res.MachineID),
+		Hostname:       utils.NonZeroOption(res.Hostname),
+		IpAddress:      utils.NonZeroOption(res.IPAddress),
 		OsFamily:       res.OSFamily,
 		OsName:         res.OSName,
 		OsMajor:        res.OSMajor,
 		OsVersion:      res.OSVersion,
 		Architecture:   res.Architecture,
 		LastSeenAt:     sql.TimestamptzFromTime(collectedAt),
-		LastSnapshotID: optionString(snapshotID),
+		LastSnapshotID: utils.NonZeroOption(snapshotID),
 	})
 	if err != nil {
 		return fmt.Errorf("update host from snapshot: %w", err)
@@ -1553,7 +1655,7 @@ func (s *hosts) IngestManualReport(ctx context.Context, actor ActorRef, hostID s
 		if registerErr == nil {
 			err = s.sql.UpdateHostAdvisoryScopeKey(ctx, sql.UpdateHostAdvisoryScopeKeyParams{
 				ID:               hostID,
-				AdvisoryScopeKey: optionString(scopeKey),
+				AdvisoryScopeKey: utils.NonZeroOption(scopeKey),
 			})
 			if err != nil {
 				utils.GetLogger(ctx).Warn("update host advisory scope key failed", "error", err)

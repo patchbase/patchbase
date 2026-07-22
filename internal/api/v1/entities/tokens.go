@@ -28,18 +28,10 @@ func NewRegistrationToken(value services.RegistrationTokenInfo) RegistrationToke
 		ID:              value.ID,
 		Name:            value.Name,
 		CreatedByUserID: value.CreatedBy,
-		CreatedAt:       value.CreatedAt.UTC().Format(apiTimeLayout),
-		RevokedAt:       NewOptionalFormattedTime(value.RevokedAt),
-		LastUsedAt:      NewOptionalFormattedTime(value.LastUsedAt),
+		CreatedAt:       TimeToString(value.CreatedAt),
+		RevokedAt:       value.RevokedAt.Map(TimeToString),
+		LastUsedAt:      value.LastUsedAt.Map(TimeToString),
 	}
-}
-
-func NewRegistrationTokens(values []services.RegistrationTokenInfo) []RegistrationToken {
-	result := make([]RegistrationToken, 0, len(values))
-	for _, value := range values {
-		result = append(result, NewRegistrationToken(value))
-	}
-	return result
 }
 
 func NewCreatedRegistrationToken(value services.CreatedRegistrationToken) CreatedRegistrationToken {
@@ -47,6 +39,6 @@ func NewCreatedRegistrationToken(value services.CreatedRegistrationToken) Create
 		ID:        value.ID,
 		Name:      value.Name,
 		Token:     value.Token,
-		CreatedAt: value.CreatedAt.UTC().Format(apiTimeLayout),
+		CreatedAt: TimeToString(value.CreatedAt),
 	}
 }

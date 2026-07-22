@@ -170,6 +170,11 @@ SELECT
     hp.pull_last_run_at,
     hp.pull_last_run_status,
     hp.pull_last_run_error,
+    hp.pull_hostname,
+    hp.pull_ssh_user,
+    hp.pull_frequency_minutes,
+    hp.onboarded,
+    COALESCE(hp.pull_private_key IS NOT NULL, false)::boolean AS uses_unique_key_pair,
     COALESCE(hcs.overall_action, 'none') AS overall_action,
     COALESCE(hcs.critical_count, 0) AS critical_count,
     COALESCE(hcs.important_count, 0) AS important_count,
@@ -188,21 +193,26 @@ WHERE h.id = $1
 `
 
 type GetHostWithStateByIDRow struct {
-	Host              Host
-	PullLastRunAt     pgtype.Timestamptz
-	PullLastRunStatus utils.Option[string]
-	PullLastRunError  utils.Option[string]
-	OverallAction     string
-	CriticalCount     int32
-	ImportantCount    int32
-	ModerateCount     int32
-	ActionableCount   int32
-	AvailableUpdates  int32
-	NeedsReboot       int32
-	NeedsRestart      int32
-	NoFix             int32
-	Unknown           int32
-	StateUpdatedAt    pgtype.Timestamptz
+	Host                 Host
+	PullLastRunAt        pgtype.Timestamptz
+	PullLastRunStatus    utils.Option[string]
+	PullLastRunError     utils.Option[string]
+	PullHostname         utils.Option[string]
+	PullSshUser          utils.Option[string]
+	PullFrequencyMinutes *int32
+	Onboarded            *bool
+	UsesUniqueKeyPair    bool
+	OverallAction        string
+	CriticalCount        int32
+	ImportantCount       int32
+	ModerateCount        int32
+	ActionableCount      int32
+	AvailableUpdates     int32
+	NeedsReboot          int32
+	NeedsRestart         int32
+	NoFix                int32
+	Unknown              int32
+	StateUpdatedAt       pgtype.Timestamptz
 }
 
 func (q *Queries) GetHostWithStateByID(ctx context.Context, id string) (GetHostWithStateByIDRow, error) {
@@ -233,6 +243,11 @@ func (q *Queries) GetHostWithStateByID(ctx context.Context, id string) (GetHostW
 		&i.PullLastRunAt,
 		&i.PullLastRunStatus,
 		&i.PullLastRunError,
+		&i.PullHostname,
+		&i.PullSshUser,
+		&i.PullFrequencyMinutes,
+		&i.Onboarded,
+		&i.UsesUniqueKeyPair,
 		&i.OverallAction,
 		&i.CriticalCount,
 		&i.ImportantCount,
@@ -621,6 +636,11 @@ SELECT
     hp.pull_last_run_at,
     hp.pull_last_run_status,
     hp.pull_last_run_error,
+    hp.pull_hostname,
+    hp.pull_ssh_user,
+    hp.pull_frequency_minutes,
+    hp.onboarded,
+    COALESCE(hp.pull_private_key IS NOT NULL, false)::boolean AS uses_unique_key_pair,
     COALESCE(hcs.overall_action, 'none') AS overall_action,
     COALESCE(hcs.critical_count, 0) AS critical_count,
     COALESCE(hcs.important_count, 0) AS important_count,
@@ -649,21 +669,26 @@ ORDER BY
 `
 
 type ListHostsWithStateRow struct {
-	Host              Host
-	PullLastRunAt     pgtype.Timestamptz
-	PullLastRunStatus utils.Option[string]
-	PullLastRunError  utils.Option[string]
-	OverallAction     string
-	CriticalCount     int32
-	ImportantCount    int32
-	ModerateCount     int32
-	ActionableCount   int32
-	AvailableUpdates  int32
-	NeedsReboot       int32
-	NeedsRestart      int32
-	NoFix             int32
-	Unknown           int32
-	StateUpdatedAt    pgtype.Timestamptz
+	Host                 Host
+	PullLastRunAt        pgtype.Timestamptz
+	PullLastRunStatus    utils.Option[string]
+	PullLastRunError     utils.Option[string]
+	PullHostname         utils.Option[string]
+	PullSshUser          utils.Option[string]
+	PullFrequencyMinutes *int32
+	Onboarded            *bool
+	UsesUniqueKeyPair    bool
+	OverallAction        string
+	CriticalCount        int32
+	ImportantCount       int32
+	ModerateCount        int32
+	ActionableCount      int32
+	AvailableUpdates     int32
+	NeedsReboot          int32
+	NeedsRestart         int32
+	NoFix                int32
+	Unknown              int32
+	StateUpdatedAt       pgtype.Timestamptz
 }
 
 func (q *Queries) ListHostsWithState(ctx context.Context) ([]ListHostsWithStateRow, error) {
@@ -700,6 +725,11 @@ func (q *Queries) ListHostsWithState(ctx context.Context) ([]ListHostsWithStateR
 			&i.PullLastRunAt,
 			&i.PullLastRunStatus,
 			&i.PullLastRunError,
+			&i.PullHostname,
+			&i.PullSshUser,
+			&i.PullFrequencyMinutes,
+			&i.Onboarded,
+			&i.UsesUniqueKeyPair,
 			&i.OverallAction,
 			&i.CriticalCount,
 			&i.ImportantCount,
@@ -812,6 +842,47 @@ func (q *Queries) UpdateHostAdvisoryScopeKey(ctx context.Context, arg UpdateHost
 	return err
 }
 
+const updateHostDisplayName = `-- name: UpdateHostDisplayName :one
+UPDATE hosts
+SET display_name = $2
+WHERE id = $1
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+`
+
+type UpdateHostDisplayNameParams struct {
+	ID          string
+	DisplayName utils.Option[string]
+}
+
+func (q *Queries) UpdateHostDisplayName(ctx context.Context, arg UpdateHostDisplayNameParams) (Host, error) {
+	row := q.db.QueryRow(ctx, updateHostDisplayName, arg.ID, arg.DisplayName)
+	var i Host
+	err := row.Scan(
+		&i.ID,
+		&i.OnboardingMode,
+		&i.ApprovalStatus,
+		&i.ApprovedAt,
+		&i.DisplayName,
+		&i.MachineID,
+		&i.Hostname,
+		&i.IpAddress,
+		&i.OsFamily,
+		&i.OsName,
+		&i.OsMajor,
+		&i.OsVersion,
+		&i.Architecture,
+		&i.Status,
+		&i.LastSeenAt,
+		&i.LastAdvisoryCheckAt,
+		&i.FirstSeenAt,
+		&i.LastSnapshotID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AdvisoryScopeKey,
+	)
+	return i, err
+}
+
 const updateHostFromSnapshot = `-- name: UpdateHostFromSnapshot :one
 UPDATE hosts
 SET
@@ -882,6 +953,46 @@ func (q *Queries) UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFrom
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AdvisoryScopeKey,
+	)
+	return i, err
+}
+
+const updateSSHPullConfig = `-- name: UpdateSSHPullConfig :one
+UPDATE host_ssh_pull
+SET
+    pull_hostname = COALESCE($1, pull_hostname),
+    pull_ssh_user = COALESCE($2, pull_ssh_user),
+    pull_frequency_minutes = COALESCE($3, pull_frequency_minutes)
+WHERE host_id = $4
+RETURNING host_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, onboarded, pull_hostname
+`
+
+type UpdateSSHPullConfigParams struct {
+	PullHostname         utils.Option[string]
+	PullSshUser          utils.Option[string]
+	PullFrequencyMinutes *int32
+	HostID               string
+}
+
+func (q *Queries) UpdateSSHPullConfig(ctx context.Context, arg UpdateSSHPullConfigParams) (HostSshPull, error) {
+	row := q.db.QueryRow(ctx, updateSSHPullConfig,
+		arg.PullHostname,
+		arg.PullSshUser,
+		arg.PullFrequencyMinutes,
+		arg.HostID,
+	)
+	var i HostSshPull
+	err := row.Scan(
+		&i.HostID,
+		&i.PullSshUser,
+		&i.PullFrequencyMinutes,
+		&i.PullPublicKey,
+		&i.PullPrivateKey,
+		&i.PullLastRunAt,
+		&i.PullLastRunStatus,
+		&i.PullLastRunError,
+		&i.Onboarded,
+		&i.PullHostname,
 	)
 	return i, err
 }

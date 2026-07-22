@@ -6,6 +6,7 @@
 	import StatsRow from '$lib/components/StatsRow.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import ApproveHostButton from '$lib/components/ApproveHostButton.svelte';
+	import EditHostButton from '$lib/components/EditHostButton.svelte';
 	import DeleteHostButton from '$lib/components/DeleteHostButton.svelte';
 	import { listHosts, runPullNow } from '$lib/api/hosts.js';
 	import { relativeTime } from '$lib/format';
@@ -276,6 +277,15 @@
 												error = err.message;
 											}}
 										/>
+										<EditHostButton
+											{host}
+											class="host-actions-item"
+											onUpdate={(updated) => {
+												hosts.update(items => items.map((item) => item.id === updated.id ? updated : item));
+												openActionsHostID = null;
+											}}
+											onError={(err) => { error = err.message; }}
+										/>
 										<DeleteHostButton
 											{host}
 											class="host-actions-item host-actions-item-danger"
@@ -432,7 +442,16 @@
 													{runningPullNowHostId === host.id ? 'Running...' : 'Run now'}
 												</button>
 											{/if}
-											<DeleteHostButton
+											<EditHostButton
+											{host}
+											class="host-actions-item"
+											onUpdate={(updated) => {
+												hosts.update(items => items.map((item) => item.id === updated.id ? updated : item));
+												openActionsHostID = null;
+											}}
+											onError={(err) => { error = err.message; }}
+										/>
+										<DeleteHostButton
 												{host}
 												class="host-actions-item host-actions-item-danger"
 												onDelete={() => {

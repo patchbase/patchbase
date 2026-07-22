@@ -6,6 +6,7 @@
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
 	import Modal from '$lib/components/Modal.svelte';
 	import ApproveHostButton from '$lib/components/ApproveHostButton.svelte';
+	import EditHostButton from '$lib/components/EditHostButton.svelte';
 	import DeleteHostButton from '$lib/components/DeleteHostButton.svelte';
 	import {
 		getHost,
@@ -291,6 +292,13 @@
 				onError={(err) => {
 					error = err.message;
 				}}
+			/>
+			<EditHostButton
+				{host}
+				class="btn btn-secondary btn-sm"
+				buttonText="Edit Host"
+				onUpdate={(updated) => { host = updated; }}
+				onError={(err) => { error = err.message; }}
 			/>
 			<DeleteHostButton
 				{host}

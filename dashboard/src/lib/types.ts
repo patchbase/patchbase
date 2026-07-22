@@ -1,5 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Configure Labs SRL
 // SPDX-License-Identifier: AGPL-3.0-only
+export interface SSHPullConfiguration {
+  pull_hostname: string;
+  pull_ssh_user: string;
+  pull_frequency_minutes: number;
+  onboarded: boolean;
+  uses_unique_key_pair: boolean;
+}
+
 export interface Host {
   id: string;
   onboarding_mode?: string;
@@ -29,6 +37,7 @@ export interface Host {
   pull_last_run_at?: string | null;
   pull_last_run_status?: string;
   pull_last_run_error?: string;
+  configuration?: SSHPullConfiguration;
   created_at?: string;
   updated_at: string;
 }

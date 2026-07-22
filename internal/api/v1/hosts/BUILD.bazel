@@ -20,6 +20,7 @@ go_api_library(
         "onboard_ssh_host.go",
         "revoke_token.go",
         "run_pull_now.go",
+        "update_host.go",
         "upgradable.go",
         "vulnerable.go",
     ],
@@ -32,6 +33,7 @@ go_api_library(
         "//internal/apperr",
         "//internal/services",
         "//internal/sql",
+        "//internal/utils",
         "//proto/agent",
         "@com_github_samber_do_v2//:do",
         "@org_golang_google_protobuf//proto",
@@ -198,6 +200,16 @@ integration_test(
         "//internal/testing",
         "//internal/utils",
         "@com_github_samber_do_v2//:do",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+integration_test(
+    name = "update_host_test",
+    srcs = ["update_host_test.go"],
+    deps = [
+        "//internal/testing",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
     ],
