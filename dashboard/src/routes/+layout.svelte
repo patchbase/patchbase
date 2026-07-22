@@ -1,6 +1,6 @@
-// SPDX-FileCopyrightText: 2026 Configure Labs SRL
-// SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts">
+	// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+	// SPDX-License-Identifier: AGPL-3.0-only
 	import { goto } from '$app/navigation';
 	import '../app.css';
 	import { getSetupStatus } from '$lib/api/auth.js';

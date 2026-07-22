@@ -1,6 +1,6 @@
-// SPDX-FileCopyrightText: 2026 Configure Labs SRL
-// SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts">
+	// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+	// SPDX-License-Identifier: AGPL-3.0-only
 	import AppLayout from '$lib/components/AppLayout.svelte';
 	import StatsRow from '$lib/components/StatsRow.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
@@ -53,7 +53,7 @@
 
 <AppLayout page="dashboard" title="Dashboard">
 	<StatsRow {stats} />
-	<div class="table-container" style="margin-bottom:24px">
+	<div class="table-container section-space">
 		<div class="table-header">
 			<h2>Host Fleet</h2>
 			<a href="/hosts" class="btn btn-secondary btn-sm">View all</a>
@@ -121,9 +121,22 @@
 			</table>
 		{/if}
 		{#if overview}
-			<p style="padding:20px;color:var(--text-secondary)">
+			<p class="overview-info">
 				Tracking {overview.total_advisories} advisories across {overview.total_scopes} advisory scopes.
 			</p>
 		{/if}
 	</div>
 </AppLayout>
+
+<style>
+	.section-space {
+		margin-bottom: var(--space-lg);
+	}
+
+	.overview-info {
+		padding: 16px 20px;
+		color: var(--text-secondary);
+		font-size: 13px;
+		border-top: 1px solid var(--border);
+	}
+</style>

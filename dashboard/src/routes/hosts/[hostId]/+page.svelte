@@ -1,6 +1,6 @@
-// SPDX-FileCopyrightText: 2026 Configure Labs SRL
-// SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts">
+	// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+	// SPDX-License-Identifier: AGPL-3.0-only
 	import { onMount } from 'svelte';
 	import AppLayout from '$lib/components/AppLayout.svelte';
 	import StatusBadge from '$lib/components/StatusBadge.svelte';
