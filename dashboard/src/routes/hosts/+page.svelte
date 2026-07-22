@@ -1,6 +1,6 @@
-// SPDX-FileCopyrightText: 2026 Configure Labs SRL
-// SPDX-License-Identifier: AGPL-3.0-only
 <script lang="ts">
+	// SPDX-FileCopyrightText: 2026 Configure Labs SRL
+	// SPDX-License-Identifier: AGPL-3.0-only
 	import { onMount } from 'svelte';
 	import AppLayout from '$lib/components/AppLayout.svelte';
 	import StatsRow from '$lib/components/StatsRow.svelte';
@@ -44,7 +44,6 @@
 		}
 		try {
 			const newHosts = await listHosts();
-			// Since we use the store now, we can update it directly
 			hosts.set(newHosts);
 		} catch (err) {
 			if (!silent) {
@@ -220,7 +219,7 @@
 </script>
 
 {#snippet pageActions()}
-	<div style="display:flex;align-items:center;gap:8px">
+	<div class="page-actions-row">
 		<a class="btn btn-secondary btn-sm" href="/hosts/register">Register Host</a>
 		<div class="segmented-toggle" role="group" aria-label="Hosts view mode">
 			<button type="button" class:active={viewMode === 'grid'} onclick={() => setViewMode('grid')}>Grid</button>
@@ -327,149 +326,293 @@
 			{/each}
 		</div>
 	{:else}
-		<table>
-			<thead>
-				<tr>
-					<th onclick={() => handleSort('host')} class="sortable-header">
-						Host
-						{#if sortField === 'host'}
-							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-						{/if}
-					</th>
-					<th onclick={() => handleSort('platform')} class="sortable-header">
-						Platform
-						{#if sortField === 'platform'}
-							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-						{/if}
-					</th>
-					<th>Action</th>
-					<th onclick={() => handleSort('critical')} class="sortable-header">
-						Critical
-						{#if sortField === 'critical'}
-							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-						{/if}
-					</th>
-					<th onclick={() => handleSort('important')} class="sortable-header">
-						Important
-						{#if sortField === 'important'}
-							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-						{/if}
-					</th>
-					<th onclick={() => handleSort('moderate')} class="sortable-header">
-						Moderate
-						{#if sortField === 'moderate'}
-							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-						{/if}
-					</th>
-					<th onclick={() => handleSort('updates')} class="sortable-header">
-						Updates
-						{#if sortField === 'updates'}
-							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-						{/if}
-					</th>
-					<th onclick={() => handleSort('last_check')} class="sortable-header">
-						Last Check
-						{#if sortField === 'last_check'}
-							<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
-						{/if}
-					</th>
-					<th></th>
-				</tr>
-			</thead>
-			<tbody>
-				{#each sortedHosts as host (host.id)}
+		<div class="table-container">
+			<table>
+				<thead>
 					<tr>
-						<td><a href="/hosts/{host.id}">{hostLabel(host)}</a></td>
-						<td>{host.os_name} {host.os_version} ({host.architecture})</td>
-						<td>
-							{#if host.approval_status === 'waiting_approval'}
-								<StatusBadge status="waiting_approval" />
-							{:else if host.approval_status === 'rejected'}
-								<StatusBadge status="rejected" />
-							{:else}
-								<StatusBadge status={host.overall_action} />
+						<th onclick={() => handleSort('host')} class="sortable-header">
+							Host
+							{#if sortField === 'host'}
+								<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
 							{/if}
-						</td>
-						<td class="mono">{host.critical_count || '-'}</td>
-						<td class="mono">{host.important_count || '-'}</td>
-						<td class="mono">{host.moderate_count || '-'}</td>
-						<td class="mono">{host.available_updates || '-'}</td>
-						<td>{relativeTime(host.last_advisory_check_at || null)}</td>
-						<td class="host-actions-cell">
-							<div class="host-actions">
-								<button
-									type="button"
-									class="host-actions-trigger"
-									aria-label={`Host actions for ${hostLabel(host)}`}
-									aria-expanded={openActionsHostID === host.id}
-									onclick={() => toggleHostActions(host.id)}
-								>
-									<span></span>
-									<span></span>
-									<span></span>
-								</button>
-								{#if openActionsHostID === host.id}
-									<div class="host-actions-menu host-actions-menu-right">
-										<ApproveHostButton
-											{host}
-											class="host-actions-item"
-											onApprove={() => {
-												openActionsHostID = null;
-												void loadHosts();
-											}}
-											onError={(err) => {
-												openActionsHostID = null;
-												error = err.message;
-											}}
-										/>
-										{#if host.onboarding_mode === 'ssh'}
-											<button
-												type="button"
-												class="host-actions-item"
-												onclick={() => void runPullNowJob(host.id)}
-												disabled={runningPullNowHostId !== null}
-											>
-												{runningPullNowHostId === host.id ? 'Running...' : 'Run now'}
-											</button>
-										{/if}
-										<DeleteHostButton
-											{host}
-											class="host-actions-item host-actions-item-danger"
-											onDelete={() => {
-												hosts.update(items => items.filter((item) => item.id !== host.id));
-												openActionsHostID = null;
-											}}
-											onError={(err) => {
-												error = err.message;
-												openActionsHostID = null;
-											}}
-										/>
-									</div>
-								{/if}
-							</div>
-						</td>
+						</th>
+						<th onclick={() => handleSort('platform')} class="sortable-header">
+							Platform
+							{#if sortField === 'platform'}
+								<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+							{/if}
+						</th>
+						<th>Action</th>
+						<th onclick={() => handleSort('critical')} class="sortable-header">
+							Critical
+							{#if sortField === 'critical'}
+								<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+							{/if}
+						</th>
+						<th onclick={() => handleSort('important')} class="sortable-header">
+							Important
+							{#if sortField === 'important'}
+								<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+							{/if}
+						</th>
+						<th onclick={() => handleSort('moderate')} class="sortable-header">
+							Moderate
+							{#if sortField === 'moderate'}
+								<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+							{/if}
+						</th>
+						<th onclick={() => handleSort('updates')} class="sortable-header">
+							Updates
+							{#if sortField === 'updates'}
+								<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+							{/if}
+						</th>
+						<th onclick={() => handleSort('last_check')} class="sortable-header">
+							Last Check
+							{#if sortField === 'last_check'}
+								<span class="sort-direction">{sortDirection === 'asc' ? '▲' : '▼'}</span>
+							{/if}
+						</th>
+						<th></th>
 					</tr>
-				{/each}
-			</tbody>
-		</table>
+				</thead>
+				<tbody>
+					{#each sortedHosts as host (host.id)}
+						<tr>
+							<td><a href="/hosts/{host.id}">{hostLabel(host)}</a></td>
+							<td>{host.os_name} {host.os_version} ({host.architecture})</td>
+							<td>
+								{#if host.approval_status === 'waiting_approval'}
+									<StatusBadge status="waiting_approval" />
+								{:else if host.approval_status === 'rejected'}
+									<StatusBadge status="rejected" />
+								{:else}
+									<StatusBadge status={host.overall_action} />
+								{/if}
+							</td>
+							<td class="mono">{host.critical_count || '-'}</td>
+							<td class="mono">{host.important_count || '-'}</td>
+							<td class="mono">{host.moderate_count || '-'}</td>
+							<td class="mono">{host.available_updates || '-'}</td>
+							<td>{relativeTime(host.last_advisory_check_at || null)}</td>
+							<td class="host-actions-cell">
+								<div class="host-actions">
+									<button
+										type="button"
+										class="host-actions-trigger"
+										aria-label={`Host actions for ${hostLabel(host)}`}
+										aria-expanded={openActionsHostID === host.id}
+										onclick={() => toggleHostActions(host.id)}
+									>
+										<span></span>
+										<span></span>
+										<span></span>
+									</button>
+									{#if openActionsHostID === host.id}
+										<div class="host-actions-menu host-actions-menu-right">
+											<ApproveHostButton
+												{host}
+												class="host-actions-item"
+												onApprove={() => {
+													openActionsHostID = null;
+													void loadHosts();
+												}}
+												onError={(err) => {
+													openActionsHostID = null;
+													error = err.message;
+												}}
+											/>
+											{#if host.onboarding_mode === 'ssh'}
+												<button
+													type="button"
+													class="host-actions-item"
+													onclick={() => void runPullNowJob(host.id)}
+													disabled={runningPullNowHostId !== null}
+												>
+													{runningPullNowHostId === host.id ? 'Running...' : 'Run now'}
+												</button>
+											{/if}
+											<DeleteHostButton
+												{host}
+												class="host-actions-item host-actions-item-danger"
+												onDelete={() => {
+													hosts.update(items => items.filter((item) => item.id !== host.id));
+													openActionsHostID = null;
+												}}
+												onError={(err) => {
+													error = err.message;
+													openActionsHostID = null;
+												}}
+											/>
+										</div>
+									{/if}
+								</div>
+							</td>
+						</tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
 	{/if}
 </AppLayout>
 
 <style>
+	.page-actions-row {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.host-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+		gap: var(--space-md);
+	}
+
+	.host-card {
+		background: var(--bg-card);
+		backdrop-filter: blur(12px);
+		border: 1px solid var(--border);
+		border-radius: var(--radius-md);
+		padding: 18px 20px;
+		transition: all var(--transition-normal);
+	}
+
+	.host-card:hover {
+		border-color: var(--border-light);
+		box-shadow: var(--shadow-md);
+		transform: translateY(-1px);
+	}
+
+	.host-card-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		margin-bottom: 8px;
+	}
+
+	.host-card-header-right {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+	}
+
+	.host-card-name {
+		font-size: 15px;
+		font-weight: 700;
+		color: var(--text-primary);
+	}
+
+	.host-card-name a {
+		color: var(--text-primary);
+		text-decoration: none;
+	}
+
+	.host-card-name a:hover {
+		color: var(--accent-light);
+	}
+
+	.host-card-meta {
+		font-size: 12px;
+		color: var(--text-dim);
+		font-family: var(--font-mono);
+		margin-bottom: 12px;
+	}
+
+	.host-card-signals {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+		margin-bottom: 14px;
+	}
+
+	.host-card-footer {
+		display: flex;
+		justify-content: space-between;
+		font-size: 12px;
+		color: var(--text-dim);
+		padding-top: 10px;
+		border-top: 1px solid var(--border);
+	}
+
+	.host-actions-cell {
+		width: 1%;
+		white-space: nowrap;
+		text-align: right;
+	}
+
+	.host-actions {
+		position: relative;
+		display: inline-flex;
+	}
+
+	.host-actions-trigger {
+		width: 28px;
+		height: 28px;
+		border: 1px solid var(--border);
+		background: var(--bg-primary);
+		border-radius: var(--radius-sm);
+		display: inline-flex;
+		flex-direction: column;
+		justify-content: center;
+		align-items: center;
+		gap: 3px;
+		cursor: pointer;
+		transition: all var(--transition-fast);
+	}
+
+	.host-actions-trigger:hover {
+		border-color: var(--border-light);
+		background: var(--bg-card-hover);
+	}
+
+	.host-actions-trigger span {
+		display: block;
+		width: 12px;
+		height: 1px;
+		background: var(--text-secondary);
+	}
+
+	.host-actions-menu {
+		position: absolute;
+		top: calc(100% + 6px);
+		left: 0;
+		min-width: 132px;
+		background: var(--bg-secondary);
+		border: 1px solid var(--border-light);
+		border-radius: var(--radius-sm);
+		padding: 6px;
+		z-index: 20;
+		box-shadow: var(--shadow-lg);
+	}
+
+	.host-actions-menu-right {
+		right: 0;
+		left: auto;
+	}
+
 	.sortable-header {
 		cursor: pointer;
 		user-select: none;
-		transition: background-color 0.15s ease, color 0.15s ease;
+		transition: background-color var(--transition-fast), color var(--transition-fast);
 	}
+
 	.sortable-header:hover {
 		background: var(--bg-card-hover);
 		color: var(--text-primary);
 	}
+
 	.sort-direction {
 		font-size: 10px;
 		margin-left: 4px;
 		color: var(--accent);
 		display: inline-block;
 		vertical-align: middle;
+	}
+
+	@media (max-width: 768px) {
+		.host-grid {
+			grid-template-columns: 1fr;
+		}
 	}
 </style>
