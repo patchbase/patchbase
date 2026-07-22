@@ -16,7 +16,7 @@
     "oxlint": "^1.73.0",
     "svelte": "^5.56.7",
     "typescript": "^6.0.2",
-    "vite": "^8.1.4"
+    "vite": "^8.1.5"
   },
   "packageManager": "pnpm@10.32.1",
   "pnpm": {
