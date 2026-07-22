@@ -8,7 +8,6 @@ go_api_library(
         "hosts.go",
         "kernel.go",
         "matcher.go",
-        "optional.go",
         "packages_helper.go",
         "timestamp.go",
         "tokens.go",
@@ -21,7 +20,6 @@ go_api_library(
         "//internal/sql",
         "//internal/utils",
         "//proto/agent",
-        "@com_github_jackc_pgx_v5//pgtype",
     ],
 )
 

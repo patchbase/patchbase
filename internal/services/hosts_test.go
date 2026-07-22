@@ -290,13 +290,59 @@ func TestHostIngestion_RepeatedSnapshotsKeepAdvisorySyncRateBounded(t *testing.T
 
 type hostsMockPeriodicJobManager struct {
 	services.PeriodicJobManager
-	removeErr     error
-	removedHostID string
+	removeErr      error
+	removedHostID  string
+	addErrors      []error
+	addFrequencies []int32
+}
+
+func (m *hostsMockPeriodicJobManager) AddSSHPullJob(_ context.Context, _ string, frequencyMinutes int32, _ bool) error {
+	m.addFrequencies = append(m.addFrequencies, frequencyMinutes)
+	if len(m.addErrors) == 0 {
+		return nil
+	}
+	err := m.addErrors[0]
+	m.addErrors = m.addErrors[1:]
+	return err
 }
 
 func (m *hostsMockPeriodicJobManager) RemoveSSHPullJob(ctx context.Context, hostID string) error {
 	m.removedHostID = hostID
 	return m.removeErr
+}
+
+func TestHosts_UpdateHost_RestoresScheduleWhenRescheduleFails(t *testing.T) {
+	rescheduleErr := fmt.Errorf("mock reschedule error")
+	mockMgr := &hostsMockPeriodicJobManager{addErrors: []error{rescheduleErr, nil}}
+	backend := apitesting.NewBackend(t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+		apitesting.WithInjectorOverride(func(i do.Injector) {
+			do.Override[services.PeriodicJobManager](i, func(_ do.Injector) (services.PeriodicJobManager, error) {
+				return mockMgr, nil
+			})
+		}),
+	)
+	ctx := context.Background()
+	hostsService := do.MustInvoke[services.Hosts](backend.Injector())
+	queries := do.MustInvoke[db.Querier](backend.Injector())
+
+	created, err := hostsService.CreateSSHHost(ctx, services.SystemActorRef(), services.CreateSSHHostInput{
+		DisplayName: "reschedule-host", Hostname: "reschedule.example.com", SSHUser: "root", FrequencyMinutes: 60,
+	})
+	require.NoError(t, err)
+	err = queries.SetSSHPullOnboarded(ctx, db.SetSSHPullOnboardedParams{HostID: created.HostID, Onboarded: true})
+	require.NoError(t, err)
+
+	_, err = hostsService.UpdateHost(ctx, services.SystemActorRef(), created.HostID, services.UpdateHostInput{
+		PullFrequencyMinutes: utils.Some(int32(30)),
+	})
+	require.ErrorIs(t, err, rescheduleErr)
+	assert.Equal(t, []int32{30, 60}, mockMgr.addFrequencies)
+
+	config, err := queries.GetSSHPullConfigByHostID(ctx, created.HostID)
+	require.NoError(t, err)
+	require.NotNil(t, config.PullFrequencyMinutes)
+	assert.Equal(t, int32(60), *config.PullFrequencyMinutes)
 }
 
 func TestHosts_DeleteHost_HandlesPeriodicJobRemovalError(t *testing.T) {
@@ -516,8 +562,8 @@ func TestHosts_RunSSHPull_CollectErrorPreserved(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, jobs, 1)
 	assert.Equal(t, "failed", jobs[0].Status)
-	require.NotNil(t, jobs[0].Error)
-	assert.Contains(t, *jobs[0].Error, "ssh failed: permission denied")
+	require.True(t, jobs[0].Error.IsPresent())
+	assert.Contains(t, jobs[0].Error.Unwrap(), "ssh failed: permission denied")
 }
 
 func mockProtobufPayload(t *testing.T) []byte {
@@ -769,6 +815,24 @@ func TestHosts_UniqueConstraints(t *testing.T) {
 	assert.ErrorIs(t, err, apperr.ErrDuplicateSSHPullHostname)
 }
 
+func TestHosts_CreateManualHost_AllowsMultipleMissingDisplayNames(t *testing.T) {
+	backend := apitesting.NewBackend(t,
+		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
+	)
+
+	hostsService := do.MustInvoke[services.Hosts](backend.Injector())
+	ctx := context.Background()
+
+	first, err := hostsService.CreateManualHost(ctx, services.SystemActorRef(), "", "manual-1.example.com")
+	require.NoError(t, err)
+	second, err := hostsService.CreateManualHost(ctx, services.SystemActorRef(), "", "manual-2.example.com")
+	require.NoError(t, err)
+
+	assert.NotEqual(t, first.ID, second.ID)
+	assert.Empty(t, first.DisplayName)
+	assert.Empty(t, second.DisplayName)
+}
+
 func TestHosts_RegisterAgentHost_AuditsAsTokenOwner(t *testing.T) {
 	backend := apitesting.NewBackend(t,
 		apitesting.WithFixture(apitesting.LoadYAMLFixtures("users.yml")),
@@ -793,9 +857,9 @@ func TestHosts_RegisterAgentHost_AuditsAsTokenOwner(t *testing.T) {
 		Hostname:          "agent-host.example.com",
 		MachineId:         "machine-agent-1",
 		Metadata: &agentpb.RegisterHostMetadata{
-			IpAddress:  "203.0.113.42",
-			OsName:     "Ubuntu",
-			OsVersion:  "22.04",
+			IpAddress:    "203.0.113.42",
+			OsName:       "Ubuntu",
+			OsVersion:    "22.04",
 			Architecture: "x86_64",
 		},
 	})

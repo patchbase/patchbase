@@ -23,6 +23,7 @@ const (
 	auditLogActionTokenCreate   = "host.registration_token.create" // nolint: gosec
 	auditLogActionTokenRevoke   = "host.registration_token.revoke" // nolint: gosec
 	auditLogActionHostCreate    = "host.create"
+	auditLogActionHostUpdate    = "host.update"
 	auditLogActionHostDelete    = "host.delete"
 	auditLogActionHostApprove   = "host.approve"
 	auditLogActionSSHPull       = "host.ssh.pull"

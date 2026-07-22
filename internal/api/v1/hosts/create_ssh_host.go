@@ -99,7 +99,7 @@ func (req *createSSHHostRequest) validate(ctx context.Context, settingsService s
 		}
 	}
 
-	if req.FrequencyMinutes < 0 {
+	if req.FrequencyMinutes != 0 && req.FrequencyMinutes < 5 {
 		return apperr.ErrInvalidFrequency
 	}
 

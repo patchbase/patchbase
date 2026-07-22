@@ -91,6 +91,21 @@ SELECT *
 FROM hosts
 WHERE id = $1;
 
+-- name: UpdateHostDisplayName :one
+UPDATE hosts
+SET display_name = $2
+WHERE id = $1
+RETURNING *;
+
+-- name: UpdateSSHPullConfig :one
+UPDATE host_ssh_pull
+SET
+    pull_hostname = COALESCE(sqlc.narg('pull_hostname'), pull_hostname),
+    pull_ssh_user = COALESCE(sqlc.narg('pull_ssh_user'), pull_ssh_user),
+    pull_frequency_minutes = COALESCE(sqlc.narg('pull_frequency_minutes'), pull_frequency_minutes)
+WHERE host_id = sqlc.arg('host_id')
+RETURNING *;
+
 -- name: ListPendingHosts :many
 SELECT *
 FROM hosts
@@ -163,6 +178,11 @@ SELECT
     hp.pull_last_run_at,
     hp.pull_last_run_status,
     hp.pull_last_run_error,
+    hp.pull_hostname,
+    hp.pull_ssh_user,
+    hp.pull_frequency_minutes,
+    hp.onboarded,
+    COALESCE(hp.pull_private_key IS NOT NULL, false)::boolean AS uses_unique_key_pair,
     COALESCE(hcs.overall_action, 'none') AS overall_action,
     COALESCE(hcs.critical_count, 0) AS critical_count,
     COALESCE(hcs.important_count, 0) AS important_count,
@@ -195,6 +215,11 @@ SELECT
     hp.pull_last_run_at,
     hp.pull_last_run_status,
     hp.pull_last_run_error,
+    hp.pull_hostname,
+    hp.pull_ssh_user,
+    hp.pull_frequency_minutes,
+    hp.onboarded,
+    COALESCE(hp.pull_private_key IS NOT NULL, false)::boolean AS uses_unique_key_pair,
     COALESCE(hcs.overall_action, 'none') AS overall_action,
     COALESCE(hcs.critical_count, 0) AS critical_count,
     COALESCE(hcs.important_count, 0) AS important_count,

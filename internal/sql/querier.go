@@ -85,8 +85,10 @@ type Querier interface {
 	TouchRegistrationTokenLastUsed(ctx context.Context, id string) error
 	UpdateAdvisoryScopeStatus(ctx context.Context, arg UpdateAdvisoryScopeStatusParams) (AdvisoryScope, error)
 	UpdateHostAdvisoryScopeKey(ctx context.Context, arg UpdateHostAdvisoryScopeKeyParams) error
+	UpdateHostDisplayName(ctx context.Context, arg UpdateHostDisplayNameParams) (Host, error)
 	UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFromSnapshotParams) (Host, error)
 	UpdateHostSSHPullJob(ctx context.Context, arg UpdateHostSSHPullJobParams) (HostSshPullJob, error)
+	UpdateSSHPullConfig(ctx context.Context, arg UpdateSSHPullConfigParams) (HostSshPull, error)
 	UpdateSSHPullRun(ctx context.Context, arg UpdateSSHPullRunParams) error
 	UpdateUserEmail(ctx context.Context, arg UpdateUserEmailParams) (User, error)
 	UpdateUserPassword(ctx context.Context, arg UpdateUserPasswordParams) (User, error)

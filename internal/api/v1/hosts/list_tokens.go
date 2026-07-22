@@ -11,6 +11,7 @@ import (
 	"go.patchbase.net/server/internal/api/webutil"
 	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/services"
+	"go.patchbase.net/server/internal/utils"
 )
 
 func ListTokens(i do.Injector) apiauth.AuthenticatedHandler {
@@ -28,6 +29,6 @@ func ListTokens(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		webutil.WriteJSON(w, http.StatusOK, entities.NewRegistrationTokens(items))
+		webutil.WriteJSON(w, http.StatusOK, utils.Map(items, entities.NewRegistrationToken))
 	}
 }

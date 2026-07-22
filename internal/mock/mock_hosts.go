@@ -321,3 +321,18 @@ func (mr *MockHostsMockRecorder) RunSSHPull(ctx, actor, hostID any) *gomock.Call
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunSSHPull", reflect.TypeOf((*MockHosts)(nil).RunSSHPull), ctx, actor, hostID)
 }
+
+// UpdateHost mocks base method.
+func (m *MockHosts) UpdateHost(ctx context.Context, actor services.ActorRef, hostID string, input services.UpdateHostInput) (services.HostInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateHost", ctx, actor, hostID, input)
+	ret0, _ := ret[0].(services.HostInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateHost indicates an expected call of UpdateHost.
+func (mr *MockHostsMockRecorder) UpdateHost(ctx, actor, hostID, input any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHost", reflect.TypeOf((*MockHosts)(nil).UpdateHost), ctx, actor, hostID, input)
+}

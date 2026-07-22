@@ -47,6 +47,7 @@ var (
 	ErrHostnameRequired    = New(http.StatusBadRequest, "hostname_required", "hostname is required")
 	ErrSSHUserRequired     = New(http.StatusBadRequest, "ssh_user_required", "ssh user is required")
 	ErrInvalidFrequency    = New(http.StatusBadRequest, "invalid_frequency", "invalid frequency")
+	ErrSSHFieldsForNonSSH  = New(http.StatusBadRequest, "ssh_fields_for_non_ssh_host", "SSH configuration can only be updated for SSH hosts")
 
 	// manual host / ingest manual report
 	ErrDisplayNameOrHostnameRequired = New(http.StatusBadRequest, "display_name_or_hostname_required", "display name or hostname is required")
@@ -58,6 +59,7 @@ var (
 
 	// forbidden — per-action messages (preserved from pre-refactor handlers).
 	ErrForbiddenApproveHost        = New(http.StatusForbidden, "forbidden_approve_host", "only admins can approve hosts")
+	ErrForbiddenUpdateHost         = New(http.StatusForbidden, "forbidden_update_host", "only admins can update hosts")
 	ErrForbiddenDeleteHost         = New(http.StatusForbidden, "forbidden_delete_host", "only admins can delete hosts")
 	ErrForbiddenCreateToken        = New(http.StatusForbidden, "forbidden_create_token", "only admins can create registration tokens")
 	ErrForbiddenListPendingHosts   = New(http.StatusForbidden, "forbidden_list_pending_hosts", "only admins can list pending hosts")

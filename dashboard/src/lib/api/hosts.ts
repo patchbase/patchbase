@@ -53,6 +53,21 @@ export async function getHostSnapshot(id: string): Promise<HostSnapshot> {
   return authenticatedRequest(`/api/v1/hosts/${id}/snapshot`);
 }
 
+export interface UpdateHostPayload {
+  display_name?: string;
+  pull_hostname?: string;
+  pull_ssh_user?: string;
+  pull_frequency_minutes?: number;
+}
+
+export async function updateHost(id: string, payload: UpdateHostPayload): Promise<Host> {
+  return authenticatedRequest(`/api/v1/hosts/${id}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function deleteHost(id: string): Promise<void> {
   await authenticatedRequest(`/api/v1/hosts/${id}`, {
     method: "DELETE",

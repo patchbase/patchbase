@@ -10,6 +10,7 @@ go_library(
         "password.go",
         "random.go",
         "ssh.go",
+        "strings.go",
     ],
     importpath = "go.patchbase.net/server/internal/utils",
     visibility = ["//:__subpackages__"],

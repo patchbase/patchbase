@@ -1128,6 +1128,21 @@ func (mr *MockSQLQuerierMockRecorder) UpdateHostAdvisoryScopeKey(ctx, arg any) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostAdvisoryScopeKey", reflect.TypeOf((*MockSQLQuerier)(nil).UpdateHostAdvisoryScopeKey), ctx, arg)
 }
 
+// UpdateHostDisplayName mocks base method.
+func (m *MockSQLQuerier) UpdateHostDisplayName(ctx context.Context, arg sql.UpdateHostDisplayNameParams) (sql.Host, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateHostDisplayName", ctx, arg)
+	ret0, _ := ret[0].(sql.Host)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateHostDisplayName indicates an expected call of UpdateHostDisplayName.
+func (mr *MockSQLQuerierMockRecorder) UpdateHostDisplayName(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostDisplayName", reflect.TypeOf((*MockSQLQuerier)(nil).UpdateHostDisplayName), ctx, arg)
+}
+
 // UpdateHostFromSnapshot mocks base method.
 func (m *MockSQLQuerier) UpdateHostFromSnapshot(ctx context.Context, arg sql.UpdateHostFromSnapshotParams) (sql.Host, error) {
 	m.ctrl.T.Helper()
@@ -1156,6 +1171,21 @@ func (m *MockSQLQuerier) UpdateHostSSHPullJob(ctx context.Context, arg sql.Updat
 func (mr *MockSQLQuerierMockRecorder) UpdateHostSSHPullJob(ctx, arg any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostSSHPullJob", reflect.TypeOf((*MockSQLQuerier)(nil).UpdateHostSSHPullJob), ctx, arg)
+}
+
+// UpdateSSHPullConfig mocks base method.
+func (m *MockSQLQuerier) UpdateSSHPullConfig(ctx context.Context, arg sql.UpdateSSHPullConfigParams) (sql.HostSshPull, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateSSHPullConfig", ctx, arg)
+	ret0, _ := ret[0].(sql.HostSshPull)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateSSHPullConfig indicates an expected call of UpdateSSHPullConfig.
+func (mr *MockSQLQuerierMockRecorder) UpdateSSHPullConfig(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateSSHPullConfig", reflect.TypeOf((*MockSQLQuerier)(nil).UpdateSSHPullConfig), ctx, arg)
 }
 
 // UpdateSSHPullRun mocks base method.
