@@ -44,21 +44,21 @@ func UpdateSettings(i do.Injector) apiauth.AuthenticatedHandler {
 				webutil.WriteError(w, r, apperr.ErrDefaultSSHPullUserEmpty)
 				return
 			}
-			if err := settingsService.SetDefaultSSHPullUser(r.Context(), user); err != nil {
+			if err := settingsService.SetDefaultSSHPullUser(r.Context(), authInfo.ActorFromRequest(r), user); err != nil {
 				webutil.WriteError(w, r, err)
 				return
 			}
 		}
 
 		if req.AskToCopyPublicKey.IsPresent() {
-			if err := settingsService.SetAskToCopyPublicKey(r.Context(), req.AskToCopyPublicKey.Unwrap()); err != nil {
+			if err := settingsService.SetAskToCopyPublicKey(r.Context(), authInfo.ActorFromRequest(r), req.AskToCopyPublicKey.Unwrap()); err != nil {
 				webutil.WriteError(w, r, err)
 				return
 			}
 		}
 
 		if req.SMTPSettings.IsPresent() {
-			if err := settingsService.SetSMTPSettings(r.Context(), req.SMTPSettings.Unwrap()); err != nil {
+			if err := settingsService.SetSMTPSettings(r.Context(), authInfo.ActorFromRequest(r), req.SMTPSettings.Unwrap()); err != nil {
 				webutil.WriteError(w, r, err)
 				return
 			}
@@ -75,7 +75,7 @@ func UpdateSettings(i do.Injector) apiauth.AuthenticatedHandler {
 
 		if req.EmailFrequency.IsPresent() {
 			freq := strings.TrimSpace(req.EmailFrequency.Unwrap())
-			if err := settingsService.SetEmailFrequency(r.Context(), freq); err != nil {
+			if err := settingsService.SetEmailFrequency(r.Context(), authInfo.ActorFromRequest(r), freq); err != nil {
 				webutil.WriteError(w, r, err)
 				return
 			}

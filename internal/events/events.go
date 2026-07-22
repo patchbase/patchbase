@@ -5,6 +5,7 @@ package events
 const (
 	topicHosts      = "hosts"
 	topicAdvisories = "advisories"
+	topicAuditLog   = "audit_log"
 )
 
 func hostTopic(hostID string) string {
@@ -29,4 +30,8 @@ func NewHostDeletedEvent(hostID string) Event {
 
 func NewAdvisoriesUpdatedEvent() Event {
 	return Event{Topic: topicAdvisories, Type: "updated", Data: nil}
+}
+
+func NewAuditLogCreatedEvent() Event {
+	return Event{Topic: topicAuditLog, Type: "created", Data: nil}
 }

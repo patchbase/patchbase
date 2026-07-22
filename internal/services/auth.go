@@ -22,10 +22,10 @@ import (
 const accessTokenTTL = 24 * time.Hour
 
 type Auth interface {
-	Login(ctx context.Context, email string, password string) (LoginResult, error)
+	Login(ctx context.Context, email string, password string, ipAddress string, userAgent string) (LoginResult, error)
 	Authenticate(ctx context.Context, token string) (sql.User, error)
 	IssueAccessToken(ctx context.Context, userID string) (string, error)
-	UpdateProfile(ctx context.Context, userID string, input UpdateProfileInput) (UpdateProfileResult, error)
+	UpdateProfile(ctx context.Context, actor ActorRef, userID string, input UpdateProfileInput) (UpdateProfileResult, error)
 }
 
 type LoginResult struct {
@@ -48,6 +48,7 @@ type auth struct {
 	pool         *pgxpool.Pool
 	sql          sql.Querier
 	jwtSecretKey string
+	audit        AuditLogService
 }
 
 func NewAuth(i do.Injector) (Auth, error) {
@@ -63,21 +64,29 @@ func NewAuth(i do.Injector) (Auth, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get sql.Querier: %w", err)
 	}
+	audit, err := do.Invoke[AuditLogService](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get audit log service: %w", err)
+	}
 
 	return &auth{
 		pool:         pool,
 		sql:          queries,
 		jwtSecretKey: cfg.API.JWTSecretKey,
+		audit:        audit,
 	}, nil
 }
 
-func (a *auth) Login(ctx context.Context, email string, password string) (LoginResult, error) {
-	user, err := sql.Required(a.sql.GetUserByEmail(ctx, normalizeEmail(email)))(apperr.ErrInvalidCredentials)
+func (a *auth) Login(ctx context.Context, email string, password string, ipAddress string, userAgent string) (LoginResult, error) {
+	normalized := normalizeEmail(email)
+	user, err := sql.Required(a.sql.GetUserByEmail(ctx, normalized))(apperr.ErrInvalidCredentials)
 	if err != nil {
+		a.recordLoginFailure(ctx, normalized, email, ipAddress, userAgent)
 		return LoginResult{}, fmt.Errorf("get user by email: %w", err)
 	}
 
 	if !utils.CheckPasswordHash(password, user.PasswordHash) {
+		a.recordLoginFailure(ctx, normalized, email, ipAddress, userAgent)
 		return LoginResult{}, apperr.ErrInvalidCredentials
 	}
 
@@ -86,10 +95,38 @@ func (a *auth) Login(ctx context.Context, email string, password string) (LoginR
 		return LoginResult{}, fmt.Errorf("sign access token: %w", err)
 	}
 
+	a.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    user.ID,
+		ActorEmail: user.Email,
+		Action:     auditLogActionLoginSuccess,
+		TargetType: auditLogTargetTypeUser,
+		TargetID:   user.ID,
+		IPAddress:  ipAddress,
+		UserAgent:  userAgent,
+	})
+
 	return LoginResult{
 		AccessToken: token,
 		User:        user,
 	}, nil
+}
+
+func (a *auth) recordLoginFailure(ctx context.Context, normalizedEmail string, rawEmail string, ipAddress string, userAgent string) {
+	email := normalizedEmail
+	if email == "" {
+		email = rawEmail
+	}
+	a.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorEmail: email,
+		Action:     auditLogActionLoginFailure,
+		TargetType: auditLogTargetTypeUser,
+		TargetID:   "",
+		Metadata: map[string]any{
+			"reason": "invalid_credentials",
+		},
+		IPAddress: ipAddress,
+		UserAgent: userAgent,
+	})
 }
 
 func (a *auth) Authenticate(ctx context.Context, token string) (sql.User, error) {
@@ -124,7 +161,7 @@ func (a *auth) IssueAccessToken(ctx context.Context, userID string) (string, err
 	return token, nil
 }
 
-func (a *auth) UpdateProfile(ctx context.Context, userID string, input UpdateProfileInput) (UpdateProfileResult, error) {
+func (a *auth) UpdateProfile(ctx context.Context, actor ActorRef, userID string, input UpdateProfileInput) (UpdateProfileResult, error) {
 	tx, err := a.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
 		return UpdateProfileResult{}, fmt.Errorf("begin profile update transaction: %w", err)
@@ -137,6 +174,7 @@ func (a *auth) UpdateProfile(ctx context.Context, userID string, input UpdatePro
 		return UpdateProfileResult{}, fmt.Errorf("get user by id: %w", err)
 	}
 
+	emailChanged := false
 	if input.Email.IsPresent() {
 		email := normalizeEmail(input.Email.Unwrap())
 		if email == "" {
@@ -153,6 +191,7 @@ func (a *auth) UpdateProfile(ctx context.Context, userID string, input UpdatePro
 			}
 			return UpdateProfileResult{}, fmt.Errorf("update user email: %w", err)
 		}
+		emailChanged = true
 	}
 
 	passwordChanged := false
@@ -185,6 +224,26 @@ func (a *auth) UpdateProfile(ctx context.Context, userID string, input UpdatePro
 
 	if err := tx.Commit(ctx); err != nil {
 		return UpdateProfileResult{}, fmt.Errorf("commit profile update transaction: %w", err)
+	}
+
+	if emailChanged || passwordChanged {
+		metadata := map[string]any{}
+		if emailChanged {
+			metadata["email_changed"] = true
+		}
+		if passwordChanged {
+			metadata["password_changed"] = true
+		}
+		a.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+			ActorID:    user.ID,
+			ActorEmail: user.Email,
+			Action:     auditLogActionProfileUpdate,
+			TargetType: auditLogTargetTypeUser,
+			TargetID:   user.ID,
+			Metadata:   metadata,
+			IPAddress:  actor.IP,
+			UserAgent:  actor.UserAgent,
+		})
 	}
 
 	return UpdateProfileResult{

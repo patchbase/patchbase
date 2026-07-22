@@ -38,25 +38,45 @@ func (SSHPullArgs) Kind() string {
 }
 
 type Hosts interface {
-	CreateRegistrationToken(ctx context.Context, userID string, name string) (CreatedRegistrationToken, error)
+	CreateRegistrationToken(ctx context.Context, actor ActorRef, userID string, name string) (CreatedRegistrationToken, error)
 	ListRegistrationTokens(ctx context.Context) ([]RegistrationTokenInfo, error)
-	RevokeRegistrationToken(ctx context.Context, tokenID string) error
+	RevokeRegistrationToken(ctx context.Context, actor ActorRef, tokenID string) error
 	RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHostRequest) (*agentpb.RegisterHostResponse, error)
 	IngestAgentSnapshot(ctx context.Context, hostAccessToken string, payload *agentpb.AgentSnapshot) (*agentpb.SyncResponse, error)
 	ListPendingHosts(ctx context.Context) ([]HostInfo, error)
-	ApproveHost(ctx context.Context, hostID string) (HostInfo, error)
-	DeleteHost(ctx context.Context, hostID string) error
-	CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (CreateSSHHostResult, error)
-	OnboardSSHHost(ctx context.Context, hostID string) error
+	ApproveHost(ctx context.Context, actor ActorRef, hostID string) (HostInfo, error)
+	DeleteHost(ctx context.Context, actor ActorRef, hostID string) error
+	CreateSSHHost(ctx context.Context, actor ActorRef, input CreateSSHHostInput) (CreateSSHHostResult, error)
+	OnboardSSHHost(ctx context.Context, actor ActorRef, hostID string) error
 	ListHosts(ctx context.Context) ([]HostInfo, error)
 	GetHost(ctx context.Context, hostID string) (HostInfo, error)
 	GetLatestSnapshot(ctx context.Context, hostID string) (HostSnapshotInfo, error)
-	RunSSHPull(ctx context.Context, hostID string) error
+	RunSSHPull(ctx context.Context, actor ActorRef, hostID string) error
 	ListSSHPullJobs(ctx context.Context, hostID string) ([]HostSSHPullJobInfo, error)
 	GetDashboardOverview(ctx context.Context) (DashboardOverview, error)
-	CreateManualHost(ctx context.Context, displayName string, hostname string) (HostInfo, error)
-	IngestManualReport(ctx context.Context, hostID string, reportContent []byte) error
+	CreateManualHost(ctx context.Context, actor ActorRef, displayName string, hostname string) (HostInfo, error)
+	IngestManualReport(ctx context.Context, actor ActorRef, hostID string, reportContent []byte) error
 	GetCollectorScript(osFamily string) (string, error)
+}
+
+// ActorRef describes the user performing an audited action. The user ID and
+// email are kept separate so anonymous flows (e.g. failed logins) can supply
+// only the email without a known user ID.
+type ActorRef struct {
+	UserID    string
+	Email     string
+	IP        string
+	UserAgent string
+}
+
+// SystemActorRef returns an ActorRef representing a system-triggered action
+// (e.g. an SSH pull scheduled by the periodic job runner). The system actor
+// is recorded with a synthetic email so audit consumers can filter on it.
+func SystemActorRef() ActorRef {
+	return ActorRef{ // nolint: exhaustruct
+		UserID: "system",
+		Email:  "system@patchbase.local",
+	}
 }
 
 type DashboardOverview struct {
@@ -91,6 +111,7 @@ type hosts struct {
 	matcher            matchers.Matcher
 	settingsService    Settings
 	broker             events.Broker
+	audit              AuditLogService
 }
 
 type CreatedRegistrationToken struct {
@@ -226,6 +247,11 @@ func NewHosts(i do.Injector) (Hosts, error) {
 		return nil, fmt.Errorf("failed to get events broker: %w", err)
 	}
 
+	audit, err := do.Invoke[AuditLogService](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get audit log service: %w", err)
+	}
+
 	return &hosts{
 		pool:               pool,
 		sql:                queries,
@@ -238,10 +264,11 @@ func NewHosts(i do.Injector) (Hosts, error) {
 		matcher:            matcher,
 		settingsService:    settingsService,
 		broker:             broker,
+		audit:              audit,
 	}, nil
 }
 
-func (s *hosts) CreateRegistrationToken(ctx context.Context, userID string, name string) (CreatedRegistrationToken, error) {
+func (s *hosts) CreateRegistrationToken(ctx context.Context, actor ActorRef, userID string, name string) (CreatedRegistrationToken, error) {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" {
 		trimmed = "Registration token"
@@ -256,6 +283,26 @@ func (s *hosts) CreateRegistrationToken(ctx context.Context, userID string, name
 	})
 	if err != nil {
 		return CreatedRegistrationToken{}, fmt.Errorf("insert registration token: %w", err)
+	}
+
+	user, err := s.sql.GetUserByID(ctx, userID)
+	if err != nil {
+		utils.GetLogger(ctx).
+			ErrorContext(ctx, "failed to load user for audit context after registration token creation",
+				"user_id", userID, "token_id", created.ID, "error", err)
+	} else {
+		s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+			ActorID:    user.ID,
+			ActorEmail: user.Email,
+			Action:     auditLogActionTokenCreate,
+			TargetType: auditLogTargetTypeRegistrationToken,
+			TargetID:   created.ID,
+			Metadata: map[string]any{
+				"name": created.Name,
+			},
+			IPAddress: actor.IP,
+			UserAgent: actor.UserAgent,
+		})
 	}
 
 	return CreatedRegistrationToken{
@@ -285,11 +332,25 @@ func (s *hosts) ListRegistrationTokens(ctx context.Context) ([]RegistrationToken
 	return items, nil
 }
 
-func (s *hosts) RevokeRegistrationToken(ctx context.Context, tokenID string) error {
-	_, err := sql.Required(s.sql.RevokeRegistrationToken(ctx, tokenID))(apperr.ErrTokenAlreadyRevoked)
+func (s *hosts) RevokeRegistrationToken(ctx context.Context, actor ActorRef, tokenID string) error {
+	revoked, err := sql.Required(s.sql.RevokeRegistrationToken(ctx, tokenID))(apperr.ErrTokenAlreadyRevoked)
 	if err != nil {
 		return fmt.Errorf("revoke registration token: %w", err)
 	}
+
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionTokenRevoke,
+		TargetType: auditLogTargetTypeRegistrationToken,
+		TargetID:   revoked.ID,
+		Metadata: map[string]any{
+			"name": revoked.Name,
+		},
+		IPAddress: actor.IP,
+		UserAgent: actor.UserAgent,
+	})
+
 	return nil
 }
 
@@ -367,6 +428,30 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 	}
 
 	s.broker.Publish(events.NewHostsUpdatedEvent())
+
+	if tokenOwner, ownerErr := s.sql.GetUserByID(ctx, regToken.CreatedByUserID); ownerErr == nil {
+		s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+			ActorID:    tokenOwner.ID,
+			ActorEmail: tokenOwner.Email,
+			Action:     auditLogActionHostCreate,
+			TargetType: auditLogTargetTypeHost,
+			TargetID:   host.ID,
+			Metadata: map[string]any{
+				"onboarding_mode":       "agent",
+				"display_name":          hostname,
+				"machine_id":            machineID,
+				"os_name":               osName,
+				"os_version":            osVersion,
+				"architecture":          architecture,
+				"registration_token_id": regToken.ID,
+			},
+			IPAddress: ipAddress,
+		})
+	} else {
+		utils.GetLogger(ctx).
+			ErrorContext(ctx, "failed to load token owner for agent host audit",
+				"host_id", host.ID, "token_id", regToken.ID, "user_id", regToken.CreatedByUserID, "error", ownerErr)
+	}
 
 	return &agentpb.RegisterHostResponse{
 		HostId:          host.ID,
@@ -562,16 +647,24 @@ func (s *hosts) ListPendingHosts(ctx context.Context) ([]HostInfo, error) {
 	return items, nil
 }
 
-func (s *hosts) ApproveHost(ctx context.Context, hostID string) (HostInfo, error) {
+func (s *hosts) ApproveHost(ctx context.Context, actor ActorRef, hostID string) (HostInfo, error) {
 	host, err := sql.Required(s.sql.ApproveHostByID(ctx, hostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return HostInfo{}, fmt.Errorf("approve host: %w", err)
 	}
 	s.broker.Publish(events.NewHostsUpdatedEvent())
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionHostApprove,
+		TargetType: auditLogTargetTypeHost,
+		TargetID:   host.ID,
+		IPAddress:  actor.IP,
+	})
 	return mapHost(host, nil), nil
 }
 
-func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (CreateSSHHostResult, error) {
+func (s *hosts) CreateSSHHost(ctx context.Context, actor ActorRef, input CreateSSHHostInput) (CreateSSHHostResult, error) {
 	hostname := strings.TrimSpace(input.Hostname)
 	sshUser := strings.TrimSpace(input.SSHUser)
 	if hostname == "" {
@@ -644,6 +737,22 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 	}
 
 	s.broker.Publish(events.NewHostsUpdatedEvent())
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionHostCreate,
+		TargetType: auditLogTargetTypeHost,
+		TargetID:   host.Host.ID,
+		Metadata: map[string]any{
+			"onboarding_mode": "ssh",
+			"display_name":    input.DisplayName,
+			"hostname":        hostname,
+			"ssh_user":        sshUser,
+			"unique_key_pair": input.UniqueKeyPair,
+		},
+		IPAddress: actor.IP,
+		UserAgent: actor.UserAgent,
+	})
 
 	return CreateSSHHostResult{
 		HostID:          host.Host.ID,
@@ -655,7 +764,7 @@ func (s *hosts) CreateSSHHost(ctx context.Context, input CreateSSHHostInput) (Cr
 	}, nil
 }
 
-func (s *hosts) OnboardSSHHost(ctx context.Context, hostID string) error {
+func (s *hosts) OnboardSSHHost(ctx context.Context, actor ActorRef, hostID string) error {
 	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return fmt.Errorf("get host: %w", err)
@@ -685,6 +794,15 @@ func (s *hosts) OnboardSSHHost(ctx context.Context, hostID string) error {
 	if err := s.periodicJobManager.AddSSHPullJob(ctx, hostID, frequency, true); err != nil {
 		return fmt.Errorf("add periodic job: %w", err)
 	}
+
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionSSHOnboard,
+		TargetType: auditLogTargetTypeHost,
+		TargetID:   hostID,
+		IPAddress:  actor.IP,
+	})
 
 	return nil
 }
@@ -726,7 +844,7 @@ func (s *hosts) GetLatestSnapshot(ctx context.Context, hostID string) (HostSnaps
 	}, nil
 }
 
-func (s *hosts) DeleteHost(ctx context.Context, hostID string) error {
+func (s *hosts) DeleteHost(ctx context.Context, actor ActorRef, hostID string) error {
 	trimmedHostID := strings.TrimSpace(hostID)
 	if trimmedHostID == "" {
 		return apperr.ErrHostNotFound
@@ -772,6 +890,14 @@ func (s *hosts) DeleteHost(ctx context.Context, hostID string) error {
 
 	s.broker.Publish(events.NewHostsUpdatedEvent())
 	s.broker.Publish(events.NewHostDeletedEvent(trimmedHostID))
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionHostDelete,
+		TargetType: auditLogTargetTypeHost,
+		TargetID:   trimmedHostID,
+		IPAddress:  actor.IP,
+	})
 
 	return nil
 }
@@ -967,7 +1093,7 @@ func mapHostWithStateByID(row sql.GetHostWithStateByIDRow) HostInfo {
 	}
 }
 
-func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
+func (s *hosts) RunSSHPull(ctx context.Context, actor ActorRef, hostID string) error {
 	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return fmt.Errorf("get host: %w", err)
@@ -979,6 +1105,32 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 	}
 
 	jobID := id.New("spjob")
+	trigger := "scheduled"
+	if actor.UserID != "system" {
+		trigger = "manual"
+	}
+	auditStatus := "success"
+	auditErrMsg := ""
+	auditMetadata := map[string]any{
+		"trigger": trigger,
+		"job_id":  jobID,
+	}
+	defer func() {
+		auditMetadata["status"] = auditStatus
+		if auditErrMsg != "" {
+			auditMetadata["error"] = auditErrMsg
+		}
+		s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+			ActorID:    actor.UserID,
+			ActorEmail: actor.Email,
+			Action:     auditLogActionSSHPull,
+			TargetType: auditLogTargetTypeHost,
+			TargetID:   hostID,
+			Metadata:   auditMetadata,
+			IPAddress:  actor.IP,
+			UserAgent:  actor.UserAgent,
+		})
+	}()
 	_, err = s.sql.InsertHostSSHPullJob(ctx, sql.InsertHostSSHPullJobParams{
 		ID:        jobID,
 		HostID:    hostID,
@@ -1130,7 +1282,9 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 		var err error
 		decryptedKey, err = s.crypto.Decrypt(key)
 		if err != nil {
-			upErr := updateJobResult("failed", fmt.Sprintf("decrypt private key: %v", err), nil)
+			auditStatus = "failed"
+			auditErrMsg = fmt.Sprintf("decrypt private key: %v", err)
+			upErr := updateJobResult("failed", auditErrMsg, nil)
 			if upErr != nil {
 				return fmt.Errorf("decrypt private key failed (%v), and job update failed: %w", err, upErr)
 			}
@@ -1139,7 +1293,9 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 	} else {
 		globalKey, err := s.settingsService.GetGlobalSSHKeyPair(ctx)
 		if err != nil {
-			upErr := updateJobResult("failed", fmt.Sprintf("get global ssh key: %v", err), nil)
+			auditStatus = "failed"
+			auditErrMsg = fmt.Sprintf("get global ssh key: %v", err)
+			upErr := updateJobResult("failed", auditErrMsg, nil)
 			if upErr != nil {
 				return fmt.Errorf("get global ssh key failed (%v), and job update failed: %w", err, upErr)
 			}
@@ -1150,7 +1306,9 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 
 	sshHost := strings.TrimSpace(cfg.PullHostname)
 	if sshHost == "" {
-		upErr := updateJobResult("failed", "ssh pull hostname is empty", nil)
+		auditStatus = "failed"
+		auditErrMsg = "ssh pull hostname is empty"
+		upErr := updateJobResult("failed", auditErrMsg, nil)
 		if upErr != nil {
 			return fmt.Errorf("empty ssh pull hostname, and job update failed: %w", upErr)
 		}
@@ -1164,7 +1322,9 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 
 	res, err := s.sshRunner.Collect(ctx, decryptedKey, cfg.PullSshUser.UnwrapOr(""), address)
 	if err != nil {
-		upErr := updateJobResult("failed", err.Error(), nil)
+		auditStatus = "failed"
+		auditErrMsg = err.Error()
+		upErr := updateJobResult("failed", auditErrMsg, nil)
 		if upErr != nil {
 			return fmt.Errorf("collect snapshot failed (%v), and job update failed: %w", err, upErr)
 		}
@@ -1172,6 +1332,8 @@ func (s *hosts) RunSSHPull(ctx context.Context, hostID string) error {
 	}
 
 	if err := updateJobResult("success", "", &res); err != nil {
+		auditStatus = "failed"
+		auditErrMsg = err.Error()
 		return fmt.Errorf("update job results for success: %w", err)
 	}
 
@@ -1250,7 +1412,7 @@ func (s *hosts) GetCollectorScript(osFamily string) (string, error) {
 	return collectorScriptForOSFamily(osFamily)
 }
 
-func (s *hosts) CreateManualHost(ctx context.Context, displayName string, hostname string) (HostInfo, error) {
+func (s *hosts) CreateManualHost(ctx context.Context, actor ActorRef, displayName string, hostname string) (HostInfo, error) {
 	displayName = strings.TrimSpace(displayName)
 	hostname = strings.TrimSpace(hostname)
 	if displayName == "" && hostname == "" {
@@ -1282,11 +1444,25 @@ func (s *hosts) CreateManualHost(ctx context.Context, displayName string, hostna
 	}
 
 	s.broker.Publish(events.NewHostsUpdatedEvent())
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionHostCreate,
+		TargetType: auditLogTargetTypeHost,
+		TargetID:   host.ID,
+		Metadata: map[string]any{
+			"onboarding_mode": "manual",
+			"display_name":    displayName,
+			"hostname":        hostname,
+		},
+		IPAddress: actor.IP,
+		UserAgent: actor.UserAgent,
+	})
 
 	return mapHost(host, nil), nil
 }
 
-func (s *hosts) IngestManualReport(ctx context.Context, hostID string, reportContent []byte) error {
+func (s *hosts) IngestManualReport(ctx context.Context, actor ActorRef, hostID string, reportContent []byte) error {
 	host, err := sql.Required(s.sql.GetHostByID(ctx, hostID))(apperr.ErrHostNotFound)
 	if err != nil {
 		return fmt.Errorf("get host: %w", err)
@@ -1394,6 +1570,18 @@ func (s *hosts) IngestManualReport(ctx context.Context, hostID string, reportCon
 
 	s.broker.Publish(events.NewHostsUpdatedEvent())
 	s.broker.Publish(events.NewHostSnapshotEvent(hostID))
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionManualIngest,
+		TargetType: auditLogTargetTypeHost,
+		TargetID:   hostID,
+		Metadata: map[string]any{
+			"snapshot_id": snapshotID,
+		},
+		IPAddress: actor.IP,
+		UserAgent: actor.UserAgent,
+	})
 
 	return nil
 }

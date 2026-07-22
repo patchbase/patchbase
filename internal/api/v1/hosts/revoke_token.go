@@ -27,7 +27,7 @@ func RevokeToken(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		if err := hosts.RevokeRegistrationToken(r.Context(), tokenID); err != nil {
+		if err := hosts.RevokeRegistrationToken(r.Context(), authInfo.ActorFromRequest(r), tokenID); err != nil {
 			webutil.WriteError(w, r, err)
 			return
 		}

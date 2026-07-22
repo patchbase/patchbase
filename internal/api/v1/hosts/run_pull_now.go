@@ -27,7 +27,7 @@ func RunPullNow(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		if err := hostsService.RunSSHPull(r.Context(), hostID); err != nil {
+		if err := hostsService.RunSSHPull(r.Context(), authInfo.ActorFromRequest(r), hostID); err != nil {
 			webutil.WriteError(w, r, err)
 			return
 		}

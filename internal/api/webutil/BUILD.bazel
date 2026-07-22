@@ -5,6 +5,7 @@ go_library(
     srcs = [
         "client_ip.go",
         "json.go",
+        "parse.go",
         "proto.go",
         "validate.go",
     ],

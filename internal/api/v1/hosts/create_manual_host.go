@@ -46,7 +46,7 @@ func CreateManualHost(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		result, err := hostsService.CreateManualHost(r.Context(), req.DisplayName, req.Hostname)
+		result, err := hostsService.CreateManualHost(r.Context(), authInfo.ActorFromRequest(r), req.DisplayName, req.Hostname)
 		if err != nil {
 			webutil.WriteError(w, r, err)
 			return

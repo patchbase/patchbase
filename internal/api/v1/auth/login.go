@@ -41,7 +41,7 @@ func Login(i do.Injector) http.HandlerFunc {
 			return
 		}
 
-		result, err := authService.Login(r.Context(), req.Email, req.Password)
+		result, err := authService.Login(r.Context(), req.Email, req.Password, webutil.ClientIP(r), r.UserAgent())
 		if err != nil {
 			webutil.WriteError(w, r, err)
 			return

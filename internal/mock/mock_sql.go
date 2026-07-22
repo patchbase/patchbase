@@ -86,6 +86,36 @@ func (mr *MockSQLQuerierMockRecorder) CompleteInitialSetupForUser(ctx, arg any) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteInitialSetupForUser", reflect.TypeOf((*MockSQLQuerier)(nil).CompleteInitialSetupForUser), ctx, arg)
 }
 
+// CountAuditLogs mocks base method.
+func (m *MockSQLQuerier) CountAuditLogs(ctx context.Context) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountAuditLogs", ctx)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountAuditLogs indicates an expected call of CountAuditLogs.
+func (mr *MockSQLQuerierMockRecorder) CountAuditLogs(ctx any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountAuditLogs", reflect.TypeOf((*MockSQLQuerier)(nil).CountAuditLogs), ctx)
+}
+
+// CountAuditLogsFiltered mocks base method.
+func (m *MockSQLQuerier) CountAuditLogsFiltered(ctx context.Context, arg sql.CountAuditLogsFilteredParams) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountAuditLogsFiltered", ctx, arg)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountAuditLogsFiltered indicates an expected call of CountAuditLogsFiltered.
+func (mr *MockSQLQuerierMockRecorder) CountAuditLogsFiltered(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountAuditLogsFiltered", reflect.TypeOf((*MockSQLQuerier)(nil).CountAuditLogsFiltered), ctx, arg)
+}
+
 // CreateAdminUser mocks base method.
 func (m *MockSQLQuerier) CreateAdminUser(ctx context.Context, arg sql.CreateAdminUserParams) (sql.User, error) {
 	m.ctrl.T.Helper()
@@ -566,6 +596,20 @@ func (mr *MockSQLQuerierMockRecorder) InsertAgentHost(ctx, arg any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertAgentHost", reflect.TypeOf((*MockSQLQuerier)(nil).InsertAgentHost), ctx, arg)
 }
 
+// InsertAuditLog mocks base method.
+func (m *MockSQLQuerier) InsertAuditLog(ctx context.Context, arg sql.InsertAuditLogParams) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertAuditLog", ctx, arg)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// InsertAuditLog indicates an expected call of InsertAuditLog.
+func (mr *MockSQLQuerierMockRecorder) InsertAuditLog(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertAuditLog", reflect.TypeOf((*MockSQLQuerier)(nil).InsertAuditLog), ctx, arg)
+}
+
 // InsertDecisionRecord mocks base method.
 func (m *MockSQLQuerier) InsertDecisionRecord(ctx context.Context, arg sql.InsertDecisionRecordParams) error {
 	m.ctrl.T.Helper()
@@ -802,6 +846,36 @@ func (m *MockSQLQuerier) ListApprovedSSHHosts(ctx context.Context) ([]sql.ListAp
 func (mr *MockSQLQuerierMockRecorder) ListApprovedSSHHosts(ctx any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListApprovedSSHHosts", reflect.TypeOf((*MockSQLQuerier)(nil).ListApprovedSSHHosts), ctx)
+}
+
+// ListAuditLogs mocks base method.
+func (m *MockSQLQuerier) ListAuditLogs(ctx context.Context, arg sql.ListAuditLogsParams) ([]sql.AuditLog, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAuditLogs", ctx, arg)
+	ret0, _ := ret[0].([]sql.AuditLog)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAuditLogs indicates an expected call of ListAuditLogs.
+func (mr *MockSQLQuerierMockRecorder) ListAuditLogs(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAuditLogs", reflect.TypeOf((*MockSQLQuerier)(nil).ListAuditLogs), ctx, arg)
+}
+
+// ListAuditLogsFiltered mocks base method.
+func (m *MockSQLQuerier) ListAuditLogsFiltered(ctx context.Context, arg sql.ListAuditLogsFilteredParams) ([]sql.AuditLog, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAuditLogsFiltered", ctx, arg)
+	ret0, _ := ret[0].([]sql.AuditLog)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAuditLogsFiltered indicates an expected call of ListAuditLogsFiltered.
+func (mr *MockSQLQuerierMockRecorder) ListAuditLogsFiltered(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAuditLogsFiltered", reflect.TypeOf((*MockSQLQuerier)(nil).ListAuditLogsFiltered), ctx, arg)
 }
 
 // ListDecisionPageRowsBySnapshot mocks base method.

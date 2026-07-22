@@ -53,7 +53,7 @@ func CreateSSHHost(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		result, err := hostsService.CreateSSHHost(r.Context(), services.CreateSSHHostInput{
+		result, err := hostsService.CreateSSHHost(r.Context(), authInfo.ActorFromRequest(r), services.CreateSSHHostInput{
 			DisplayName:      req.DisplayName,
 			Hostname:         req.Hostname,
 			SSHUser:          req.SSHUser,

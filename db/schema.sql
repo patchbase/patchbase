@@ -171,6 +171,25 @@ CREATE TABLE public.affected_package_rules (
 
 
 --
+-- Name: audit_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.audit_log (
+    id text NOT NULL,
+    actor_id text,
+    actor_email text NOT NULL,
+    action text NOT NULL,
+    target_type text NOT NULL,
+    target_id text,
+    metadata jsonb,
+    ip_address text,
+    user_agent text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT audit_log_id_prefix_check CHECK ((id ~~ like_escape('audit\_%'::text, '\'::text)))
+);
+
+
+--
 -- Name: decision_records; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -595,6 +614,14 @@ ALTER TABLE ONLY public.affected_package_rules
 
 
 --
+-- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.audit_log
+    ADD CONSTRAINT audit_log_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: decision_records decision_records_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -744,6 +771,34 @@ ALTER TABLE ONLY public.settings
 
 ALTER TABLE ONLY public.users
     ADD CONSTRAINT users_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: audit_log_action_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_action_idx ON public.audit_log USING btree (action);
+
+
+--
+-- Name: audit_log_actor_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_actor_id_idx ON public.audit_log USING btree (actor_id);
+
+
+--
+-- Name: audit_log_created_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_created_at_idx ON public.audit_log USING btree (created_at DESC);
+
+
+--
+-- Name: audit_log_target_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_target_idx ON public.audit_log USING btree (target_type, target_id);
 
 
 --

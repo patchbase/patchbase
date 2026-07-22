@@ -19,6 +19,25 @@ type AuthInfo struct {
 	User  sql.User
 }
 
+// Actor returns a services.ActorRef derived from the authenticated user so
+// that downstream service calls can record audit events with consistent
+// identity, IP and email fields.
+func (a AuthInfo) Actor() services.ActorRef {
+	return services.ActorRef{ // nolint: exhaustruct
+		UserID: a.User.ID,
+		Email:  a.User.Email,
+	}
+}
+
+// ActorFromRequest enriches the AuthInfo-derived actor with the request's IP address
+// and user agent so audit log entries can trace which client performed the action.
+func (a AuthInfo) ActorFromRequest(r *http.Request) services.ActorRef {
+	actor := a.Actor()
+	actor.IP = webutil.ClientIP(r)
+	actor.UserAgent = r.UserAgent()
+	return actor
+}
+
 type AuthenticatedHandler func(w http.ResponseWriter, r *http.Request, authInfo AuthInfo)
 
 type Auth interface {

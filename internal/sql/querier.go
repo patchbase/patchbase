@@ -14,6 +14,8 @@ type Querier interface {
 	ApproveHostByID(ctx context.Context, id string) (Host, error)
 	ClearHostLastSnapshotByID(ctx context.Context, id string) error
 	CompleteInitialSetupForUser(ctx context.Context, arg CompleteInitialSetupForUserParams) (User, error)
+	CountAuditLogs(ctx context.Context) (int64, error)
+	CountAuditLogsFiltered(ctx context.Context, arg CountAuditLogsFilteredParams) (int64, error)
 	CreateAdminUser(ctx context.Context, arg CreateAdminUserParams) (User, error)
 	CreateSetting(ctx context.Context, arg CreateSettingParams) (Setting, error)
 	CreateSettingIfAbsent(ctx context.Context, arg CreateSettingIfAbsentParams) error
@@ -47,6 +49,7 @@ type Querier interface {
 	InsertAdvisoryScopeIfNotExists(ctx context.Context, arg InsertAdvisoryScopeIfNotExistsParams) error
 	InsertAffectedPackageRule(ctx context.Context, arg InsertAffectedPackageRuleParams) error
 	InsertAgentHost(ctx context.Context, arg InsertAgentHostParams) (Host, error)
+	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertDecisionRecord(ctx context.Context, arg InsertDecisionRecordParams) error
 	InsertFixedPackage(ctx context.Context, arg InsertFixedPackageParams) error
 	InsertHostAccessToken(ctx context.Context, arg InsertHostAccessTokenParams) (HostAccessToken, error)
@@ -63,6 +66,8 @@ type Querier interface {
 	ListAdvisoryScopes(ctx context.Context) ([]AdvisoryScope, error)
 	ListAffectedPackageRulesByStreamIDs(ctx context.Context, dollar_1 []string) ([]AffectedPackageRule, error)
 	ListApprovedSSHHosts(ctx context.Context) ([]ListApprovedSSHHostsRow, error)
+	ListAuditLogs(ctx context.Context, arg ListAuditLogsParams) ([]AuditLog, error)
+	ListAuditLogsFiltered(ctx context.Context, arg ListAuditLogsFilteredParams) ([]AuditLog, error)
 	ListDecisionPageRowsBySnapshot(ctx context.Context, snapshotID string) ([]ListDecisionPageRowsBySnapshotRow, error)
 	ListFixedPackagesByStreamIDs(ctx context.Context, dollar_1 []string) ([]FixedPackage, error)
 	ListHostSSHPullJobsByHostID(ctx context.Context, arg ListHostSSHPullJobsByHostIDParams) ([]HostSshPullJob, error)

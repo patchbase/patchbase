@@ -33,7 +33,7 @@ func CreateToken(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		created, err := hosts.CreateRegistrationToken(r.Context(), authInfo.User.ID, req.Name)
+		created, err := hosts.CreateRegistrationToken(r.Context(), authInfo.ActorFromRequest(r), authInfo.User.ID, req.Name)
 		if err != nil {
 			webutil.WriteError(w, r, err)
 			return

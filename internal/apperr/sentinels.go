@@ -72,4 +72,7 @@ var (
 	ErrForbiddenSendReport         = New(http.StatusForbidden, "forbidden_send_report", "only admins can send report")
 	ErrForbiddenTestEmail          = New(http.StatusForbidden, "forbidden_test_email", "only admins can test email")
 	ErrForbiddenCompleteSetup      = New(http.StatusForbidden, "forbidden_complete_setup", "only admins can complete setup")
+
+	// audit log
+	ErrForbiddenListAuditLog = New(http.StatusForbidden, "forbidden_list_audit_log", "only admins can view the audit log")
 )
