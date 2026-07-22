@@ -67,13 +67,13 @@ type Settings interface {
 	CompleteInitialSetup(ctx context.Context, userID string, input CompleteInitialSetupInput) (sql.User, error)
 	GetGlobalSSHKeyPair(ctx context.Context) (GlobalSSHKeyPair, error)
 	GetDefaultSSHPullUser(ctx context.Context) (string, error)
-	SetDefaultSSHPullUser(ctx context.Context, user string) error
+	SetDefaultSSHPullUser(ctx context.Context, actor ActorRef, user string) error
 	GetAskToCopyPublicKey(ctx context.Context) (bool, error)
-	SetAskToCopyPublicKey(ctx context.Context, ask bool) error
+	SetAskToCopyPublicKey(ctx context.Context, actor ActorRef, ask bool) error
 	GetSMTPSettings(ctx context.Context) (SMTPSettings, error)
-	SetSMTPSettings(ctx context.Context, s SMTPSettings) error
+	SetSMTPSettings(ctx context.Context, actor ActorRef, s SMTPSettings) error
 	GetEmailFrequency(ctx context.Context) (string, error)
-	SetEmailFrequency(ctx context.Context, frequency string) error
+	SetEmailFrequency(ctx context.Context, actor ActorRef, frequency string) error
 }
 
 type settings struct {
@@ -81,6 +81,7 @@ type settings struct {
 	sql    sql.Querier
 	random utils.RandomStringGenerator
 	crypto utils.Crypto
+	audit  AuditLogService
 }
 
 func NewSettings(i do.Injector) (Settings, error) {
@@ -100,11 +101,16 @@ func NewSettings(i do.Injector) (Settings, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get utils.Crypto: %w", err)
 	}
+	audit, err := do.Invoke[AuditLogService](i)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get audit log service: %w", err)
+	}
 	return &settings{
 		pool:   pool,
 		sql:    sql,
 		random: random,
 		crypto: crypto,
+		audit:  audit,
 	}, nil
 }
 
@@ -425,7 +431,7 @@ func (s *settings) GetDefaultSSHPullUser(ctx context.Context) (string, error) {
 	return val, nil
 }
 
-func (s *settings) SetDefaultSSHPullUser(ctx context.Context, user string) error {
+func (s *settings) SetDefaultSSHPullUser(ctx context.Context, actor ActorRef, user string) error {
 	user = strings.TrimSpace(user)
 	if user == "" {
 		return fmt.Errorf("default ssh pull user cannot be empty")
@@ -434,6 +440,18 @@ func (s *settings) SetDefaultSSHPullUser(ctx context.Context, user string) error
 	if err := manager.Set(ctx, user); err != nil {
 		return fmt.Errorf("failed to set default ssh pull user: %w", err)
 	}
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionSettingUpdate,
+		TargetType: auditLogTargetTypeSetting,
+		TargetID:   "default_ssh_pull_user",
+		Metadata: map[string]any{
+			"value": user,
+		},
+		IPAddress: actor.IP,
+		UserAgent: actor.UserAgent,
+	})
 	return nil
 }
 
@@ -449,11 +467,23 @@ func (s *settings) GetAskToCopyPublicKey(ctx context.Context) (bool, error) {
 	return *val, nil
 }
 
-func (s *settings) SetAskToCopyPublicKey(ctx context.Context, ask bool) error {
+func (s *settings) SetAskToCopyPublicKey(ctx context.Context, actor ActorRef, ask bool) error {
 	manager := NewSettingManager[bool]("ask_to_copy_public_key", s.sql)
 	if err := manager.Set(ctx, ask); err != nil {
 		return fmt.Errorf("failed to set ask to copy public key setting: %w", err)
 	}
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionSettingUpdate,
+		TargetType: auditLogTargetTypeSetting,
+		TargetID:   "ask_to_copy_public_key",
+		Metadata: map[string]any{
+			"value": ask,
+		},
+		IPAddress: actor.IP,
+		UserAgent: actor.UserAgent,
+	})
 	return nil
 }
 
@@ -485,14 +515,15 @@ func (s *settings) GetSMTPSettings(ctx context.Context) (SMTPSettings, error) {
 	return res, nil
 }
 
-func (s *settings) SetSMTPSettings(ctx context.Context, s_ SMTPSettings) error {
+func (s *settings) SetSMTPSettings(ctx context.Context, actor ActorRef, s_ SMTPSettings) error {
 	if s_.ReportHour < 0 || s_.ReportHour > 23 {
 		return fmt.Errorf("report hour must be between 0 and 23")
 	}
 	manager := NewSettingManager[smtpSettingsDB]("smtp_settings", s.sql)
 
 	encryptedPass := ""
-	if s_.Password != "" {
+	passwordUpdated := s_.Password != ""
+	if passwordUpdated {
 		enc, err := s.crypto.Encrypt(s_.Password)
 		if err != nil {
 			return fmt.Errorf("failed to encrypt smtp password: %w", err)
@@ -517,6 +548,23 @@ func (s *settings) SetSMTPSettings(ctx context.Context, s_ SMTPSettings) error {
 	if err := manager.Set(ctx, val); err != nil {
 		return fmt.Errorf("failed to set smtp settings: %w", err)
 	}
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionSettingUpdate,
+		TargetType: auditLogTargetTypeSetting,
+		TargetID:   "smtp_settings",
+		Metadata: map[string]any{
+			"host":             s_.Host,
+			"port":             s_.Port,
+			"username":         s_.Username,
+			"from":             s_.From,
+			"report_hour":      s_.ReportHour,
+			"password_updated": passwordUpdated,
+		},
+		IPAddress: actor.IP,
+		UserAgent: actor.UserAgent,
+	})
 	return nil
 }
 
@@ -532,10 +580,22 @@ func (s *settings) GetEmailFrequency(ctx context.Context) (string, error) {
 	return val, nil
 }
 
-func (s *settings) SetEmailFrequency(ctx context.Context, frequency string) error {
+func (s *settings) SetEmailFrequency(ctx context.Context, actor ActorRef, frequency string) error {
 	manager := NewSettingManager[string]("email_frequency", s.sql)
 	if err := manager.Set(ctx, frequency); err != nil {
 		return fmt.Errorf("failed to set email frequency: %w", err)
 	}
+	s.audit.Record(ctx, AuditEvent{ // nolint: exhaustruct
+		ActorID:    actor.UserID,
+		ActorEmail: actor.Email,
+		Action:     auditLogActionSettingUpdate,
+		TargetType: auditLogTargetTypeSetting,
+		TargetID:   "email_frequency",
+		Metadata: map[string]any{
+			"value": frequency,
+		},
+		IPAddress: actor.IP,
+		UserAgent: actor.UserAgent,
+	})
 	return nil
 }

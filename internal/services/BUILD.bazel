@@ -1,9 +1,19 @@
 load("@rules_go//go:def.bzl", "go_library", "go_test")
 
+exports_files(
+    srcs = [
+        "advisory_sync.go",
+        "auth.go",
+        "hosts.go",
+    ],
+    visibility = ["//internal/mock:__subpackages__"],
+)
+
 go_library(
     name = "services",
     srcs = [
         "advisory_sync.go",
+        "audit_log.go",
         "auth.go",
         "hosts.go",
         "periodic.go",

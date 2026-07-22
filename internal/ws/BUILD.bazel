@@ -34,11 +34,12 @@ go_test(
     deps = [
         "//internal/apperr",
         "//internal/events",
+        "//internal/mock",
         "//internal/services",
         "//internal/sql",
-        "//proto/agent",
         "@com_github_coder_websocket//:websocket",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
+        "@org_uber_go_mock//gomock",
     ],
 )

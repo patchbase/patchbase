@@ -122,6 +122,19 @@ type AffectedPackageRule struct {
 	EvidenceTier      string
 }
 
+type AuditLog struct {
+	ID         string
+	ActorID    utils.Option[string]
+	ActorEmail string
+	Action     string
+	TargetType string
+	TargetID   utils.Option[string]
+	Metadata   []byte
+	IpAddress  utils.Option[string]
+	UserAgent  utils.Option[string]
+	CreatedAt  pgtype.Timestamptz
+}
+
 type DecisionRecord struct {
 	ID                 string
 	HostID             string

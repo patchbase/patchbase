@@ -5,6 +5,48 @@ load("@bazel_gomock//rules:gomock.bzl", "gomock")
 load("@rules_go//go:def.bzl", "go_library")
 
 gomock(
+    name = "auth",
+    out = "auth.go",
+    interfaces = [
+        "Auth",
+    ],
+    library = "//internal/services",
+    mock_names = {
+        "Auth": "MockAuth",
+    },
+    package = "mock",
+    source = "//internal/services:auth.go",
+)
+
+gomock(
+    name = "hosts",
+    out = "hosts.go",
+    interfaces = [
+        "Hosts",
+    ],
+    library = "//internal/services",
+    mock_names = {
+        "Hosts": "MockHosts",
+    },
+    package = "mock",
+    source = "//internal/services:hosts.go",
+)
+
+gomock(
+    name = "advisory_sync",
+    out = "advisory_sync.go",
+    interfaces = [
+        "AdvisorySyncService",
+    ],
+    library = "//internal/services",
+    mock_names = {
+        "AdvisorySyncService": "MockAdvisorySyncService",
+    },
+    package = "mock",
+    source = "//internal/services:advisory_sync.go",
+)
+
+gomock(
     name = "mailer",
     out = "mailer.go",
     interfaces = [
@@ -33,6 +75,27 @@ gomock(
 )
 
 write_source_file(
+    name = "write_auth",
+    in_file = "auth",
+    out_file = "mock_auth.go",
+    visibility = ["//visibility:private"],
+)
+
+write_source_file(
+    name = "write_hosts",
+    in_file = "hosts",
+    out_file = "mock_hosts.go",
+    visibility = ["//visibility:private"],
+)
+
+write_source_file(
+    name = "write_advisory_sync",
+    in_file = "advisory_sync",
+    out_file = "mock_advisory_sync.go",
+    visibility = ["//visibility:private"],
+)
+
+write_source_file(
     name = "write_mailer",
     in_file = "mailer",
     out_file = "mock_mailer.go",
@@ -49,6 +112,9 @@ write_source_file(
 go_library(
     name = "mock",
     srcs = [
+        ":advisory_sync",
+        ":auth",
+        ":hosts",
         ":mailer",
         ":sql",
     ],
@@ -59,6 +125,7 @@ go_library(
         "//internal/services",
         "//internal/sql",
         "//internal/utils",
+        "//proto/agent",
         "@com_github_jackc_pgx_v5//pgtype",
         "@org_uber_go_mock//gomock",
     ],

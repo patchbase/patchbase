@@ -4,6 +4,7 @@ go_api_library(
     name = "entities",
     srcs = [
         "advisory.go",
+        "audit_log.go",
         "hosts.go",
         "kernel.go",
         "matcher.go",

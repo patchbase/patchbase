@@ -24,6 +24,7 @@ genrule(
     outs = [
         "gen/advisories.sql.go",
         "gen/advisory_scopes.sql.go",
+        "gen/audit_log.sql.go",
         "gen/db.go",
         "gen/host_access_tokens.sql.go",
         "gen/host_snapshots.sql.go",

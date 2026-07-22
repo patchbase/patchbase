@@ -21,11 +21,11 @@ import (
 
 type mockHosts struct {
 	services.Hosts
-	RunSSHPullFunc func(ctx context.Context, hostID string) error
+	RunSSHPullFunc func(ctx context.Context, actor services.ActorRef, hostID string) error
 }
 
-func (m *mockHosts) RunSSHPull(ctx context.Context, hostID string) error {
-	return m.RunSSHPullFunc(ctx, hostID)
+func (m *mockHosts) RunSSHPull(ctx context.Context, actor services.ActorRef, hostID string) error {
+	return m.RunSSHPullFunc(ctx, actor, hostID)
 }
 
 func newSSHPullWorkerTestInjector() do.Injector {
@@ -43,7 +43,7 @@ func TestSSHPullWorker_Work_HostNotFound(t *testing.T) {
 	injector := newSSHPullWorkerTestInjector()
 
 	mock := &mockHosts{
-		RunSSHPullFunc: func(ctx context.Context, hostID string) error {
+		RunSSHPullFunc: func(ctx context.Context, _ services.ActorRef, hostID string) error {
 			return apperr.ErrHostNotFound
 		},
 	}
@@ -84,7 +84,7 @@ func TestSSHPullWorker_Work_CommandErrorCancel(t *testing.T) {
 	}
 
 	mock := &mockHosts{
-		RunSSHPullFunc: func(ctx context.Context, hostID string) error {
+		RunSSHPullFunc: func(ctx context.Context, _ services.ActorRef, hostID string) error {
 			return sshErr
 		},
 	}
@@ -113,7 +113,7 @@ func TestSSHPullWorker_Work_ConnectionErrorRetry(t *testing.T) {
 	}
 
 	mock := &mockHosts{
-		RunSSHPullFunc: func(ctx context.Context, hostID string) error {
+		RunSSHPullFunc: func(ctx context.Context, _ services.ActorRef, hostID string) error {
 			return sshErr
 		},
 	}

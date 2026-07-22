@@ -51,7 +51,7 @@ func UpdateProfile(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		result, err := authService.UpdateProfile(r.Context(), authInfo.User.ID, services.UpdateProfileInput{
+		result, err := authService.UpdateProfile(r.Context(), authInfo.ActorFromRequest(r), authInfo.User.ID, services.UpdateProfileInput{
 			Email:           req.Email,
 			CurrentPassword: req.CurrentPassword,
 			NewPassword:     req.NewPassword,

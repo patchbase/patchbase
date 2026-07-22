@@ -12,40 +12,24 @@ import (
 	"github.com/samber/do/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/api/auth"
+	"go.patchbase.net/server/internal/apperr"
+	"go.patchbase.net/server/internal/mock"
 	"go.patchbase.net/server/internal/services"
 	"go.patchbase.net/server/internal/sql"
+	"go.uber.org/mock/gomock"
 )
-
-type mockAuthService struct {
-	authenticateFunc func(ctx context.Context, token string) (sql.User, error)
-}
-
-func (m *mockAuthService) Login(ctx context.Context, email string, password string) (services.LoginResult, error) {
-	panic("not implemented")
-}
-
-func (m *mockAuthService) Authenticate(ctx context.Context, token string) (sql.User, error) {
-	if m.authenticateFunc != nil {
-		return m.authenticateFunc(ctx, token)
-	}
-	return sql.User{}, nil
-}
-
-func (m *mockAuthService) IssueAccessToken(ctx context.Context, userID string) (string, error) {
-	panic("not implemented")
-}
-
-func (m *mockAuthService) UpdateProfile(ctx context.Context, userID string, input services.UpdateProfileInput) (services.UpdateProfileResult, error) {
-	panic("not implemented")
-}
 
 func setupMiddleware(t *testing.T, authMock func(ctx context.Context, token string) (sql.User, error), next auth.AuthenticatedHandler) http.HandlerFunc {
 	t.Helper()
+	ctrl := gomock.NewController(t)
+	mockAuth := mock.NewMockAuth(ctrl)
+	if authMock != nil {
+		mockAuth.EXPECT().Authenticate(gomock.Any(), gomock.Any()).DoAndReturn(authMock).AnyTimes()
+	}
+
 	i := do.New()
-	mockService := &mockAuthService{authenticateFunc: authMock}
-	do.ProvideValue[services.Auth](i, mockService)
+	do.ProvideValue[services.Auth](i, mockAuth)
 
 	authMiddleware, err := auth.New(i)
 	require.NoError(t, err)
@@ -105,7 +89,7 @@ func TestAuthMiddleware_MalformedHeaderJustBearer(t *testing.T) {
 
 func TestAuthMiddleware_InvalidToken(t *testing.T) {
 	nextCalled := false
-	authMock := func(ctx context.Context, token string) (sql.User, error) {
+	authMock := func(_ context.Context, _ string) (sql.User, error) {
 		return sql.User{}, apperr.ErrUnauthorized
 	}
 	handler := setupMiddleware(t, authMock, func(w http.ResponseWriter, r *http.Request, authInfo auth.AuthInfo) {
@@ -125,7 +109,7 @@ func TestAuthMiddleware_InvalidToken(t *testing.T) {
 
 func TestAuthMiddleware_InternalError(t *testing.T) {
 	nextCalled := false
-	authMock := func(ctx context.Context, token string) (sql.User, error) {
+	authMock := func(_ context.Context, _ string) (sql.User, error) {
 		return sql.User{}, errors.New("database connection failed")
 	}
 	handler := setupMiddleware(t, authMock, func(w http.ResponseWriter, r *http.Request, authInfo auth.AuthInfo) {
@@ -145,7 +129,7 @@ func TestAuthMiddleware_InternalError(t *testing.T) {
 
 func TestAuthMiddleware_ValidToken(t *testing.T) {
 	nextCalled := false
-	authMock := func(ctx context.Context, token string) (sql.User, error) {
+	authMock := func(_ context.Context, token string) (sql.User, error) {
 		assert.Equal(t, "valid-token", token)
 		return sql.User{ID: "user-123"}, nil
 	}

@@ -28,7 +28,7 @@ func Approve(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		host, err := hostsService.ApproveHost(r.Context(), hostID)
+		host, err := hostsService.ApproveHost(r.Context(), authInfo.ActorFromRequest(r), hostID)
 		if err != nil {
 			webutil.WriteError(w, r, err)
 			return

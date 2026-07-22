@@ -106,13 +106,15 @@ write_file(
     content = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
+        "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"",
+        "OXFMT_BIN=\"$SCRIPT_DIR/format.runfiles/_main/dashboard/node_modules/oxfmt/bin/oxfmt\"",
         "if [ -n \"${BUILD_WORKSPACE_DIRECTORY:-}\" ]; then",
         "  cd \"$BUILD_WORKSPACE_DIRECTORY/dashboard\"",
         "else",
         "  echo \"Error: This target must be run via 'bazel run'\" >&2",
         "  exit 1",
         "fi",
-        "exec node node_modules/oxfmt/bin/oxfmt --write .",
+        "exec node \"$OXFMT_BIN\" --write .",
     ],
 )
 
@@ -166,13 +168,15 @@ write_file(
     content = [
         "#!/usr/bin/env bash",
         "set -euo pipefail",
+        "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"",
+        "OXLINT_BIN=\"$SCRIPT_DIR/lint.runfiles/_main/dashboard/node_modules/oxlint/bin/oxlint\"",
         "if [ -n \"${BUILD_WORKSPACE_DIRECTORY:-}\" ]; then",
         "  cd \"$BUILD_WORKSPACE_DIRECTORY/dashboard\"",
         "else",
         "  echo \"Error: This target must be run via 'bazel run'\" >&2",
         "  exit 1",
         "fi",
-        "exec node node_modules/oxlint/bin/oxlint --fix .",
+        "exec node \"$OXLINT_BIN\" --fix .",
     ],
 )
 

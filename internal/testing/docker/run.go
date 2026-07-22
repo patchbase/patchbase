@@ -387,7 +387,7 @@ func RunSSHPullForContainer(t *testing.T, ctx context.Context, backend *apitesti
 	require.NoError(t, c.WriteAuthorizedKey(ctx, publicKey))
 
 	hostsService := do.MustInvoke[services.Hosts](backend.Injector())
-	require.NoError(t, hostsService.RunSSHPull(ctx, hostID))
+	require.NoError(t, hostsService.RunSSHPull(ctx, services.SystemActorRef(), hostID))
 
 	jobsRec := backend.HTTPGet(
 		fmt.Sprintf("/api/v1/hosts/%s/pull-jobs", hostID),

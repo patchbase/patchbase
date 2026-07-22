@@ -13,6 +13,7 @@ go_library(
         "advisory_references.sql.go",
         "advisory_scopes.sql.go",
         "affected_package_rules.sql.go",
+        "audit_log.sql.go",
         "db.go",
         "decision_records.sql.go",
         "extra.go",

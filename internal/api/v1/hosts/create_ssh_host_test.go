@@ -126,7 +126,7 @@ func TestCreateSSHHostValidation(t *testing.T) {
 
 	// Test global-default SSH user behavior
 	settingsService := do.MustInvoke[services.Settings](backend.Injector())
-	err = settingsService.SetDefaultSSHPullUser(context.Background(), "default-admin")
+	err = settingsService.SetDefaultSSHPullUser(context.Background(), services.SystemActorRef(), "default-admin")
 	require.NoError(t, err)
 
 	recorder := backend.HTTPPost(

@@ -16,119 +16,13 @@ import (
 	"github.com/coder/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	agentpb "go.patchbase.net/proto/agent"
 	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/events"
+	"go.patchbase.net/server/internal/mock"
 	"go.patchbase.net/server/internal/services"
 	"go.patchbase.net/server/internal/sql"
+	"go.uber.org/mock/gomock"
 )
-
-type mockAuth struct {
-	validToken string
-	user       sql.User
-}
-
-func (m *mockAuth) Login(_ context.Context, _ string, _ string) (services.LoginResult, error) {
-	return services.LoginResult{}, nil
-}
-
-func (m *mockAuth) Authenticate(_ context.Context, token string) (sql.User, error) {
-	if token == m.validToken {
-		return m.user, nil
-	}
-	return sql.User{}, apperr.ErrUnauthorized
-}
-
-func (m *mockAuth) IssueAccessToken(_ context.Context, _ string) (string, error) {
-	return "", nil
-}
-
-func (m *mockAuth) UpdateProfile(_ context.Context, _ string, _ services.UpdateProfileInput) (services.UpdateProfileResult, error) {
-	return services.UpdateProfileResult{}, nil
-}
-
-var _ services.Auth = (*mockAuth)(nil)
-
-type mockHosts struct {
-	hosts []services.HostInfo
-}
-
-func (m *mockHosts) ListHosts(_ context.Context) ([]services.HostInfo, error) {
-	return m.hosts, nil
-}
-
-func (m *mockHosts) GetHost(_ context.Context, _ string) (services.HostInfo, error) {
-	return services.HostInfo{}, nil
-}
-
-func (m *mockHosts) GetLatestSnapshot(_ context.Context, _ string) (services.HostSnapshotInfo, error) {
-	return services.HostSnapshotInfo{}, nil
-}
-
-func (m *mockHosts) ListSSHPullJobs(_ context.Context, _ string) ([]services.HostSSHPullJobInfo, error) {
-	return nil, nil
-}
-
-func (m *mockHosts) RunSSHPull(_ context.Context, _ string) error { return nil }
-func (m *mockHosts) CreateRegistrationToken(_ context.Context, _ string, _ string) (services.CreatedRegistrationToken, error) {
-	return services.CreatedRegistrationToken{}, nil
-}
-func (m *mockHosts) ListRegistrationTokens(_ context.Context) ([]services.RegistrationTokenInfo, error) {
-	return nil, nil
-}
-func (m *mockHosts) RevokeRegistrationToken(_ context.Context, _ string) error { return nil }
-func (m *mockHosts) RegisterAgentHost(_ context.Context, _ *agentpb.RegisterHostRequest) (*agentpb.RegisterHostResponse, error) {
-	return nil, nil
-}
-func (m *mockHosts) IngestAgentSnapshot(_ context.Context, _ string, _ *agentpb.AgentSnapshot) (*agentpb.SyncResponse, error) {
-	return nil, nil
-}
-func (m *mockHosts) ListPendingHosts(_ context.Context) ([]services.HostInfo, error) {
-	return nil, nil
-}
-func (m *mockHosts) ApproveHost(_ context.Context, _ string) (services.HostInfo, error) {
-	return services.HostInfo{}, nil
-}
-func (m *mockHosts) DeleteHost(_ context.Context, _ string) error { return nil }
-func (m *mockHosts) CreateSSHHost(_ context.Context, _ services.CreateSSHHostInput) (services.CreateSSHHostResult, error) {
-	return services.CreateSSHHostResult{}, nil
-}
-func (m *mockHosts) OnboardSSHHost(_ context.Context, _ string) error { return nil }
-func (m *mockHosts) GetDashboardOverview(_ context.Context) (services.DashboardOverview, error) {
-	return services.DashboardOverview{}, nil
-}
-func (m *mockHosts) CreateManualHost(_ context.Context, _ string, _ string) (services.HostInfo, error) {
-	return services.HostInfo{}, nil
-}
-func (m *mockHosts) IngestManualReport(_ context.Context, _ string, _ []byte) error { return nil }
-func (m *mockHosts) GetCollectorScript(_ string) (string, error) { return "", nil }
-
-var _ services.Hosts = (*mockHosts)(nil)
-
-type mockAdvisories struct {
-	scopes   []services.AdvisoryScopeStatus
-	overview services.AdvisoryOverview
-}
-
-func (m *mockAdvisories) GetScopeStatuses(_ context.Context) ([]services.AdvisoryScopeStatus, error) {
-	return m.scopes, nil
-}
-
-func (m *mockAdvisories) GetOverview(_ context.Context) (services.AdvisoryOverview, error) {
-	return m.overview, nil
-}
-
-func (m *mockAdvisories) SyncScope(_ context.Context, _ string) error                { return nil }
-func (m *mockAdvisories) TriggerManualSync(_ context.Context, _ string) error         { return nil }
-func (m *mockAdvisories) ResolveScopeKey(_ context.Context, _, _, _ string, _ int32, _ string) (string, error) {
-	return "", nil
-}
-func (m *mockAdvisories) RegisterScopeDemand(_ context.Context, _ string) error { return nil }
-func (m *mockAdvisories) GetAdvisory(_ context.Context, _ string) (sql.Advisory, error) {
-	return sql.Advisory{}, nil
-}
-
-var _ services.AdvisorySyncService = (*mockAdvisories)(nil)
 
 // signalingBroker wraps events.Broker and signals a channel after
 // each Subscribe or Update call completes, so tests can synchronize
@@ -165,15 +59,53 @@ func (s *signalingBroker) waitForSignal(t *testing.T) {
 	}
 }
 
-func newTestHub(broker events.Broker) *localHub {
+const (
+	testUserID      = "u1"
+	testUserEmail   = "test@example.com"
+	testUserName    = "Test"
+	testHostID      = "h1"
+	testHostName    = "host1"
+	testToken       = "test-token"
+	testScopeKey    = "el9"
+	testTotalAdv    = int64(42)
+	testTotalScopes = int32(1)
+	testSynced      = int32(1)
+)
+
+func newTestHub(t *testing.T, broker events.Broker) *localHub {
+	t.Helper()
+	ctrl := gomock.NewController(t)
+
+	auth := mock.NewMockAuth(ctrl)
+	auth.EXPECT().Authenticate(gomock.Any(), testToken).
+		Return(sql.User{ID: testUserID, Email: testUserEmail, Name: testUserName}, nil).
+		AnyTimes()
+	auth.EXPECT().Authenticate(gomock.Any(), gomock.Not(testToken)).
+		Return(sql.User{}, apperr.ErrUnauthorized).
+		AnyTimes()
+
+	hosts := mock.NewMockHosts(ctrl)
+	hosts.EXPECT().ListHosts(gomock.Any()).
+		Return([]services.HostInfo{{ID: testHostID, DisplayName: testHostName}}, nil).
+		AnyTimes()
+
+	advisories := mock.NewMockAdvisorySyncService(ctrl)
+	advisories.EXPECT().GetScopeStatuses(gomock.Any()).
+		Return([]services.AdvisoryScopeStatus{{ScopeKey: testScopeKey}}, nil).
+		AnyTimes()
+	advisories.EXPECT().GetOverview(gomock.Any()).
+		Return(services.AdvisoryOverview{
+			TotalAdvisories: testTotalAdv,
+			TotalScopes:     testTotalScopes,
+			SyncedScopes:    testSynced,
+		}, nil).
+		AnyTimes()
+
 	return &localHub{
-		broker: broker,
-		auth: &mockAuth{
-			validToken: "test-token",
-			user:       sql.User{ID: "u1", Email: "test@example.com", Name: "Test"},
-		},
-		hosts:      &mockHosts{hosts: []services.HostInfo{{ID: "h1", DisplayName: "host1"}}},
-		advisories: &mockAdvisories{scopes: []services.AdvisoryScopeStatus{{ScopeKey: "el9"}}, overview: services.AdvisoryOverview{TotalAdvisories: 42, TotalScopes: 1, SyncedScopes: 1}},
+		broker:     broker,
+		auth:       auth,
+		hosts:      hosts,
+		advisories: advisories,
 		logger:     slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 }
@@ -188,7 +120,7 @@ func dialAndAuth(t *testing.T, ts *httptest.Server) *websocket.Conn {
 	require.NoError(t, err)
 
 	require.NoError(t, conn.Write(context.Background(), websocket.MessageText,
-		mustJSON(t, clientMessage{Type: "auth", Token: "test-token"})))
+		mustJSON(t, clientMessage{Type: "auth", Token: testToken})))
 
 	msg := readServerMessage(t, conn)
 	require.Equal(t, "auth_ok", msg.Type)
@@ -240,7 +172,7 @@ func mustJSON(t *testing.T, v any) []byte {
 
 func TestHandleWS_RejectsInvalidAuth(t *testing.T) {
 	broker := events.NewBroker()
-	hub := newTestHub(broker)
+	hub := newTestHub(t, broker)
 
 	ts := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
 	defer ts.Close()
@@ -259,7 +191,7 @@ func TestHandleWS_RejectsInvalidAuth(t *testing.T) {
 
 func TestHandleWS_RejectsMissingAuth(t *testing.T) {
 	broker := events.NewBroker()
-	hub := newTestHub(broker)
+	hub := newTestHub(t, broker)
 
 	ts := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
 	defer ts.Close()
@@ -278,7 +210,7 @@ func TestHandleWS_RejectsMissingAuth(t *testing.T) {
 
 func TestHandleWS_DeliversHostsPush(t *testing.T) {
 	broker := newSignalingBroker()
-	hub := newTestHub(broker)
+	hub := newTestHub(t, broker)
 
 	ts := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
 	defer ts.Close()
@@ -293,19 +225,19 @@ func TestHandleWS_DeliversHostsPush(t *testing.T) {
 	assert.Equal(t, "hosts", msg.Type)
 
 	type hostsPayload struct {
-		Type string `json:"type"`
+		Type string           `json:"type"`
 		Data []map[string]any `json:"data"`
 	}
 	var payload hostsPayload
 	require.NoError(t, json.Unmarshal(raw, &payload))
 	require.Len(t, payload.Data, 1)
-	assert.Equal(t, "h1", payload.Data[0]["id"])
-	assert.Equal(t, "host1", payload.Data[0]["display_name"])
+	assert.Equal(t, testHostID, payload.Data[0]["id"])
+	assert.Equal(t, testHostName, payload.Data[0]["display_name"])
 }
 
 func TestHandleWS_DeliversAdvisoriesPush(t *testing.T) {
 	broker := newSignalingBroker()
-	hub := newTestHub(broker)
+	hub := newTestHub(t, broker)
 
 	ts := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
 	defer ts.Close()
@@ -329,51 +261,51 @@ func TestHandleWS_DeliversAdvisoriesPush(t *testing.T) {
 	var payload advisoriesPayload
 	require.NoError(t, json.Unmarshal(raw, &payload))
 	require.Len(t, payload.Data.Scopes, 1)
-	assert.Equal(t, "el9", payload.Data.Scopes[0]["scope_key"])
-	assert.EqualValues(t, 42, payload.Data.Overview["total_advisories"])
-	assert.EqualValues(t, 1, payload.Data.Overview["total_scopes"])
-	assert.EqualValues(t, 1, payload.Data.Overview["synced_scopes"])
+	assert.Equal(t, testScopeKey, payload.Data.Scopes[0]["scope_key"])
+	assert.EqualValues(t, testTotalAdv, payload.Data.Overview["total_advisories"])
+	assert.EqualValues(t, testTotalScopes, payload.Data.Overview["total_scopes"])
+	assert.EqualValues(t, testSynced, payload.Data.Overview["synced_scopes"])
 }
 
 func TestHandleWS_DeliversHostNotification(t *testing.T) {
 	broker := newSignalingBroker()
-	hub := newTestHub(broker)
+	hub := newTestHub(t, broker)
 
 	ts := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
 	defer ts.Close()
 
 	conn := dialAndAuth(t, ts)
 	defer conn.Close(websocket.StatusNormalClosure, "")
-	sendSubscribe(t, conn, broker, "host:h1")
+	sendSubscribe(t, conn, broker, "host:"+testHostID)
 
-	broker.Publish(events.NewHostMatchedEvent("h1"))
+	broker.Publish(events.NewHostMatchedEvent(testHostID))
 
 	msg := readServerMessage(t, conn)
 	assert.Equal(t, "host_updated", msg.Type)
-	assert.Equal(t, "h1", msg.HostID)
+	assert.Equal(t, testHostID, msg.HostID)
 }
 
 func TestHandleWS_DeliversHostDeletedNotification(t *testing.T) {
 	broker := newSignalingBroker()
-	hub := newTestHub(broker)
+	hub := newTestHub(t, broker)
 
 	ts := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
 	defer ts.Close()
 
 	conn := dialAndAuth(t, ts)
 	defer conn.Close(websocket.StatusNormalClosure, "")
-	sendSubscribe(t, conn, broker, "host:h1")
+	sendSubscribe(t, conn, broker, "host:"+testHostID)
 
-	broker.Publish(events.NewHostDeletedEvent("h1"))
+	broker.Publish(events.NewHostDeletedEvent(testHostID))
 
 	msg := readServerMessage(t, conn)
 	assert.Equal(t, "host_deleted", msg.Type)
-	assert.Equal(t, "h1", msg.HostID)
+	assert.Equal(t, testHostID, msg.HostID)
 }
 
 func TestHandleWS_DoesNotDeliverUnsubscribedTopic(t *testing.T) {
 	broker := newSignalingBroker()
-	hub := newTestHub(broker)
+	hub := newTestHub(t, broker)
 
 	ts := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
 	defer ts.Close()
@@ -416,7 +348,7 @@ func TestHandleWS_DoesNotDeliverUnsubscribedTopic(t *testing.T) {
 
 func TestHandleWS_DynamicSubscribeReceivesEvents(t *testing.T) {
 	broker := newSignalingBroker()
-	hub := newTestHub(broker)
+	hub := newTestHub(t, broker)
 
 	ts := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
 	defer ts.Close()
@@ -435,7 +367,7 @@ func TestHandleWS_DynamicSubscribeReceivesEvents(t *testing.T) {
 
 func TestHandleWS_PartialUnsubscribeStopsDelivery(t *testing.T) {
 	broker := newSignalingBroker()
-	hub := newTestHub(broker)
+	hub := newTestHub(t, broker)
 
 	ts := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
 	defer ts.Close()
@@ -478,7 +410,7 @@ func TestHandleWS_PartialUnsubscribeStopsDelivery(t *testing.T) {
 
 func TestHandleWS_UnsubscribeAllStopsDelivery(t *testing.T) {
 	broker := newSignalingBroker()
-	hub := newTestHub(broker)
+	hub := newTestHub(t, broker)
 
 	ts := httptest.NewServer(http.HandlerFunc(hub.HandleWS))
 	defer ts.Close()
@@ -511,8 +443,8 @@ func TestHandleWS_UnsubscribeAllStopsDelivery(t *testing.T) {
 	}
 
 	// Prove connection liveness
-	sendSubscribe(t, conn, broker, "host:h1")
-	broker.Publish(events.NewHostMatchedEvent("h1"))
+	sendSubscribe(t, conn, broker, "host:"+testHostID)
+	broker.Publish(events.NewHostMatchedEvent(testHostID))
 
 	select {
 	case msg := <-msgCh:

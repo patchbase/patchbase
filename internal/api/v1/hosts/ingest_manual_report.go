@@ -43,7 +43,7 @@ func IngestManualReport(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		if err := hostsService.IngestManualReport(r.Context(), hostID, body); err != nil {
+		if err := hostsService.IngestManualReport(r.Context(), authInfo.ActorFromRequest(r), hostID, body); err != nil {
 			webutil.WriteError(w, r, err)
 			return
 		}

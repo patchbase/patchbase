@@ -61,7 +61,7 @@ func (w *SSHPullWorker) Work(ctx context.Context, job *river.Job[services.SSHPul
 
 	w.logger.InfoContext(ctx, "starting ssh pull job", "host_id", job.Args.HostID)
 
-	if err := hostsService.RunSSHPull(ctx, job.Args.HostID); err != nil {
+	if err := hostsService.RunSSHPull(ctx, services.SystemActorRef(), job.Args.HostID); err != nil {
 		w.logger.ErrorContext(ctx, "ssh pull job failed", "host_id", job.Args.HostID, "error", err)
 
 		if errors.Is(err, apperr.ErrHostNotFound) {
