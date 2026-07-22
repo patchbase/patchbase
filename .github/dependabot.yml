@@ -23,6 +23,13 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "build(deps)"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # Docker (for compose.yaml)
   - package-ecosystem: "docker"
