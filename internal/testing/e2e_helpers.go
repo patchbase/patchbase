@@ -89,7 +89,7 @@ func UbuntuE2EExpectation() DistroExpectation {
 		Package: PackageExpectation{
 			Name:    "nginx",
 			Version: "1.24.0",
-			Release: "2ubuntu7.13",
+			Release: "2ubuntu7.15",
 		},
 		Repo: RepoExpectation{
 			BaseURL: "http://archive.ubuntu.com/ubuntu/",

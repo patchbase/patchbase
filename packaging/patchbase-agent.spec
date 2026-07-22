@@ -2,7 +2,7 @@ Name:           patchbase-agent
 Version:        0.1.0
 Release:        1
 Summary:        PatchBase Agent
-License:        Apache-2.0
+License:        AGPL-3.0-only
 Source0:        @@ARCHIVE_PATH@@
 
 %{!?_bindir:%global _bindir /usr/bin}

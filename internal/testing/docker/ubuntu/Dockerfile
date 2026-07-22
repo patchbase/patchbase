@@ -27,8 +27,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 # name when bumping the base image.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      openssh-server=1:9.6p1-3ubuntu13.16 \
-      nginx=1.24.0-2ubuntu7.13 \
+      openssh-server=1:9.6p1-3ubuntu13.18 \
+      nginx=1.24.0-2ubuntu7.15 \
       libssl3t64=3.0.13-0ubuntu3.11 \
       curl \
  && rm -rf /var/lib/apt/lists/*
