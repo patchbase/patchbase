@@ -21,6 +21,7 @@ go_library(
         "files/015_add_ask_to_copy_public_key_setting.sql",
         "files/016_add_host_unique_constraints.sql",
         "files/017_add_audit_log.sql",
+        "files/018_add_registration_token_auto_approve.sql",
     ],
     importpath = "go.patchbase.net/server/internal/migrations",
     visibility = ["//:__subpackages__"],

@@ -408,6 +408,7 @@ CREATE TABLE public.registration_tokens (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     revoked_at timestamp with time zone,
     last_used_at timestamp with time zone,
+    auto_approve boolean DEFAULT false NOT NULL,
     CONSTRAINT registration_tokens_id_prefix_check CHECK ((id ~~ like_escape('rtok\_%'::text, '\'::text)))
 );
 

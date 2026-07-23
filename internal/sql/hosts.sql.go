@@ -366,6 +366,87 @@ func (q *Queries) InsertAgentHost(ctx context.Context, arg InsertAgentHostParams
 	return i, err
 }
 
+const insertAgentHostApproved = `-- name: InsertAgentHostApproved :one
+INSERT INTO hosts (
+    id,
+    onboarding_mode,
+    approval_status,
+    approved_at,
+    display_name,
+    machine_id,
+    hostname,
+    ip_address,
+    os_name,
+    os_version,
+    architecture,
+    status
+)
+VALUES (
+    $1,
+    'agent',
+    'approved',
+    now(),
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    'active'
+)
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+`
+
+type InsertAgentHostApprovedParams struct {
+	ID           string
+	DisplayName  utils.Option[string]
+	MachineID    utils.Option[string]
+	Hostname     utils.Option[string]
+	IpAddress    utils.Option[string]
+	OsName       string
+	OsVersion    string
+	Architecture string
+}
+
+func (q *Queries) InsertAgentHostApproved(ctx context.Context, arg InsertAgentHostApprovedParams) (Host, error) {
+	row := q.db.QueryRow(ctx, insertAgentHostApproved,
+		arg.ID,
+		arg.DisplayName,
+		arg.MachineID,
+		arg.Hostname,
+		arg.IpAddress,
+		arg.OsName,
+		arg.OsVersion,
+		arg.Architecture,
+	)
+	var i Host
+	err := row.Scan(
+		&i.ID,
+		&i.OnboardingMode,
+		&i.ApprovalStatus,
+		&i.ApprovedAt,
+		&i.DisplayName,
+		&i.MachineID,
+		&i.Hostname,
+		&i.IpAddress,
+		&i.OsFamily,
+		&i.OsName,
+		&i.OsMajor,
+		&i.OsVersion,
+		&i.Architecture,
+		&i.Status,
+		&i.LastSeenAt,
+		&i.LastAdvisoryCheckAt,
+		&i.FirstSeenAt,
+		&i.LastSnapshotID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AdvisoryScopeKey,
+	)
+	return i, err
+}
+
 const insertManualHost = `-- name: InsertManualHost :one
 INSERT INTO hosts (
     id,

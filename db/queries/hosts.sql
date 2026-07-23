@@ -30,6 +30,37 @@ VALUES (
 )
 RETURNING *;
 
+-- name: InsertAgentHostApproved :one
+INSERT INTO hosts (
+    id,
+    onboarding_mode,
+    approval_status,
+    approved_at,
+    display_name,
+    machine_id,
+    hostname,
+    ip_address,
+    os_name,
+    os_version,
+    architecture,
+    status
+)
+VALUES (
+    $1,
+    'agent',
+    'approved',
+    now(),
+    $2,
+    $3,
+    $4,
+    $5,
+    $6,
+    $7,
+    $8,
+    'active'
+)
+RETURNING *;
+
 -- name: InsertSSHHost :one
 WITH new_host AS (
     INSERT INTO hosts (

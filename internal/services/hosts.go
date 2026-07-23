@@ -38,7 +38,7 @@ func (SSHPullArgs) Kind() string {
 }
 
 type Hosts interface {
-	CreateRegistrationToken(ctx context.Context, actor ActorRef, userID string, name string) (CreatedRegistrationToken, error)
+	CreateRegistrationToken(ctx context.Context, actor ActorRef, userID string, name string, autoApprove bool) (CreatedRegistrationToken, error)
 	ListRegistrationTokens(ctx context.Context) ([]RegistrationTokenInfo, error)
 	RevokeRegistrationToken(ctx context.Context, actor ActorRef, tokenID string) error
 	RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHostRequest) (*agentpb.RegisterHostResponse, error)
@@ -123,12 +123,13 @@ type CreatedRegistrationToken struct {
 }
 
 type RegistrationTokenInfo struct {
-	ID         string                  `json:"id"`
-	Name       string                  `json:"name"`
-	CreatedBy  string                  `json:"created_by_user_id"`
-	CreatedAt  time.Time               `json:"created_at"`
-	RevokedAt  utils.Option[time.Time] `json:"revoked_at"`
-	LastUsedAt utils.Option[time.Time] `json:"last_used_at"`
+	ID          string                  `json:"id"`
+	Name        string                  `json:"name"`
+	CreatedBy   string                  `json:"created_by_user_id"`
+	CreatedAt   time.Time               `json:"created_at"`
+	RevokedAt   utils.Option[time.Time] `json:"revoked_at"`
+	LastUsedAt  utils.Option[time.Time] `json:"last_used_at"`
+	AutoApprove bool                    `json:"auto_approve"`
 }
 
 type SSHPullConfiguration struct {
@@ -285,7 +286,7 @@ func NewHosts(i do.Injector) (Hosts, error) {
 	}, nil
 }
 
-func (s *hosts) CreateRegistrationToken(ctx context.Context, actor ActorRef, userID string, name string) (CreatedRegistrationToken, error) {
+func (s *hosts) CreateRegistrationToken(ctx context.Context, actor ActorRef, userID string, name string, autoApprove bool) (CreatedRegistrationToken, error) {
 	trimmed := strings.TrimSpace(name)
 	if trimmed == "" {
 		trimmed = "Registration token"
@@ -297,6 +298,7 @@ func (s *hosts) CreateRegistrationToken(ctx context.Context, actor ActorRef, use
 		Name:            trimmed,
 		TokenHash:       utils.SHA256(plain),
 		CreatedByUserID: userID,
+		AutoApprove:     autoApprove,
 	})
 	if err != nil {
 		return CreatedRegistrationToken{}, fmt.Errorf("insert registration token: %w", err)
@@ -315,7 +317,8 @@ func (s *hosts) CreateRegistrationToken(ctx context.Context, actor ActorRef, use
 			TargetType: auditLogTargetTypeRegistrationToken,
 			TargetID:   created.ID,
 			Metadata: map[string]any{
-				"name": created.Name,
+				"name":         created.Name,
+				"auto_approve": created.AutoApprove,
 			},
 			IPAddress: actor.IP,
 			UserAgent: actor.UserAgent,
@@ -338,12 +341,13 @@ func (s *hosts) ListRegistrationTokens(ctx context.Context) ([]RegistrationToken
 	items := make([]RegistrationTokenInfo, 0, len(rows))
 	for _, row := range rows {
 		items = append(items, RegistrationTokenInfo{
-			ID:         row.ID,
-			Name:       row.Name,
-			CreatedBy:  row.CreatedByUserID,
-			CreatedAt:  row.CreatedAt.Time.UTC(),
-			RevokedAt:  sql.NewTimeOption(row.RevokedAt),
-			LastUsedAt: sql.NewTimeOption(row.LastUsedAt),
+			ID:          row.ID,
+			Name:        row.Name,
+			CreatedBy:   row.CreatedByUserID,
+			CreatedAt:   row.CreatedAt.Time.UTC(),
+			RevokedAt:   sql.NewTimeOption(row.RevokedAt),
+			LastUsedAt:  sql.NewTimeOption(row.LastUsedAt),
+			AutoApprove: row.AutoApprove,
 		})
 	}
 	return items, nil
@@ -400,7 +404,7 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 	}
 	displayName := utils.NonZeroOption(hostname)
 
-	host, err := queries.InsertAgentHost(ctx, sql.InsertAgentHostParams{
+	insertParams := sql.InsertAgentHostParams{
 		ID:           id.New("h"),
 		DisplayName:  displayName,
 		MachineID:    utils.NonZeroOption(machineID),
@@ -409,7 +413,14 @@ func (s *hosts) RegisterAgentHost(ctx context.Context, input *agentpb.RegisterHo
 		OsName:       osName,
 		OsVersion:    osVersion,
 		Architecture: architecture,
-	})
+	}
+
+	var host sql.Host
+	if regToken.AutoApprove {
+		host, err = queries.InsertAgentHostApproved(ctx, sql.InsertAgentHostApprovedParams(insertParams))
+	} else {
+		host, err = queries.InsertAgentHost(ctx, insertParams)
+	}
 	if err != nil {
 		if sql.IsUniqueViolation(err, "hosts_display_name_unique_idx") {
 			return nil, apperr.ErrDuplicateHostDisplayName

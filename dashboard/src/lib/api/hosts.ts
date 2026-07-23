@@ -16,6 +16,7 @@ export interface RegistrationTokenInfo {
   created_at: string;
   revoked_at: string | null;
   last_used_at: string | null;
+  auto_approve: boolean;
 }
 
 export interface CreatedRegistrationToken {
@@ -90,11 +91,14 @@ export async function listRegistrationTokens(): Promise<RegistrationTokenInfo[]>
   return authenticatedRequest("/api/v1/hosts/tokens");
 }
 
-export async function createRegistrationToken(name: string): Promise<CreatedRegistrationToken> {
+export async function createRegistrationToken(
+  name: string,
+  autoApprove: boolean,
+): Promise<CreatedRegistrationToken> {
   return authenticatedRequest("/api/v1/hosts/tokens", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, auto_approve: autoApprove }),
   });
 }
 

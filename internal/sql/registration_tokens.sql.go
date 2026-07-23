@@ -10,7 +10,7 @@ import (
 )
 
 const getActiveRegistrationTokenByHash = `-- name: GetActiveRegistrationTokenByHash :one
-SELECT id, name, token_hash, created_by_user_id, created_at, revoked_at, last_used_at
+SELECT id, name, token_hash, created_by_user_id, created_at, revoked_at, last_used_at, auto_approve
 FROM registration_tokens
 WHERE token_hash = $1
   AND revoked_at IS NULL
@@ -28,6 +28,7 @@ func (q *Queries) GetActiveRegistrationTokenByHash(ctx context.Context, tokenHas
 		&i.CreatedAt,
 		&i.RevokedAt,
 		&i.LastUsedAt,
+		&i.AutoApprove,
 	)
 	return i, err
 }
@@ -37,15 +38,17 @@ INSERT INTO registration_tokens (
     id,
     name,
     token_hash,
-    created_by_user_id
+    created_by_user_id,
+    auto_approve
 )
 VALUES (
     $1,
     $2,
     $3,
-    $4
+    $4,
+    $5
 )
-RETURNING id, name, token_hash, created_by_user_id, created_at, revoked_at, last_used_at
+RETURNING id, name, token_hash, created_by_user_id, created_at, revoked_at, last_used_at, auto_approve
 `
 
 type InsertRegistrationTokenParams struct {
@@ -53,6 +56,7 @@ type InsertRegistrationTokenParams struct {
 	Name            string
 	TokenHash       string
 	CreatedByUserID string
+	AutoApprove     bool
 }
 
 func (q *Queries) InsertRegistrationToken(ctx context.Context, arg InsertRegistrationTokenParams) (RegistrationToken, error) {
@@ -61,6 +65,7 @@ func (q *Queries) InsertRegistrationToken(ctx context.Context, arg InsertRegistr
 		arg.Name,
 		arg.TokenHash,
 		arg.CreatedByUserID,
+		arg.AutoApprove,
 	)
 	var i RegistrationToken
 	err := row.Scan(
@@ -71,12 +76,13 @@ func (q *Queries) InsertRegistrationToken(ctx context.Context, arg InsertRegistr
 		&i.CreatedAt,
 		&i.RevokedAt,
 		&i.LastUsedAt,
+		&i.AutoApprove,
 	)
 	return i, err
 }
 
 const listRegistrationTokens = `-- name: ListRegistrationTokens :many
-SELECT id, name, token_hash, created_by_user_id, created_at, revoked_at, last_used_at
+SELECT id, name, token_hash, created_by_user_id, created_at, revoked_at, last_used_at, auto_approve
 FROM registration_tokens
 ORDER BY created_at DESC, id DESC
 `
@@ -98,6 +104,7 @@ func (q *Queries) ListRegistrationTokens(ctx context.Context) ([]RegistrationTok
 			&i.CreatedAt,
 			&i.RevokedAt,
 			&i.LastUsedAt,
+			&i.AutoApprove,
 		); err != nil {
 			return nil, err
 		}
@@ -114,7 +121,7 @@ UPDATE registration_tokens
 SET revoked_at = now()
 WHERE id = $1
   AND revoked_at IS NULL
-RETURNING id, name, token_hash, created_by_user_id, created_at, revoked_at, last_used_at
+RETURNING id, name, token_hash, created_by_user_id, created_at, revoked_at, last_used_at, auto_approve
 `
 
 func (q *Queries) RevokeRegistrationToken(ctx context.Context, id string) (RegistrationToken, error) {
@@ -128,6 +135,7 @@ func (q *Queries) RevokeRegistrationToken(ctx context.Context, id string) (Regis
 		&i.CreatedAt,
 		&i.RevokedAt,
 		&i.LastUsedAt,
+		&i.AutoApprove,
 	)
 	return i, err
 }

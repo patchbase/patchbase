@@ -281,6 +281,7 @@ type RegistrationToken struct {
 	CreatedAt       pgtype.Timestamptz
 	RevokedAt       pgtype.Timestamptz
 	LastUsedAt      pgtype.Timestamptz
+	AutoApprove     bool
 }
 
 type RiverClient struct {

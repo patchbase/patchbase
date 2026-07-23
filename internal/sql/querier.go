@@ -49,6 +49,7 @@ type Querier interface {
 	InsertAdvisoryScopeIfNotExists(ctx context.Context, arg InsertAdvisoryScopeIfNotExistsParams) error
 	InsertAffectedPackageRule(ctx context.Context, arg InsertAffectedPackageRuleParams) error
 	InsertAgentHost(ctx context.Context, arg InsertAgentHostParams) (Host, error)
+	InsertAgentHostApproved(ctx context.Context, arg InsertAgentHostApprovedParams) (Host, error)
 	InsertAuditLog(ctx context.Context, arg InsertAuditLogParams) error
 	InsertDecisionRecord(ctx context.Context, arg InsertDecisionRecordParams) error
 	InsertFixedPackage(ctx context.Context, arg InsertFixedPackageParams) error

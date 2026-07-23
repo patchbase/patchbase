@@ -3,13 +3,15 @@ INSERT INTO registration_tokens (
     id,
     name,
     token_hash,
-    created_by_user_id
+    created_by_user_id,
+    auto_approve
 )
 VALUES (
     $1,
     $2,
     $3,
-    $4
+    $4,
+    $5
 )
 RETURNING *;
 
