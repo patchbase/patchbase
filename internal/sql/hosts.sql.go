@@ -400,7 +400,7 @@ VALUES (
     $8,
     'active'
 )
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
 `
 
 type InsertAgentHostApprovedParams struct {
@@ -448,6 +448,7 @@ func (q *Queries) InsertAgentHostApproved(ctx context.Context, arg InsertAgentHo
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AdvisoryScopeKey,
+		&i.Notes,
 	)
 	return i, err
 }

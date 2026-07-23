@@ -330,6 +330,9 @@
 {#snippet pageActions()}
 	{#if host}
 		<div style="display:flex;align-items:center;gap:8px">
+			{#if isAdmin && !host.notes}
+				<button class="btn btn-secondary btn-sm" type="button" onclick={openNotesModal}>Add notes</button>
+			{/if}
 			<ApproveHostButton
 				{host}
 				class="btn btn-secondary btn-sm"
@@ -399,22 +402,6 @@
 				<div class="detail-row"><span class="label">Last Advisory Check</span><span class="value">{formatTime(host.last_advisory_check_at)}</span></div>
 			</div>
 
-			<div class="detail-card">
-				<div class="notes-card-header">
-					<h3>Notes</h3>
-					{#if isAdmin && host.notes}
-						<button class="btn btn-secondary btn-sm" type="button" onclick={openNotesModal}>Edit</button>
-					{/if}
-				</div>
-				{#if host.notes}
-					<pre class="host-notes">{host.notes}</pre>
-				{:else if isAdmin}
-					<button class="btn btn-secondary btn-sm" type="button" onclick={openNotesModal}>Add notes</button>
-				{:else}
-					<p class="notes-empty">No notes.</p>
-				{/if}
-			</div>
-
 			{#if snapshot}
 				<div class="detail-card">
 					<h3>Security Posture</h3>
@@ -425,6 +412,18 @@
 					<div class="detail-row"><span class="label">Needs Reboot</span><span class="value">{host.needs_reboot}</span></div>
 					<div class="detail-row"><span class="label">Needs Restart</span><span class="value">{host.needs_restart}</span></div>
 					<div class="detail-row"><span class="label">No Fix</span><span class="value">{host.no_fix}</span></div>
+				</div>
+			{/if}
+
+			{#if host.notes}
+				<div class="detail-card full-width">
+					<div class="notes-card-header">
+						<h3>Notes</h3>
+						{#if isAdmin}
+							<button class="btn btn-secondary btn-sm" type="button" onclick={openNotesModal}>Edit</button>
+						{/if}
+					</div>
+					<pre class="host-notes">{host.notes}</pre>
 				</div>
 			{/if}
 		</div>
