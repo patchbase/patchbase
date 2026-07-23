@@ -1173,6 +1173,21 @@ func (mr *MockSQLQuerierMockRecorder) UpdateHostFromSnapshot(ctx, arg any) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostFromSnapshot", reflect.TypeOf((*MockSQLQuerier)(nil).UpdateHostFromSnapshot), ctx, arg)
 }
 
+// UpdateHostNotesByID mocks base method.
+func (m *MockSQLQuerier) UpdateHostNotesByID(ctx context.Context, arg sql.UpdateHostNotesByIDParams) (sql.Host, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateHostNotesByID", ctx, arg)
+	ret0, _ := ret[0].(sql.Host)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateHostNotesByID indicates an expected call of UpdateHostNotesByID.
+func (mr *MockSQLQuerierMockRecorder) UpdateHostNotesByID(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostNotesByID", reflect.TypeOf((*MockSQLQuerier)(nil).UpdateHostNotesByID), ctx, arg)
+}
+
 // UpdateHostSSHPullJob mocks base method.
 func (m *MockSQLQuerier) UpdateHostSSHPullJob(ctx context.Context, arg sql.UpdateHostSSHPullJobParams) (sql.HostSshPullJob, error) {
 	m.ctrl.T.Helper()

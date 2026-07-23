@@ -371,6 +371,7 @@ CREATE TABLE public.hosts (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     advisory_scope_key text,
+    notes text,
     CONSTRAINT hosts_approval_status_check CHECK ((approval_status = ANY (ARRAY['waiting_approval'::text, 'approved'::text, 'rejected'::text]))),
     CONSTRAINT hosts_id_prefix_check CHECK ((id ~~ like_escape('h\_%'::text, '\'::text))),
     CONSTRAINT hosts_onboarding_mode_check CHECK ((onboarding_mode = ANY (ARRAY['agent'::text, 'ssh'::text, 'manual'::text])))

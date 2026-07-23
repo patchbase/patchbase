@@ -36,6 +36,10 @@ func (b *Backend) HTTPPostBytes(path string, body []byte, opts ...HTTPRequestOpt
 	return b.doHTTPRequest(http.MethodPost, path, bytes.NewReader(body), opts...)
 }
 
+func (b *Backend) HTTPPut(path string, body string, opts ...HTTPRequestOption) *httptest.ResponseRecorder {
+	return b.doHTTPRequest(http.MethodPut, path, strings.NewReader(body), opts...)
+}
+
 func (b *Backend) HTTPPatch(path string, body string, opts ...HTTPRequestOption) *httptest.ResponseRecorder {
 	return b.doHTTPRequest(http.MethodPatch, path, strings.NewReader(body), opts...)
 }

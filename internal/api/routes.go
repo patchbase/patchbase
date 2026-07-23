@@ -36,6 +36,7 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 		return nil, fmt.Errorf("failed to resolve ws hub: %w", err)
 	}
 	bodyCap := MaxBodyBytesMiddleware(cfg.API.MaxRequestBodyBytes)
+	notesBodyCap := MaxBodyBytesMiddleware(128 * 1024)
 	dashboardHandler, err := newDashboardHandler()
 	if err != nil {
 		return nil, fmt.Errorf("failed to create dashboard handler: %w", err)
@@ -74,6 +75,7 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 	mux.HandleFunc("POST /api/v1/hosts/{hostID}/report", bodyCap(auth.Required(hostsv1.IngestManualReport(i))))
 	mux.HandleFunc("DELETE /api/v1/hosts/{hostID}", auth.Required(hostsv1.DeleteHost(i)))
 	mux.HandleFunc("PATCH /api/v1/hosts/{hostID}", auth.Required(hostsv1.UpdateHost(i)))
+	mux.HandleFunc("PUT /api/v1/hosts/{hostID}/notes", notesBodyCap(auth.Required(hostsv1.UpdateHostNotes(i))))
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}", auth.Required(hostsv1.GetHost(i)))
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}/snapshot", auth.Required(hostsv1.GetLatestSnapshot(i)))
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}/pull-jobs", auth.Required(hostsv1.ListPullJobs(i)))

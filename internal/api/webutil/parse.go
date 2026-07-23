@@ -56,7 +56,7 @@ func ParseInt32Opt(raw string, fieldName string) (utils.Option[int32], error) {
 	if v > int(^uint32(0)>>1) {
 		return utils.None[int32](), fmt.Errorf("%s must not be greater than %d", fieldName, int(^uint32(0)>>1))
 	}
-	return utils.Some(int32(v)), nil
+	return utils.Some(int32(v)), nil // nolint: gosec
 }
 
 // ParseTimestamp accepts RFC3339 / RFC3339Nano and bare date (YYYY-MM-DD)

@@ -18,7 +18,7 @@ SET
     approval_status = 'approved',
     approved_at = now()
 WHERE id = $1
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
 `
 
 func (q *Queries) ApproveHostByID(ctx context.Context, id string) (Host, error) {
@@ -46,6 +46,7 @@ func (q *Queries) ApproveHostByID(ctx context.Context, id string) (Host, error) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AdvisoryScopeKey,
+		&i.Notes,
 	)
 	return i, err
 }
@@ -64,7 +65,7 @@ func (q *Queries) ClearHostLastSnapshotByID(ctx context.Context, id string) erro
 const deleteHostByID = `-- name: DeleteHostByID :one
 DELETE FROM hosts
 WHERE id = $1
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
 `
 
 func (q *Queries) DeleteHostByID(ctx context.Context, id string) (Host, error) {
@@ -92,6 +93,7 @@ func (q *Queries) DeleteHostByID(ctx context.Context, id string) (Host, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AdvisoryScopeKey,
+		&i.Notes,
 	)
 	return i, err
 }
@@ -130,7 +132,7 @@ func (q *Queries) GetDashboardOverview(ctx context.Context) (GetDashboardOvervie
 }
 
 const getHostByID = `-- name: GetHostByID :one
-SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
 FROM hosts
 WHERE id = $1
 `
@@ -160,13 +162,14 @@ func (q *Queries) GetHostByID(ctx context.Context, id string) (Host, error) {
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AdvisoryScopeKey,
+		&i.Notes,
 	)
 	return i, err
 }
 
 const getHostWithStateByID = `-- name: GetHostWithStateByID :one
 SELECT
-    h.id, h.onboarding_mode, h.approval_status, h.approved_at, h.display_name, h.machine_id, h.hostname, h.ip_address, h.os_family, h.os_name, h.os_major, h.os_version, h.architecture, h.status, h.last_seen_at, h.last_advisory_check_at, h.first_seen_at, h.last_snapshot_id, h.created_at, h.updated_at, h.advisory_scope_key,
+    h.id, h.onboarding_mode, h.approval_status, h.approved_at, h.display_name, h.machine_id, h.hostname, h.ip_address, h.os_family, h.os_name, h.os_major, h.os_version, h.architecture, h.status, h.last_seen_at, h.last_advisory_check_at, h.first_seen_at, h.last_snapshot_id, h.created_at, h.updated_at, h.advisory_scope_key, h.notes,
     hp.pull_last_run_at,
     hp.pull_last_run_status,
     hp.pull_last_run_error,
@@ -240,6 +243,7 @@ func (q *Queries) GetHostWithStateByID(ctx context.Context, id string) (GetHostW
 		&i.Host.CreatedAt,
 		&i.Host.UpdatedAt,
 		&i.Host.AdvisoryScopeKey,
+		&i.Host.Notes,
 		&i.PullLastRunAt,
 		&i.PullLastRunStatus,
 		&i.PullLastRunError,
@@ -314,7 +318,7 @@ VALUES (
     $8,
     'active'
 )
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
 `
 
 type InsertAgentHostParams struct {
@@ -362,6 +366,7 @@ func (q *Queries) InsertAgentHost(ctx context.Context, arg InsertAgentHostParams
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AdvisoryScopeKey,
+		&i.Notes,
 	)
 	return i, err
 }
@@ -466,7 +471,7 @@ VALUES (
     $3,
     'active'
 )
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
 `
 
 type InsertManualHostParams struct {
@@ -500,6 +505,7 @@ func (q *Queries) InsertManualHost(ctx context.Context, arg InsertManualHostPara
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AdvisoryScopeKey,
+		&i.Notes,
 	)
 	return i, err
 }
@@ -526,7 +532,7 @@ WITH new_host AS (
         $4,
         'active'
     )
-    RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+    RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
 ),
 new_ssh_pull AS (
     INSERT INTO host_ssh_pull (
@@ -548,7 +554,7 @@ new_ssh_pull AS (
     RETURNING host_id, pull_ssh_user, pull_frequency_minutes, pull_public_key, pull_private_key, pull_last_run_at, pull_last_run_status, pull_last_run_error, onboarded, pull_hostname
 )
 SELECT
-    hosts.id, hosts.onboarding_mode, hosts.approval_status, hosts.approved_at, hosts.display_name, hosts.machine_id, hosts.hostname, hosts.ip_address, hosts.os_family, hosts.os_name, hosts.os_major, hosts.os_version, hosts.architecture, hosts.status, hosts.last_seen_at, hosts.last_advisory_check_at, hosts.first_seen_at, hosts.last_snapshot_id, hosts.created_at, hosts.updated_at, hosts.advisory_scope_key,
+    hosts.id, hosts.onboarding_mode, hosts.approval_status, hosts.approved_at, hosts.display_name, hosts.machine_id, hosts.hostname, hosts.ip_address, hosts.os_family, hosts.os_name, hosts.os_major, hosts.os_version, hosts.architecture, hosts.status, hosts.last_seen_at, hosts.last_advisory_check_at, hosts.first_seen_at, hosts.last_snapshot_id, hosts.created_at, hosts.updated_at, hosts.advisory_scope_key, hosts.notes,
     nsp.pull_ssh_user,
     nsp.pull_hostname,
     nsp.pull_frequency_minutes,
@@ -618,6 +624,7 @@ func (q *Queries) InsertSSHHost(ctx context.Context, arg InsertSSHHostParams) (I
 		&i.Host.CreatedAt,
 		&i.Host.UpdatedAt,
 		&i.Host.AdvisoryScopeKey,
+		&i.Host.Notes,
 		&i.PullSshUser,
 		&i.PullHostname,
 		&i.PullFrequencyMinutes,
@@ -665,7 +672,7 @@ func (q *Queries) ListApprovedSSHHosts(ctx context.Context) ([]ListApprovedSSHHo
 }
 
 const listHostsByAdvisoryScopeKey = `-- name: ListHostsByAdvisoryScopeKey :many
-SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key FROM hosts
+SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes FROM hosts
 WHERE advisory_scope_key = $1
 `
 
@@ -700,6 +707,7 @@ func (q *Queries) ListHostsByAdvisoryScopeKey(ctx context.Context, advisoryScope
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AdvisoryScopeKey,
+			&i.Notes,
 		); err != nil {
 			return nil, err
 		}
@@ -713,7 +721,7 @@ func (q *Queries) ListHostsByAdvisoryScopeKey(ctx context.Context, advisoryScope
 
 const listHostsWithState = `-- name: ListHostsWithState :many
 SELECT
-    h.id, h.onboarding_mode, h.approval_status, h.approved_at, h.display_name, h.machine_id, h.hostname, h.ip_address, h.os_family, h.os_name, h.os_major, h.os_version, h.architecture, h.status, h.last_seen_at, h.last_advisory_check_at, h.first_seen_at, h.last_snapshot_id, h.created_at, h.updated_at, h.advisory_scope_key,
+    h.id, h.onboarding_mode, h.approval_status, h.approved_at, h.display_name, h.machine_id, h.hostname, h.ip_address, h.os_family, h.os_name, h.os_major, h.os_version, h.architecture, h.status, h.last_seen_at, h.last_advisory_check_at, h.first_seen_at, h.last_snapshot_id, h.created_at, h.updated_at, h.advisory_scope_key, h.notes,
     hp.pull_last_run_at,
     hp.pull_last_run_status,
     hp.pull_last_run_error,
@@ -803,6 +811,7 @@ func (q *Queries) ListHostsWithState(ctx context.Context) ([]ListHostsWithStateR
 			&i.Host.CreatedAt,
 			&i.Host.UpdatedAt,
 			&i.Host.AdvisoryScopeKey,
+			&i.Host.Notes,
 			&i.PullLastRunAt,
 			&i.PullLastRunStatus,
 			&i.PullLastRunError,
@@ -834,7 +843,7 @@ func (q *Queries) ListHostsWithState(ctx context.Context) ([]ListHostsWithStateR
 }
 
 const listPendingHosts = `-- name: ListPendingHosts :many
-SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+SELECT id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
 FROM hosts
 WHERE approval_status = 'waiting_approval'
 ORDER BY created_at DESC, id DESC
@@ -871,6 +880,7 @@ func (q *Queries) ListPendingHosts(ctx context.Context) ([]Host, error) {
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.AdvisoryScopeKey,
+			&i.Notes,
 		); err != nil {
 			return nil, err
 		}
@@ -927,7 +937,7 @@ const updateHostDisplayName = `-- name: UpdateHostDisplayName :one
 UPDATE hosts
 SET display_name = $2
 WHERE id = $1
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
 `
 
 type UpdateHostDisplayNameParams struct {
@@ -960,6 +970,7 @@ func (q *Queries) UpdateHostDisplayName(ctx context.Context, arg UpdateHostDispl
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AdvisoryScopeKey,
+		&i.Notes,
 	)
 	return i, err
 }
@@ -980,7 +991,7 @@ SET
     last_advisory_check_at = $10,
     last_snapshot_id = $11
 WHERE id = $1
-RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
 `
 
 type UpdateHostFromSnapshotParams struct {
@@ -1034,6 +1045,49 @@ func (q *Queries) UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFrom
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.AdvisoryScopeKey,
+		&i.Notes,
+	)
+	return i, err
+}
+
+const updateHostNotesByID = `-- name: UpdateHostNotesByID :one
+UPDATE hosts
+SET notes = $2
+WHERE id = $1
+RETURNING id, onboarding_mode, approval_status, approved_at, display_name, machine_id, hostname, ip_address, os_family, os_name, os_major, os_version, architecture, status, last_seen_at, last_advisory_check_at, first_seen_at, last_snapshot_id, created_at, updated_at, advisory_scope_key, notes
+`
+
+type UpdateHostNotesByIDParams struct {
+	ID    string
+	Notes utils.Option[string]
+}
+
+func (q *Queries) UpdateHostNotesByID(ctx context.Context, arg UpdateHostNotesByIDParams) (Host, error) {
+	row := q.db.QueryRow(ctx, updateHostNotesByID, arg.ID, arg.Notes)
+	var i Host
+	err := row.Scan(
+		&i.ID,
+		&i.OnboardingMode,
+		&i.ApprovalStatus,
+		&i.ApprovedAt,
+		&i.DisplayName,
+		&i.MachineID,
+		&i.Hostname,
+		&i.IpAddress,
+		&i.OsFamily,
+		&i.OsName,
+		&i.OsMajor,
+		&i.OsVersion,
+		&i.Architecture,
+		&i.Status,
+		&i.LastSeenAt,
+		&i.LastAdvisoryCheckAt,
+		&i.FirstSeenAt,
+		&i.LastSnapshotID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.AdvisoryScopeKey,
+		&i.Notes,
 	)
 	return i, err
 }

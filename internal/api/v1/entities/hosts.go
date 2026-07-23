@@ -54,6 +54,7 @@ type Host struct {
 	PullLastRunAt       utils.Option[string]               `json:"pull_last_run_at"`
 	PullLastRunStatus   string                             `json:"pull_last_run_status"`
 	PullLastRunError    string                             `json:"pull_last_run_error"`
+	Notes               utils.Option[string]               `json:"notes"`
 	Configuration       utils.Option[SSHPullConfiguration] `json:"configuration,omitempty"`
 	CreatedAt           string                             `json:"created_at"`
 	UpdatedAt           string                             `json:"updated_at"`
@@ -99,6 +100,7 @@ func NewHost(value services.HostInfo) Host {
 		PullLastRunAt:       value.PullLastRunAt.Map(TimeToString),
 		PullLastRunStatus:   value.PullLastRunStatus,
 		PullLastRunError:    value.PullLastRunError,
+		Notes:               value.Notes,
 		Configuration:       value.Configuration.Map(NewSSHPullConfiguration),
 		CreatedAt:           TimeToString(value.CreatedAt),
 		UpdatedAt:           TimeToString(value.UpdatedAt),

@@ -198,6 +198,7 @@ type Host struct {
 	CreatedAt           pgtype.Timestamptz
 	UpdatedAt           pgtype.Timestamptz
 	AdvisoryScopeKey    utils.Option[string]
+	Notes               utils.Option[string]
 }
 
 type HostAccessToken struct {

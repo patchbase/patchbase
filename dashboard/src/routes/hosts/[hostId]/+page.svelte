@@ -16,7 +16,8 @@
 		runPullNow,
 		getHostVulnerablePackages,
 		getHostUpgradablePackages,
-		ingestManualReport
+		ingestManualReport,
+		updateHostNotes
 	} from '$lib/api/hosts.js';
 	import { formatTime, formatDuration } from '$lib/format';
 	import { goto } from '$app/navigation';
@@ -24,6 +25,8 @@
 	import { globalWsClient } from '$lib/ws/client';
 	import { hostsConnected } from '$lib/stores/hosts';
 	import { createPollingFallback } from '$lib/ws/fallback';
+	import { getSession, setSession } from '$lib/auth/session.js';
+	import { getProfile } from '$lib/api/profile.js';
 
 	interface Props {
 		params: { hostId: string };
@@ -52,6 +55,58 @@
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let runningPullNow = $state(false);
 	let selectedPullError = $state<{jobId: string; hostname: string; error: string} | null>(null);
+	let notesModalOpen = $state(false);
+	let notesDraft = $state('');
+	let notesSaving = $state(false);
+	let notesError = $state('');
+	let isAdmin = $state(false);
+
+	async function loadAdminStatus(): Promise<void> {
+		const session = getSession();
+		if (!session) return;
+		if (typeof session.user.isAdmin === 'boolean') {
+			isAdmin = session.user.isAdmin;
+			return;
+		}
+		try {
+			const profile = await getProfile();
+			isAdmin = profile.user.is_admin;
+			setSession({
+				accessToken: profile.access_token,
+				passwordResetNeeded: session.passwordResetNeeded,
+				user: {
+					id: profile.user.id,
+					email: profile.user.email,
+					name: profile.user.name,
+					isAdmin: profile.user.is_admin
+				}
+			});
+		} catch {
+			isAdmin = false;
+		}
+	}
+
+	function openNotesModal(): void {
+		if (!host) return;
+		notesDraft = host.notes || '';
+		notesError = '';
+		notesModalOpen = true;
+	}
+
+	async function saveNotes(event: SubmitEvent): Promise<void> {
+		event.preventDefault();
+		if (!host) return;
+		notesSaving = true;
+		notesError = '';
+		try {
+			host = await updateHostNotes(host.id, notesDraft.trimEnd() || null);
+			notesModalOpen = false;
+		} catch (err) {
+			notesError = err instanceof Error ? err.message : 'Failed to save notes.';
+		} finally {
+			notesSaving = false;
+		}
+	}
 
 	function handleFileChange(event: Event) {
 		const input = event.target as HTMLInputElement;
@@ -236,6 +291,7 @@
 	}
 
 	onMount(() => {
+		void loadAdminStatus();
 		void loadData();
 
 		globalWsClient?.subscribe(["host:" + params.hostId]);
@@ -341,6 +397,22 @@
 				<div class="detail-row"><span class="label">Action</span><span class="value"><StatusBadge status={host.overall_action} /></span></div>
 				<div class="detail-row"><span class="label">Last Seen</span><span class="value">{formatTime(host.last_seen_at)}</span></div>
 				<div class="detail-row"><span class="label">Last Advisory Check</span><span class="value">{formatTime(host.last_advisory_check_at)}</span></div>
+			</div>
+
+			<div class="detail-card">
+				<div class="notes-card-header">
+					<h3>Notes</h3>
+					{#if isAdmin && host.notes}
+						<button class="btn btn-secondary btn-sm" type="button" onclick={openNotesModal}>Edit</button>
+					{/if}
+				</div>
+				{#if host.notes}
+					<pre class="host-notes">{host.notes}</pre>
+				{:else if isAdmin}
+					<button class="btn btn-secondary btn-sm" type="button" onclick={openNotesModal}>Add notes</button>
+				{:else}
+					<p class="notes-empty">No notes.</p>
+				{/if}
 			</div>
 
 			{#if snapshot}
@@ -787,6 +859,17 @@
 		{/if}
 	</AppLayout>
 
+	<Modal open={notesModalOpen} title="Host Notes" onclose={() => { if (!notesSaving) notesModalOpen = false; }} dismissible={!notesSaving}>
+		<form id="host-notes-form" onsubmit={saveNotes}>
+			{#if notesError}<div class="auth-error" style="margin-bottom:16px">{notesError}</div>{/if}
+			<textarea class="form-input notes-textarea" bind:value={notesDraft} rows="12" aria-label="Host notes"></textarea>
+		</form>
+		{#snippet footer()}
+			<button class="btn btn-secondary btn-sm" type="button" onclick={() => { notesModalOpen = false; }} disabled={notesSaving}>Cancel</button>
+			<button class="btn btn-primary btn-sm" type="submit" form="host-notes-form" disabled={notesSaving}>{notesSaving ? 'Saving...' : 'Save'}</button>
+		{/snippet}
+	</Modal>
+
 	<Modal
 		open={selectedPullError !== null}
 		title="Pull Error"
@@ -816,6 +899,37 @@
 {/if}
 
 <style>
+	.notes-card-header {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 12px;
+	}
+
+	.notes-card-header h3 {
+		margin: 0;
+	}
+
+	.host-notes {
+		margin: 16px 0 0;
+		font-family: inherit;
+		font-size: 14px;
+		line-height: 1.6;
+		white-space: pre-wrap;
+		word-break: break-word;
+	}
+
+	.notes-empty {
+		margin: 12px 0 0;
+		color: var(--text-secondary);
+	}
+
+	.notes-textarea {
+		width: 100%;
+		min-height: 240px;
+		resize: vertical;
+	}
+
 	.tabs-container {
 		display: flex;
 		gap: 8px;

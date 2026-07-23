@@ -21,6 +21,7 @@ go_api_library(
         "revoke_token.go",
         "run_pull_now.go",
         "update_host.go",
+        "update_host_notes.go",
         "upgradable.go",
         "vulnerable.go",
     ],
@@ -208,6 +209,16 @@ integration_test(
 integration_test(
     name = "update_host_test",
     srcs = ["update_host_test.go"],
+    deps = [
+        "//internal/testing",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+integration_test(
+    name = "update_host_notes_test",
+    srcs = ["update_host_notes_test.go"],
     deps = [
         "//internal/testing",
         "@com_github_stretchr_testify//assert",

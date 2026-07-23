@@ -22,9 +22,10 @@ type updateProfileRequest struct {
 }
 
 type responseUser struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
+	ID      string `json:"id"`
+	Email   string `json:"email"`
+	Name    string `json:"name"`
+	IsAdmin bool   `json:"is_admin"`
 }
 
 type profileResponse struct {
@@ -80,8 +81,9 @@ func UpdateProfile(i do.Injector) apiauth.AuthenticatedHandler {
 
 func toResponseUser(user sql.User) responseUser {
 	return responseUser{
-		ID:    user.ID,
-		Email: user.Email,
-		Name:  user.Name,
+		ID:      user.ID,
+		Email:   user.Email,
+		Name:    user.Name,
+		IsAdmin: user.IsAdmin,
 	}
 }

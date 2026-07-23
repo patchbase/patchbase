@@ -25,9 +25,10 @@ type loginResponse struct {
 }
 
 type responseUser struct {
-	ID    string `json:"id"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
+	ID      string `json:"id"`
+	Email   string `json:"email"`
+	Name    string `json:"name"`
+	IsAdmin bool   `json:"is_admin"`
 }
 
 func Login(i do.Injector) http.HandlerFunc {
@@ -58,9 +59,10 @@ func Login(i do.Injector) http.HandlerFunc {
 			SetupCompleted:      status.Done,
 			PasswordResetNeeded: result.User.PasswordResetRequired,
 			User: responseUser{
-				ID:    result.User.ID,
-				Email: result.User.Email,
-				Name:  result.User.Name,
+				ID:      result.User.ID,
+				Email:   result.User.Email,
+				Name:    result.User.Name,
+				IsAdmin: result.User.IsAdmin,
 			},
 		})
 	}

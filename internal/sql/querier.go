@@ -88,6 +88,7 @@ type Querier interface {
 	UpdateHostAdvisoryScopeKey(ctx context.Context, arg UpdateHostAdvisoryScopeKeyParams) error
 	UpdateHostDisplayName(ctx context.Context, arg UpdateHostDisplayNameParams) (Host, error)
 	UpdateHostFromSnapshot(ctx context.Context, arg UpdateHostFromSnapshotParams) (Host, error)
+	UpdateHostNotesByID(ctx context.Context, arg UpdateHostNotesByIDParams) (Host, error)
 	UpdateHostSSHPullJob(ctx context.Context, arg UpdateHostSSHPullJobParams) (HostSshPullJob, error)
 	UpdateSSHPullConfig(ctx context.Context, arg UpdateSSHPullConfigParams) (HostSshPull, error)
 	UpdateSSHPullRun(ctx context.Context, arg UpdateSSHPullRunParams) error

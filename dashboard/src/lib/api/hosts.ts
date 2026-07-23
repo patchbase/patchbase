@@ -69,6 +69,14 @@ export async function updateHost(id: string, payload: UpdateHostPayload): Promis
   });
 }
 
+export async function updateHostNotes(id: string, notes: string | null): Promise<Host> {
+  return authenticatedRequest(`/api/v1/hosts/${id}/notes`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ notes }),
+  });
+}
+
 export async function deleteHost(id: string): Promise<void> {
   await authenticatedRequest(`/api/v1/hosts/${id}`, {
     method: "DELETE",
