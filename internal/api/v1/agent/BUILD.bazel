@@ -29,3 +29,18 @@ integration_test(
         "@org_golang_google_protobuf//types/known/timestamppb",
     ],
 )
+
+integration_test(
+    name = "auto_approve_test",
+    size = "small",
+    srcs = ["auto_approve_test.go"],
+    deps = [
+        "//internal/sql",
+        "//internal/testing",
+        "//proto/agent",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+        "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/timestamppb",
+    ],
+)

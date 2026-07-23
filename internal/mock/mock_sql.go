@@ -596,6 +596,21 @@ func (mr *MockSQLQuerierMockRecorder) InsertAgentHost(ctx, arg any) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertAgentHost", reflect.TypeOf((*MockSQLQuerier)(nil).InsertAgentHost), ctx, arg)
 }
 
+// InsertAgentHostApproved mocks base method.
+func (m *MockSQLQuerier) InsertAgentHostApproved(ctx context.Context, arg sql.InsertAgentHostApprovedParams) (sql.Host, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertAgentHostApproved", ctx, arg)
+	ret0, _ := ret[0].(sql.Host)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// InsertAgentHostApproved indicates an expected call of InsertAgentHostApproved.
+func (mr *MockSQLQuerierMockRecorder) InsertAgentHostApproved(ctx, arg any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertAgentHostApproved", reflect.TypeOf((*MockSQLQuerier)(nil).InsertAgentHostApproved), ctx, arg)
+}
+
 // InsertAuditLog mocks base method.
 func (m *MockSQLQuerier) InsertAuditLog(ctx context.Context, arg sql.InsertAuditLogParams) error {
 	m.ctrl.T.Helper()

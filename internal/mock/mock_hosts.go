@@ -73,18 +73,18 @@ func (mr *MockHostsMockRecorder) CreateManualHost(ctx, actor, displayName, hostn
 }
 
 // CreateRegistrationToken mocks base method.
-func (m *MockHosts) CreateRegistrationToken(ctx context.Context, actor services.ActorRef, userID, name string) (services.CreatedRegistrationToken, error) {
+func (m *MockHosts) CreateRegistrationToken(ctx context.Context, actor services.ActorRef, userID, name string, autoApprove bool) (services.CreatedRegistrationToken, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateRegistrationToken", ctx, actor, userID, name)
+	ret := m.ctrl.Call(m, "CreateRegistrationToken", ctx, actor, userID, name, autoApprove)
 	ret0, _ := ret[0].(services.CreatedRegistrationToken)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateRegistrationToken indicates an expected call of CreateRegistrationToken.
-func (mr *MockHostsMockRecorder) CreateRegistrationToken(ctx, actor, userID, name any) *gomock.Call {
+func (mr *MockHostsMockRecorder) CreateRegistrationToken(ctx, actor, userID, name, autoApprove any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRegistrationToken", reflect.TypeOf((*MockHosts)(nil).CreateRegistrationToken), ctx, actor, userID, name)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRegistrationToken", reflect.TypeOf((*MockHosts)(nil).CreateRegistrationToken), ctx, actor, userID, name, autoApprove)
 }
 
 // CreateSSHHost mocks base method.

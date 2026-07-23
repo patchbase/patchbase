@@ -15,7 +15,8 @@ import (
 )
 
 type createTokenRequest struct {
-	Name string `json:"name"`
+	Name        string `json:"name"`
+	AutoApprove bool   `json:"auto_approve"`
 }
 
 func CreateToken(i do.Injector) apiauth.AuthenticatedHandler {
@@ -33,7 +34,7 @@ func CreateToken(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		created, err := hosts.CreateRegistrationToken(r.Context(), authInfo.ActorFromRequest(r), authInfo.User.ID, req.Name)
+		created, err := hosts.CreateRegistrationToken(r.Context(), authInfo.ActorFromRequest(r), authInfo.User.ID, req.Name, req.AutoApprove)
 		if err != nil {
 			webutil.WriteError(w, r, err)
 			return

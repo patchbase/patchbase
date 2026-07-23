@@ -27,6 +27,7 @@
 	let loadingTokens = $state(true);
 	let tokens = $state<RegistrationTokenInfo[]>([]);
 	let tokenName = $state('');
+	let tokenAutoApprove = $state(false);
 	let newestToken = $state('');
 	let currentOrigin = $state('https://your-server');
 	let error = $state('');
@@ -182,9 +183,10 @@
 		error = '';
 		newestToken = '';
 		try {
-			const created = await createRegistrationToken(tokenName);
+			const created = await createRegistrationToken(tokenName, tokenAutoApprove);
 			newestToken = created.token;
 			tokenName = '';
+			tokenAutoApprove = false;
 			await refreshTokens();
 		} catch (err) {
 			error = err instanceof Error ? err.message : 'Failed to create registration token.';
@@ -268,6 +270,10 @@
 			<p class="form-hint" style="margin-bottom: 16px;">To install the agent from an RPM/DEB repository, see the <a href="https://docs.patchbase.net/installation/rpm-packages" target="_blank" rel="noopener noreferrer">RPM</a> or <a href="https://docs.patchbase.net/installation/deb-packages" target="_blank" rel="noopener noreferrer">DEB</a> installation documentation.</p>
 			<div class="token-create-row">
 				<input class="form-input" placeholder="Token name" bind:value={tokenName} />
+				<label class="token-auto-approve">
+					<input type="checkbox" bind:checked={tokenAutoApprove} />
+					Auto-approve hosts that register with this token
+				</label>
 				<button class="btn btn-primary btn-sm token-create-button" type="button" onclick={() => void createToken()}>Create token</button>
 			</div>
 			{#if newestToken}
@@ -286,32 +292,34 @@
 			{:else if tokens.length === 0}
 				<p>No tokens yet.</p>
 			{:else}
-				<table>
-					<thead>
+			<table>
+				<thead>
+					<tr>
+						<th>Name</th>
+						<th>Created</th>
+						<th>Last Used</th>
+						<th>Auto-approve</th>
+						<th>Status</th>
+						<th></th>
+					</tr>
+				</thead>
+				<tbody>
+					{#each tokens as token (token.id)}
 						<tr>
-							<th>Name</th>
-							<th>Created</th>
-							<th>Last Used</th>
-							<th>Status</th>
-							<th></th>
+							<td>{token.name}</td>
+							<td>{token.created_at}</td>
+							<td>{token.last_used_at || '-'}</td>
+							<td>{token.auto_approve ? 'auto-approve' : 'manual'}</td>
+							<td>{token.revoked_at ? 'revoked' : 'active'}</td>
+							<td>
+								{#if !token.revoked_at}
+									<button class="btn btn-secondary btn-sm" type="button" onclick={() => void revokeToken(token.id)}>Revoke</button>
+								{/if}
+							</td>
 						</tr>
-					</thead>
-					<tbody>
-						{#each tokens as token (token.id)}
-							<tr>
-								<td>{token.name}</td>
-								<td>{token.created_at}</td>
-								<td>{token.last_used_at || '-'}</td>
-								<td>{token.revoked_at ? 'revoked' : 'active'}</td>
-								<td>
-									{#if !token.revoked_at}
-										<button class="btn btn-secondary btn-sm" type="button" onclick={() => void revokeToken(token.id)}>Revoke</button>
-									{/if}
-								</td>
-							</tr>
-						{/each}
-					</tbody>
-				</table>
+					{/each}
+				</tbody>
+			</table>
 			{/if}
 		</div>
 
@@ -373,13 +381,13 @@
 
 		<Modal open={showSSHModal} title="SSH Public Key" dismissible={false}>
 			<p class="form-hint" style="margin-bottom:8px;">Add this public key to <span class="mono">~/.ssh/authorized_keys</span> on the target host:</p>
-			
+
 			<div style="position: relative; margin-bottom: 16px;">
 				<pre class="mono" style="padding:12px; padding-right:48px; border:1px solid var(--border); border-radius:8px; overflow:auto; white-space:pre-wrap; word-break:break-all; margin:0;">{sshPublicKey}</pre>
-				<button 
-					type="button" 
-					class="copy-btn" 
-					onclick={copySSHKey} 
+				<button
+					type="button"
+					class="copy-btn"
+					onclick={copySSHKey}
 					title="Copy to clipboard"
 				>
 					{#if sshCopied}
@@ -464,6 +472,19 @@
 </AppLayout>
 
 <style>
+	.token-auto-approve {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		cursor: pointer;
+		user-select: none;
+	}
+	.token-auto-approve input {
+		width: 16px;
+		height: 16px;
+		accent-color: var(--accent);
+		cursor: pointer;
+	}
 	.copy-btn {
 		position: absolute;
 		top: 8px;

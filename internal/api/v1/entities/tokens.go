@@ -14,6 +14,7 @@ type RegistrationToken struct {
 	CreatedAt       string               `json:"created_at"`
 	RevokedAt       utils.Option[string] `json:"revoked_at"`
 	LastUsedAt      utils.Option[string] `json:"last_used_at"`
+	AutoApprove     bool                 `json:"auto_approve"`
 }
 
 type CreatedRegistrationToken struct {
@@ -31,6 +32,7 @@ func NewRegistrationToken(value services.RegistrationTokenInfo) RegistrationToke
 		CreatedAt:       TimeToString(value.CreatedAt),
 		RevokedAt:       value.RevokedAt.Map(TimeToString),
 		LastUsedAt:      value.LastUsedAt.Map(TimeToString),
+		AutoApprove:     value.AutoApprove,
 	}
 }
 
