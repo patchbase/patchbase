@@ -19,6 +19,7 @@
 	import { getSettings } from '$lib/api/settings.js';
 	import type { Host } from '$lib/types';
 	import { getSession } from '$lib/auth/session.js';
+	import { formatTime } from '$lib/format.js';
 
 	type Mode = 'agent' | 'ssh' | 'manual';
 	type ManualCollectorOSFamily = 'apt' | 'rpm';
@@ -272,7 +273,7 @@
 				<input class="form-input" placeholder="Token name" bind:value={tokenName} />
 				<label class="token-auto-approve">
 					<input type="checkbox" bind:checked={tokenAutoApprove} />
-					Auto-approve hosts that register with this token
+					Auto-approve hosts
 				</label>
 				<button class="btn btn-primary btn-sm token-create-button" type="button" onclick={() => void createToken()}>Create token</button>
 			</div>
@@ -307,8 +308,8 @@
 					{#each tokens as token (token.id)}
 						<tr>
 							<td>{token.name}</td>
-							<td>{token.created_at}</td>
-							<td>{token.last_used_at || '-'}</td>
+							<td>{formatTime(token.created_at)}</td>
+							<td>{formatTime(token.last_used_at)}</td>
 							<td>{token.auto_approve ? 'auto-approve' : 'manual'}</td>
 							<td>{token.revoked_at ? 'revoked' : 'active'}</td>
 							<td>
@@ -342,7 +343,7 @@
 							<tr>
 								<td>{host.display_name || host.hostname || host.id}</td>
 								<td>{host.onboarding_mode || '-'}</td>
-								<td>{host.created_at || '-'}</td>
+								<td>{formatTime(host.created_at)}</td>
 								<td><button class="btn btn-primary btn-sm" type="button" onclick={() => void approvePendingHost(host.id)}>Approve</button></td>
 							</tr>
 						{/each}
@@ -475,15 +476,19 @@
 	.token-auto-approve {
 		display: flex;
 		align-items: center;
-		gap: 8px;
+		gap: 6px;
+		font-size: 13px;
+		color: var(--text-secondary);
 		cursor: pointer;
 		user-select: none;
+		white-space: nowrap;
 	}
 	.token-auto-approve input {
-		width: 16px;
-		height: 16px;
+		width: 15px;
+		height: 15px;
 		accent-color: var(--accent);
 		cursor: pointer;
+		flex-shrink: 0;
 	}
 	.copy-btn {
 		position: absolute;
