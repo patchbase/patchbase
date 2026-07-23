@@ -13,6 +13,7 @@ export interface Host {
   onboarding_mode?: string;
   approval_status?: string;
   display_name: string | null;
+  notes: string | null;
   hostname: string;
   ip_address?: string;
   os_family: string;

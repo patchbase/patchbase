@@ -8,6 +8,8 @@ import (
 	"net"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -46,6 +48,7 @@ type Hosts interface {
 	ListPendingHosts(ctx context.Context) ([]HostInfo, error)
 	ApproveHost(ctx context.Context, actor ActorRef, hostID string) (HostInfo, error)
 	UpdateHost(ctx context.Context, actor ActorRef, hostID string, input UpdateHostInput) (HostInfo, error)
+	UpdateHostNotes(ctx context.Context, hostID string, notes utils.Option[string]) (HostInfo, error)
 	DeleteHost(ctx context.Context, actor ActorRef, hostID string) error
 	CreateSSHHost(ctx context.Context, actor ActorRef, input CreateSSHHostInput) (CreateSSHHostResult, error)
 	OnboardSSHHost(ctx context.Context, actor ActorRef, hostID string) error
@@ -169,6 +172,7 @@ type HostInfo struct {
 	PullLastRunAt       utils.Option[time.Time]            `json:"pull_last_run_at"`
 	PullLastRunStatus   string                             `json:"pull_last_run_status"`
 	PullLastRunError    string                             `json:"pull_last_run_error"`
+	Notes               utils.Option[string]               `json:"notes"`
 	Configuration       utils.Option[SSHPullConfiguration] `json:"configuration,omitempty"`
 	CreatedAt           time.Time                          `json:"created_at"`
 	UpdatedAt           time.Time                          `json:"updated_at"`
@@ -802,6 +806,33 @@ func (s *hosts) UpdateHost(ctx context.Context, actor ActorRef, hostID string, i
 	return updated, nil
 }
 
+func (s *hosts) UpdateHostNotes(ctx context.Context, hostID string, notes utils.Option[string]) (HostInfo, error) {
+	normalized := utils.None[string]()
+	if notes.IsPresent() {
+		value := strings.TrimRightFunc(notes.Unwrap(), unicode.IsSpace)
+		if utf8.RuneCountInString(value) > 8192 {
+			return HostInfo{}, apperr.ErrNotesTooLarge
+		}
+		if value != "" {
+			normalized = utils.Some(value)
+		}
+	}
+
+	_, err := sql.Required(s.sql.UpdateHostNotesByID(ctx, sql.UpdateHostNotesByIDParams{
+		ID: hostID, Notes: normalized,
+	}))(apperr.ErrHostNotFound)
+	if err != nil {
+		return HostInfo{}, fmt.Errorf("update host notes: %w", err)
+	}
+
+	updated, err := s.GetHost(ctx, hostID)
+	if err != nil {
+		return HostInfo{}, err
+	}
+	s.broker.Publish(events.NewHostsUpdatedEvent())
+	return updated, nil
+}
+
 func (s *hosts) CreateSSHHost(ctx context.Context, actor ActorRef, input CreateSSHHostInput) (CreateSSHHostResult, error) {
 	frequency := input.FrequencyMinutes
 	if frequency <= 0 {
@@ -1113,6 +1144,7 @@ func mapHost(host sql.Host, state *sql.HostCurrentState) HostInfo {
 		PullLastRunAt:       utils.None[time.Time](),
 		PullLastRunStatus:   "",
 		PullLastRunError:    "",
+		Notes:               host.Notes,
 		Configuration:       utils.None[SSHPullConfiguration](),
 		CreatedAt:           createdAt,
 		UpdatedAt:           updatedAt,
@@ -1165,6 +1197,7 @@ func mapHostWithState(row sql.ListHostsWithStateRow) HostInfo {
 		PullLastRunAt:       sql.NewTimeOption(row.PullLastRunAt),
 		PullLastRunStatus:   row.PullLastRunStatus.UnwrapOr(""),
 		PullLastRunError:    row.PullLastRunError.UnwrapOr(""),
+		Notes:               row.Host.Notes,
 		Configuration:       configuration,
 		CreatedAt:           createdAt,
 		UpdatedAt:           updatedAt,
@@ -1217,6 +1250,7 @@ func mapHostWithStateByID(row sql.GetHostWithStateByIDRow) HostInfo {
 		PullLastRunAt:       sql.NewTimeOption(row.PullLastRunAt),
 		PullLastRunStatus:   row.PullLastRunStatus.UnwrapOr(""),
 		PullLastRunError:    row.PullLastRunError.UnwrapOr(""),
+		Notes:               row.Host.Notes,
 		Configuration:       configuration,
 		CreatedAt:           createdAt,
 		UpdatedAt:           updatedAt,

@@ -55,10 +55,11 @@ func Complete(i do.Injector) apiauth.AuthenticatedHandler {
 			"access_token":          accessToken,
 			"setup_completed":       true,
 			"password_reset_needed": false,
-			"user": map[string]string{
-				"id":    updatedUser.ID,
-				"email": updatedUser.Email,
-				"name":  updatedUser.Name,
+			"user": map[string]any{
+				"id":       updatedUser.ID,
+				"email":    updatedUser.Email,
+				"name":     updatedUser.Name,
+				"is_admin": updatedUser.IsAdmin,
 			},
 		})
 	}

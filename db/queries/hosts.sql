@@ -128,6 +128,12 @@ SET display_name = $2
 WHERE id = $1
 RETURNING *;
 
+-- name: UpdateHostNotesByID :one
+UPDATE hosts
+SET notes = $2
+WHERE id = $1
+RETURNING *;
+
 -- name: UpdateSSHPullConfig :one
 UPDATE host_ssh_pull
 SET

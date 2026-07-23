@@ -16,6 +16,7 @@ var (
 	ErrSnapshotNotFound         = New(http.StatusNotFound, "snapshot_not_found", "snapshot not found")
 	ErrDuplicateHostDisplayName = New(http.StatusConflict, "duplicate_host_display_name", "a host with this display name already exists")
 	ErrDuplicateSSHPullHostname = New(http.StatusConflict, "duplicate_ssh_pull_hostname", "an SSH host with this pull hostname already exists")
+	ErrNotesTooLarge            = New(http.StatusRequestEntityTooLarge, "notes_too_large", "notes cannot exceed 8192 characters")
 
 	// auth
 	ErrInvalidCredentials          = New(http.StatusUnauthorized, "invalid_credentials", "invalid email or password")
@@ -60,6 +61,7 @@ var (
 	// forbidden — per-action messages (preserved from pre-refactor handlers).
 	ErrForbiddenApproveHost        = New(http.StatusForbidden, "forbidden_approve_host", "only admins can approve hosts")
 	ErrForbiddenUpdateHost         = New(http.StatusForbidden, "forbidden_update_host", "only admins can update hosts")
+	ErrForbiddenUpdateHostNotes    = New(http.StatusForbidden, "forbidden_update_host_notes", "only admins can update host notes")
 	ErrForbiddenDeleteHost         = New(http.StatusForbidden, "forbidden_delete_host", "only admins can delete hosts")
 	ErrForbiddenCreateToken        = New(http.StatusForbidden, "forbidden_create_token", "only admins can create registration tokens")
 	ErrForbiddenListPendingHosts   = New(http.StatusForbidden, "forbidden_list_pending_hosts", "only admins can list pending hosts")

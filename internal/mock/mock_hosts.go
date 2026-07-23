@@ -15,6 +15,7 @@ import (
 
 	agent "go.patchbase.net/proto/agent"
 	services "go.patchbase.net/server/internal/services"
+	utils "go.patchbase.net/server/internal/utils"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -335,4 +336,19 @@ func (m *MockHosts) UpdateHost(ctx context.Context, actor services.ActorRef, hos
 func (mr *MockHostsMockRecorder) UpdateHost(ctx, actor, hostID, input any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHost", reflect.TypeOf((*MockHosts)(nil).UpdateHost), ctx, actor, hostID, input)
+}
+
+// UpdateHostNotes mocks base method.
+func (m *MockHosts) UpdateHostNotes(ctx context.Context, hostID string, notes utils.Option[string]) (services.HostInfo, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateHostNotes", ctx, hostID, notes)
+	ret0, _ := ret[0].(services.HostInfo)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateHostNotes indicates an expected call of UpdateHostNotes.
+func (mr *MockHostsMockRecorder) UpdateHostNotes(ctx, hostID, notes any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateHostNotes", reflect.TypeOf((*MockHosts)(nil).UpdateHostNotes), ctx, hostID, notes)
 }

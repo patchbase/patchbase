@@ -9,6 +9,7 @@ export interface DashboardSession {
     id: string;
     email: string;
     name: string;
+    isAdmin: boolean;
   };
 }
 
@@ -44,6 +45,7 @@ export function setSessionFromLogin(result: LoginResponse): DashboardSession {
       id: result.user.id,
       email: result.user.email,
       name: result.user.name,
+      isAdmin: result.user.is_admin,
     },
   };
 
