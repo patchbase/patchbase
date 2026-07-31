@@ -12,9 +12,9 @@
     "@sveltejs/adapter-static": "^3.0.8",
     "@sveltejs/kit": "^2.70.1",
     "@sveltejs/vite-plugin-svelte": "^7.2.0",
-    "oxfmt": "^0.60.0",
-    "oxlint": "^1.75.0",
-    "svelte": "^5.56.7",
+    "oxfmt": "^0.61.0",
+    "oxlint": "^1.76.0",
+    "svelte": "^5.56.8",
     "typescript": "^6.0.2",
     "vite": "^8.1.5"
   },
