@@ -325,7 +325,7 @@
 							<span class="badge badge-blue">{host.available_updates} updates</span>
 						{/if}
 						{#if host.needs_reboot > 0}
-							<span class="badge badge-red">{host.needs_reboot} reboot</span>
+							<span class="badge badge-red">{host.needs_reboot} pending</span>
 						{/if}
 					</div>
 					<div class="host-card-footer">
@@ -489,6 +489,8 @@
 	}
 
 	.host-card {
+		display: flex;
+		flex-direction: column;
 		background: var(--bg-card);
 		backdrop-filter: blur(12px);
 		border: 1px solid var(--border);
@@ -543,6 +545,8 @@
 		flex-wrap: wrap;
 		gap: 6px;
 		margin-bottom: 14px;
+		flex: 1;
+		align-content: flex-start;
 	}
 
 	.host-card-footer {
