@@ -93,6 +93,7 @@ export interface Host {
   pull_last_run_status?: string;
   pull_last_run_error?: string;
   configuration?: SSHPullConfiguration;
+  lifecycle?: LifecycleStatus;
   created_at?: string;
   updated_at: string;
 }

@@ -225,3 +225,14 @@ integration_test(
         "@com_github_stretchr_testify//require",
     ],
 )
+
+integration_test(
+    name = "lifecycle_test",
+    srcs = ["lifecycle_test.go"],
+    deps = [
+        "//internal/testing",
+        "//proto/agent",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

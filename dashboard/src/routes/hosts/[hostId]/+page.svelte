@@ -19,7 +19,6 @@
 		ingestManualReport,
 		updateHostNotes
 	} from '$lib/api/hosts.js';
-	import { listLifecycleHosts } from '$lib/api/lifecycle.js';
 	import { formatTime, formatDuration } from '$lib/format';
 	import { goto } from '$app/navigation';
 	import type { Host, HostKernelPosture, HostSnapshot, HostPullJob, MatcherDecisionGroup, LifecycleStatus } from '$lib/types';
@@ -245,7 +244,7 @@
 			kernelError = '';
 		}
 		try {
-			const [hostData, snapshotData, jobsData, vulnsData, updatesData, kernelData, lifecycleData] = await Promise.all([
+			const [hostData, snapshotData, jobsData, vulnsData, updatesData, kernelData] = await Promise.all([
 				getHost(id),
 				getHostSnapshot(id).catch(() => null),
 				listPullJobs(id).catch(() => [] as HostPullJob[]),
@@ -261,12 +260,9 @@
 					kernelError = err instanceof Error ? err.message : 'Failed to load kernel posture';
 					return null;
 				}),
-				listLifecycleHosts().catch(() => null),
 			]);
 
-			if (lifecycleData) {
-				lifecycleStatus = lifecycleData.find((h) => h.id === id)?.lifecycle ?? null;
-			}
+			lifecycleStatus = hostData.lifecycle ?? null;
 
 			if (JSON.stringify(host) !== JSON.stringify(hostData)) {
 				host = hostData;

@@ -14,6 +14,7 @@ import (
 
 type LifecycleService interface {
 	ListHosts(ctx context.Context) ([]HostLifecycleInfo, error)
+	StatusFor(host HostInfo) lifecycle.Status
 	CatalogSource(ctx context.Context) (lifecycle.CatalogSource, error)
 }
 
@@ -47,14 +48,22 @@ func (s *lifecycleService) ListHosts(ctx context.Context) ([]HostLifecycleInfo, 
 	if err != nil {
 		return nil, fmt.Errorf("list hosts: %w", err)
 	}
-	now := time.Now().UTC()
 
+	now := time.Now().UTC()
 	return utils.Map(hosts, func(host HostInfo) HostLifecycleInfo {
 		return HostLifecycleInfo{
 			HostInfo:  host,
-			Lifecycle: s.catalog.Status(now, 0, lifecycle.NewStatusInput(host.OSName, host.OSVersion, host.OSMajor)),
+			Lifecycle: s.statusAt(now, host),
 		}
 	}), nil
+}
+
+func (s *lifecycleService) StatusFor(host HostInfo) lifecycle.Status {
+	return s.statusAt(time.Now().UTC(), host)
+}
+
+func (s *lifecycleService) statusAt(now time.Time, host HostInfo) lifecycle.Status {
+	return s.catalog.Status(now, 0, lifecycle.NewStatusInput(host.OSName, host.OSVersion, host.OSMajor))
 }
 
 func (s *lifecycleService) CatalogSource(_ context.Context) (lifecycle.CatalogSource, error) {

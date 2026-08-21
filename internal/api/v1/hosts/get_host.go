@@ -15,6 +15,7 @@ import (
 
 func GetHost(i do.Injector) apiauth.AuthenticatedHandler {
 	hostsService := do.MustInvoke[services.Hosts](i)
+	lifecycleService := do.MustInvoke[services.LifecycleService](i)
 
 	return func(w http.ResponseWriter, r *http.Request, _ apiauth.AuthInfo) {
 		hostID := r.PathValue("hostID")
@@ -29,6 +30,8 @@ func GetHost(i do.Injector) apiauth.AuthenticatedHandler {
 			return
 		}
 
-		webutil.WriteJSON(w, http.StatusOK, entities.NewHost(host))
+		status := lifecycleService.StatusFor(host)
+
+		webutil.WriteJSON(w, http.StatusOK, entities.NewHost(host, entities.WithLifecycle(entities.NewLifecycleStatus(status))))
 	}
 }
