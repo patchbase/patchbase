@@ -48,6 +48,7 @@ func New(ctx context.Context, cfg config.Config) do.Injector {
 	do.Provide[mailer.Mailer](injector, mailer.NewMailer)
 	do.Provide[services.AdvisorySyncService](injector, services.NewAdvisorySync)
 	do.Provide[services.AuditLogService](injector, services.NewAuditLog)
+	do.Provide[services.LifecycleService](injector, services.NewLifecycleService)
 	do.Provide[matchers.Matcher](injector, matchers.NewMatcher)
 
 	// api

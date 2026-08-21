@@ -56,6 +56,7 @@ type Host struct {
 	PullLastRunError    string                             `json:"pull_last_run_error"`
 	Notes               utils.Option[string]               `json:"notes"`
 	Configuration       utils.Option[SSHPullConfiguration] `json:"configuration,omitempty"`
+	Lifecycle           utils.Option[LifecycleStatus]      `json:"lifecycle,omitempty"`
 	CreatedAt           string                             `json:"created_at"`
 	UpdatedAt           string                             `json:"updated_at"`
 }
@@ -70,8 +71,8 @@ type HostSnapshot struct {
 	HasProcessData     bool                 `json:"has_process_data"`
 }
 
-func NewHost(value services.HostInfo) Host {
-	return Host{
+func NewHost(value services.HostInfo, opts ...HostOption) Host {
+	host := Host{ // nolint: exhaustruct
 		ID:                  value.ID,
 		OnboardingMode:      value.OnboardingMode,
 		ApprovalStatus:      value.ApprovalStatus,
@@ -104,6 +105,23 @@ func NewHost(value services.HostInfo) Host {
 		Configuration:       value.Configuration.Map(NewSSHPullConfiguration),
 		CreatedAt:           TimeToString(value.CreatedAt),
 		UpdatedAt:           TimeToString(value.UpdatedAt),
+	}
+	for _, opt := range opts {
+		opt(&host)
+	}
+	return host
+}
+
+// HostOption is a functional option for [NewHost].
+type HostOption func(*Host)
+
+// WithLifecycle attaches a lifecycle status to the host entity. Callers that
+// have resolved lifecycle posture (e.g. the lifecycle API) pass this option;
+// callers that don't (e.g. the regular host list) omit it and the
+// "lifecycle" field is absent from the JSON response.
+func WithLifecycle(status LifecycleStatus) HostOption {
+	return func(h *Host) {
+		h.Lifecycle = utils.Some(status)
 	}
 }
 
