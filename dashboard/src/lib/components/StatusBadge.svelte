@@ -36,6 +36,10 @@
 		pending: 'purple',
 		waiting_approval: 'purple',
 		rejected: 'red',
+		'supported': 'green',
+		'approaching-end-of-support': 'yellow',
+		'standard-support-ended': 'red',
+		'extended-coverage-available': 'orange',
 	};
 
 	let color = $derived(colors[status] || 'purple');
@@ -56,6 +60,10 @@
 		pending: 'Pending',
 		waiting_approval: 'Needs approval',
 		rejected: 'Rejected',
+		'supported': 'Supported',
+		'approaching-end-of-support': 'Approaching EOL',
+		'standard-support-ended': 'Support ended',
+		'extended-coverage-available': 'Extended coverage',
 	};
 
 	let display = $derived(labels[status] || status.replace(/_/g, ' '));
