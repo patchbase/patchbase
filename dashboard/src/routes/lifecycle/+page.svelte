@@ -101,13 +101,6 @@
 		<div class="catalog-source">
 			<span class="catalog-label">Catalog generated:</span>
 			<span class="catalog-value">{catalogSource.generated_at}</span>
-			{#if catalogSource.source_urls.length > 0}
-				<span class="catalog-label">Sources:</span>
-				{#each catalogSource.source_urls as url, i}
-					{#if i > 0}<span class="catalog-sep">,</span>{/if}
-					<a href={url} target="_blank" rel="noopener" class="catalog-link">{url}</a>
-				{/each}
-			{/if}
 		</div>
 	{/if}
 
@@ -200,20 +193,6 @@
 
 	.catalog-value {
 		font-family: var(--font-mono);
-	}
-
-	.catalog-link {
-		color: var(--accent-light);
-		text-decoration: none;
-		word-break: break-all;
-	}
-
-	.catalog-link:hover {
-		text-decoration: underline;
-	}
-
-	.catalog-sep {
-		color: var(--text-dim);
 	}
 
 	.filter-bar {
