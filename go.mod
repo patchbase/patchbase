@@ -16,7 +16,7 @@ require (
 	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.37.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.37.0
 	github.com/riverqueue/river/rivertype v0.37.0
-	github.com/samber/do/v2 v2.0.0
+	github.com/samber/do/v2 v2.1.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
