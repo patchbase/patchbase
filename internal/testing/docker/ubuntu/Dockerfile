@@ -32,9 +32,8 @@ RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*.sources \
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ca-certificates \
-      openssh-server=1:9.6p1-3ubuntu13.16 \
+      openssh-server \
       nginx=1.24.0-2ubuntu7.13 \
-      libssl3t64=3.0.13-0ubuntu3.11 \
       curl \
  && rm -f /etc/apt/apt.conf.d/99ssl-nocheck \
  && rm -rf /var/lib/apt/lists/*
