@@ -1,0 +1,190 @@
+{
+  "generated_at": "2026-08-12",
+  "source_urls": [
+    "https://ubuntu.com/about/release-cycle",
+    "https://access.redhat.com/support/policy/updates/errata",
+    "https://endoflife.date/docs/api"
+  ],
+  "products": [
+    {
+      "product_key": "ubuntu",
+      "display_name": "Ubuntu",
+      "aliases": ["Ubuntu", "ubuntu"],
+      "source_url": "https://ubuntu.com/about/release-cycle",
+      "releases": [
+        {
+          "cycle": "20.04",
+          "standard_support_end": "2025-04-23",
+          "eol": "2030-04-23",
+          "extended_coverage_end": "2030-04-23",
+          "extended_coverage_note": "Ubuntu Pro Extended Security Maintenance (ESM) is available until April 2030; PatchBase does not verify whether the host is enrolled.",
+          "source_url": "https://ubuntu.com/about/release-cycle"
+        },
+        {
+          "cycle": "22.04",
+          "standard_support_end": "2027-04-26",
+          "eol": "2032-04-26",
+          "extended_coverage_end": "2032-04-26",
+          "extended_coverage_note": "Ubuntu Pro Extended Security Maintenance (ESM) is available until April 2032; PatchBase does not verify whether the host is enrolled.",
+          "source_url": "https://ubuntu.com/about/release-cycle"
+        },
+        {
+          "cycle": "24.04",
+          "standard_support_end": "2029-04-25",
+          "eol": "2034-04-25",
+          "extended_coverage_end": "2034-04-25",
+          "extended_coverage_note": "Ubuntu Pro Extended Security Maintenance (ESM) is available until April 2034; PatchBase does not verify whether the host is enrolled.",
+          "source_url": "https://ubuntu.com/about/release-cycle"
+        },
+        {
+          "cycle": "26.04",
+          "standard_support_end": "2031-04-30",
+          "eol": "2036-04-30",
+          "extended_coverage_end": "2036-04-30",
+          "extended_coverage_note": "Ubuntu Pro Extended Security Maintenance (ESM) is available until April 2036; PatchBase does not verify whether the host is enrolled.",
+          "source_url": "https://ubuntu.com/about/release-cycle"
+        },
+        {
+          "cycle": "24.10",
+          "standard_support_end": "2025-07-11",
+          "eol": "2025-07-11",
+          "source_url": "https://ubuntu.com/about/release-cycle"
+        },
+        {
+          "cycle": "25.04",
+          "standard_support_end": "2026-01-05",
+          "eol": "2026-01-05",
+          "source_url": "https://ubuntu.com/about/release-cycle"
+        },
+        {
+          "cycle": "25.10",
+          "standard_support_end": "2026-07-08",
+          "eol": "2026-07-08",
+          "source_url": "https://ubuntu.com/about/release-cycle"
+        },
+        {
+          "cycle": "26.10",
+          "standard_support_end": "2027-07-08",
+          "eol": "2027-07-08",
+          "source_url": "https://ubuntu.com/about/release-cycle"
+        }
+      ]
+    },
+    {
+      "product_key": "debian",
+      "display_name": "Debian GNU/Linux",
+      "aliases": ["Debian GNU/Linux", "debian", "Debian"],
+      "source_url": "https://endoflife.date/debian",
+      "releases": [
+        {
+          "cycle": "11",
+          "standard_support_end": "2024-08-15",
+          "eol": "2026-08-15",
+          "extended_coverage_end": "2026-08-15",
+          "extended_coverage_note": "Debian Long Term Support (LTS) provides security updates until approximately August 2026.",
+          "source_url": "https://endoflife.date/debian"
+        },
+        {
+          "cycle": "12",
+          "standard_support_end": "2026-06-10",
+          "eol": "2028-06-30",
+          "extended_coverage_end": "2028-06-30",
+          "extended_coverage_note": "Debian Long Term Support (LTS) provides security updates until approximately June 2028.",
+          "source_url": "https://endoflife.date/debian"
+        },
+        {
+          "cycle": "13",
+          "standard_support_end": "2028-08-09",
+          "eol": "2030-08-09",
+          "extended_coverage_end": "2030-08-09",
+          "extended_coverage_note": "Debian Long Term Support (LTS) provides security updates until approximately August 2030.",
+          "source_url": "https://endoflife.date/debian"
+        }
+      ]
+    },
+    {
+      "product_key": "rocky",
+      "display_name": "Rocky Linux",
+      "aliases": ["Rocky Linux", "rocky", "Rocky"],
+      "source_url": "https://endoflife.date/rocky",
+      "releases": [
+        {
+          "cycle": "8",
+          "standard_support_end": "2029-05-31",
+          "eol": "2029-05-31",
+          "source_url": "https://endoflife.date/rocky"
+        },
+        {
+          "cycle": "9",
+          "standard_support_end": "2032-05-31",
+          "eol": "2032-05-31",
+          "source_url": "https://endoflife.date/rocky"
+        },
+        {
+          "cycle": "10",
+          "standard_support_end": "2035-05-31",
+          "eol": "2035-05-31",
+          "source_url": "https://endoflife.date/rocky"
+        }
+      ]
+    },
+    {
+      "product_key": "alma",
+      "display_name": "AlmaLinux",
+      "aliases": ["AlmaLinux", "almalinux", "Alma"],
+      "source_url": "https://endoflife.date/almalinux",
+      "releases": [
+        {
+          "cycle": "8",
+          "standard_support_end": "2029-12-01",
+          "eol": "2029-12-01",
+          "source_url": "https://endoflife.date/almalinux"
+        },
+        {
+          "cycle": "9",
+          "standard_support_end": "2032-06-01",
+          "eol": "2032-06-01",
+          "source_url": "https://endoflife.date/almalinux"
+        },
+        {
+          "cycle": "10",
+          "standard_support_end": "2035-12-01",
+          "eol": "2035-12-01",
+          "source_url": "https://endoflife.date/almalinux"
+        }
+      ]
+    },
+    {
+      "product_key": "rhel",
+      "display_name": "Red Hat Enterprise Linux",
+      "aliases": ["Red Hat Enterprise Linux", "rhel", "Red Hat Enterprise Linux Server"],
+      "source_url": "https://access.redhat.com/support/policy/updates/errata",
+      "releases": [
+        {
+          "cycle": "8",
+          "standard_support_end": "2029-05-31",
+          "eol": "2032-05-31",
+          "extended_coverage_end": "2032-05-31",
+          "extended_coverage_note": "Red Hat Extended Life-cycle Support (ELS) is a paid add-on available until May 2032; PatchBase does not verify whether the host is subscribed.",
+          "source_url": "https://access.redhat.com/support/policy/updates/errata"
+        },
+        {
+          "cycle": "9",
+          "standard_support_end": "2032-05-31",
+          "eol": "2035-05-31",
+          "extended_coverage_end": "2035-05-31",
+          "extended_coverage_note": "Red Hat Extended Life-cycle Support (ELS) is a paid add-on available until May 2035; PatchBase does not verify whether the host is subscribed.",
+          "source_url": "https://access.redhat.com/support/policy/updates/errata"
+        },
+        {
+          "cycle": "10",
+          "standard_support_end": "2035-05-31",
+          "eol": "2038-05-31",
+          "extended_coverage_end": "2038-05-31",
+          "extended_coverage_note": "Red Hat Extended Life-cycle Support (ELS) is a paid add-on available until May 2038; PatchBase does not verify whether the host is subscribed.",
+          "source_url": "https://access.redhat.com/support/policy/updates/errata"
+        }
+      ]
+    }
+  ]
+}

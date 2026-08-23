@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Configure Labs SRL
 // SPDX-License-Identifier: AGPL-3.0-only
-package hosts
+package lifecycle
 
 import (
 	"net/http"
@@ -9,29 +9,19 @@ import (
 	apiauth "go.patchbase.net/server/internal/api/auth"
 	"go.patchbase.net/server/internal/api/v1/entities"
 	"go.patchbase.net/server/internal/api/webutil"
-	"go.patchbase.net/server/internal/apperr"
 	"go.patchbase.net/server/internal/services"
 )
 
-func GetHost(i do.Injector) apiauth.AuthenticatedHandler {
-	hostsService := do.MustInvoke[services.Hosts](i)
+func ListHosts(i do.Injector) apiauth.AuthenticatedHandler {
 	lifecycleService := do.MustInvoke[services.LifecycleService](i)
 
 	return func(w http.ResponseWriter, r *http.Request, _ apiauth.AuthInfo) {
-		hostID := r.PathValue("hostID")
-		if hostID == "" {
-			webutil.WriteError(w, r, apperr.ErrMissingHostID)
-			return
-		}
-
-		host, err := hostsService.GetHost(r.Context(), hostID)
+		hosts, err := lifecycleService.ListHosts(r.Context())
 		if err != nil {
 			webutil.WriteError(w, r, err)
 			return
 		}
 
-		status := lifecycleService.StatusFor(host)
-
-		webutil.WriteJSON(w, http.StatusOK, entities.NewHost(host, entities.WithLifecycle(entities.NewLifecycleStatus(status))))
+		webutil.WriteJSON(w, http.StatusOK, entities.NewHostsWithLifecycle(hosts))
 	}
 }

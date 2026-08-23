@@ -8,6 +8,7 @@ go_library(
         "e2e_helpers.go",
         "export_test_helpers.go",
         "fixtures.go",
+        "hosts.go",
         "http.go",
     ],
     importpath = "go.patchbase.net/server/internal/testing",
@@ -27,5 +28,6 @@ go_library(
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
         "@org_golang_google_protobuf//proto",
+        "@org_golang_google_protobuf//types/known/timestamppb",
     ],
 )

@@ -7,6 +7,7 @@ go_api_library(
         "audit_log.go",
         "hosts.go",
         "kernel.go",
+        "lifecycle.go",
         "matcher.go",
         "packages_helper.go",
         "timestamp.go",
@@ -16,6 +17,7 @@ go_api_library(
     importpath = "go.patchbase.net/server/internal/api/v1/entities",
     visibility = ["//:__subpackages__"],
     deps = [
+        "//internal/lifecycle",
         "//internal/services",
         "//internal/sql",
         "//internal/utils",

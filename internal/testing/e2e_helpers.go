@@ -89,11 +89,11 @@ func UbuntuE2EExpectation() DistroExpectation {
 		Package: PackageExpectation{
 			Name:    "nginx",
 			Version: "1.24.0",
-			Release: "2ubuntu7.15",
+			Release: "2ubuntu7.13",
 		},
 		Repo: RepoExpectation{
-			BaseURL: "http://archive.ubuntu.com/ubuntu/",
-			Labels:  []string{"noble main", "noble"},
+			BaseURL: "https://snapshot.ubuntu.com/ubuntu/20260701T000000Z",
+			Labels:  []string{"noble main universe", "noble", "noble-updates main universe", "noble-updates"},
 		},
 	}
 }

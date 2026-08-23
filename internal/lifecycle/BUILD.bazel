@@ -1,0 +1,21 @@
+load("@rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "lifecycle",
+    srcs = ["lifecycle.go"],
+    embedsrcs = ["catalog.json"],
+    importpath = "go.patchbase.net/server/internal/lifecycle",
+    visibility = ["//:__subpackages__"],
+    deps = ["//internal/utils"],
+)
+
+go_test(
+    name = "lifecycle_test",
+    size = "small",
+    srcs = ["lifecycle_test.go"],
+    deps = [
+        ":lifecycle",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)

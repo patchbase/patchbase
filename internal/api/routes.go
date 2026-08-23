@@ -15,6 +15,7 @@ import (
 	dashboardv1 "go.patchbase.net/server/internal/api/v1/dashboard"
 	"go.patchbase.net/server/internal/api/v1/health"
 	hostsv1 "go.patchbase.net/server/internal/api/v1/hosts"
+	lifecyclev1 "go.patchbase.net/server/internal/api/v1/lifecycle"
 	profilev1 "go.patchbase.net/server/internal/api/v1/profile"
 	settingsv1 "go.patchbase.net/server/internal/api/v1/settings"
 	setupv1 "go.patchbase.net/server/internal/api/v1/setup"
@@ -83,6 +84,9 @@ func NewMux(i do.Injector) (*http.ServeMux, error) {
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}/packages/vulnerable", auth.Required(hostsv1.GetVulnerablePackages(i)))
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}/packages/upgradable", auth.Required(hostsv1.GetUpgradablePackages(i)))
 	mux.HandleFunc("GET /api/v1/hosts/{hostID}/kernel-posture", auth.Required(hostsv1.GetKernelPosture(i)))
+
+	mux.HandleFunc("GET /api/v1/lifecycle/hosts", auth.Required(lifecyclev1.ListHosts(i)))
+	mux.HandleFunc("GET /api/v1/lifecycle/catalog", auth.Required(lifecyclev1.GetCatalogSource(i)))
 
 	mux.HandleFunc("GET /api/v1/audit-logs", auth.Required(auditv1.List(i)))
 

@@ -8,6 +8,60 @@ export interface SSHPullConfiguration {
   uses_unique_key_pair: boolean;
 }
 
+export interface LifecycleStatus {
+  state: string;
+  product_key?: string;
+  product_display_name?: string;
+  cycle?: string;
+  standard_support_end?: string;
+  eol?: string;
+  extended_coverage_end?: string;
+  extended_coverage_note?: string;
+  source_url?: string;
+  days_remaining?: number | null;
+}
+
+export interface LifecycleCatalogSource {
+  generated_at: string;
+  source_urls: string[];
+}
+
+export interface HostLifecycle {
+  id: string;
+  onboarding_mode?: string;
+  approval_status?: string;
+  display_name: string | null;
+  notes: string | null;
+  hostname: string;
+  ip_address?: string;
+  os_family: string;
+  os_name: string;
+  os_major: number;
+  os_version: string;
+  architecture: string;
+  status: string;
+  last_seen_at: string | null;
+  overall_action: string;
+  critical_count: number;
+  important_count: number;
+  moderate_count: number;
+  actionable_count: number;
+  available_updates: number;
+  needs_reboot: number;
+  needs_restart: number;
+  no_fix: number;
+  unknown: number;
+  last_advisory_check_at?: string | null;
+  state_updated_at?: string | null;
+  pull_last_run_at?: string | null;
+  pull_last_run_status?: string;
+  pull_last_run_error?: string;
+  configuration?: SSHPullConfiguration;
+  lifecycle?: LifecycleStatus;
+  created_at?: string;
+  updated_at: string;
+}
+
 export interface Host {
   id: string;
   onboarding_mode?: string;
@@ -39,6 +93,7 @@ export interface Host {
   pull_last_run_status?: string;
   pull_last_run_error?: string;
   configuration?: SSHPullConfiguration;
+  lifecycle?: LifecycleStatus;
   created_at?: string;
   updated_at: string;
 }

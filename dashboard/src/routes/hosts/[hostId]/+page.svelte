@@ -21,7 +21,7 @@
 	} from '$lib/api/hosts.js';
 	import { formatTime, formatDuration } from '$lib/format';
 	import { goto } from '$app/navigation';
-	import type { Host, HostKernelPosture, HostSnapshot, HostPullJob, MatcherDecisionGroup } from '$lib/types';
+	import type { Host, HostKernelPosture, HostSnapshot, HostPullJob, MatcherDecisionGroup, LifecycleStatus } from '$lib/types';
 	import { globalWsClient } from '$lib/ws/client';
 	import { hostsConnected } from '$lib/stores/hosts';
 	import { createPollingFallback } from '$lib/ws/fallback';
@@ -40,6 +40,7 @@
 	let vulnerableGroups = $state<MatcherDecisionGroup[]>([]);
 	let upgradableGroups = $state<MatcherDecisionGroup[]>([]);
 	let kernelPosture = $state<HostKernelPosture | null>(null);
+	let lifecycleStatus = $state<LifecycleStatus | null>(null);
 	let activeTab = $state<'vulnerabilities' | 'updates' | 'kernel'>('vulnerabilities');
 	let expandedGroups = $state<Record<string, boolean>>({});
 	let loading = $state(true);
@@ -258,8 +259,10 @@
 				getHostKernelPosture(id).catch((err) => {
 					kernelError = err instanceof Error ? err.message : 'Failed to load kernel posture';
 					return null;
-				})
+				}),
 			]);
+
+			lifecycleStatus = hostData.lifecycle ?? null;
 
 			if (JSON.stringify(host) !== JSON.stringify(hostData)) {
 				host = hostData;
@@ -394,6 +397,15 @@
 				<div class="detail-row"><span class="label">OS Name</span><span class="value">{host.os_name || '-'}</span></div>
 				<div class="detail-row"><span class="label">OS Version</span><span class="value">{host.os_version || '-'}</span></div>
 				<div class="detail-row"><span class="label">Architecture</span><span class="value mono">{host.architecture || '-'}</span></div>
+				{#if lifecycleStatus}
+					<div class="detail-row"><span class="label">Lifecycle</span><span class="value"><StatusBadge status={lifecycleStatus.state} /></span></div>
+					{#if lifecycleStatus.standard_support_end}
+						<div class="detail-row"><span class="label">Support End</span><span class="value mono">{lifecycleStatus.standard_support_end}</span></div>
+					{/if}
+					{#if lifecycleStatus.extended_coverage_note}
+						<div class="detail-row"><span class="label">Extended Coverage</span><span class="value" title={lifecycleStatus.extended_coverage_note}>{lifecycleStatus.extended_coverage_end || '-'}</span></div>
+					{/if}
+				{/if}
 				<div class="detail-row"><span class="label">Mode</span><span class="value"><StatusBadge status={host.onboarding_mode || 'unknown'} /></span></div>
 				<div class="detail-row"><span class="label">Approval</span><span class="value"><StatusBadge status={host.approval_status || 'unknown'} /></span></div>
 				<div class="detail-row"><span class="label">Host Status</span><span class="value"><StatusBadge status={host.status} /></span></div>

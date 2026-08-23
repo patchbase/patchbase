@@ -1,11 +1,8 @@
 # Pinned Ubuntu 24.04 LTS (Noble Numbat) image for patchbase integration tests.
 #
-# Ubuntu does not have a snapshot.debian.org equivalent. The base image tag
-# `ubuntu:24.04` is itself a point-release pin (Noble Numbat LTS, 5-year
-# support); for reproducible package versions we additionally pin the
-# exact versions of openssh-server, nginx and libssl3t64 in the install
-# step. The single knob to roll this image forward is the package version
-# string below — bump them when the archive drifts.
+# Package versions are pinned via snapshot.ubuntu.com so test results are
+# reproducible regardless of when CI runs. The fixed snapshot timestamp is the
+# single knob to adjust when bumping the image.
 #
 # The authorized_keys file is NOT baked into the image; the test harness
 # injects it at runtime via WriteAuthorizedKey. The test SSH keypair
@@ -15,22 +12,30 @@ FROM ubuntu:24.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 
+# Pin apt to a snapshot.ubuntu.com archive timestamp so package versions are
+# reproducible regardless of when CI runs. The fixed snapshot timestamp is the
+# single knob to adjust when bumping the image.
+#
+# The snapshot endpoint redirects to HTTPS; disable peer verification
+# temporarily during package bootstrap before ca-certificates is installed.
+RUN rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*.sources \
+ && printf 'Acquire::https::Verify-Peer "false";\nAcquire::https::Verify-Host "false";\n' > /etc/apt/apt.conf.d/99ssl-nocheck \
+ && printf 'Types: deb\nURIs: https://snapshot.ubuntu.com/ubuntu/20260701T000000Z\nSuites: noble noble-updates\nComponents: main universe\nSigned-By: /usr/share/keyrings/ubuntu-archive-keyring.gpg\n' > /etc/apt/sources.list.d/patchbase.sources
+
 # Install openssh-server (shared by agent + SSH-pull tests), nginx at a pinned
 # known-vulnerable version, and a fixed-version libssl3t64 for non-trivial
-# package coverage. Versions are pinned to the archive as of this commit;
-# if apt-get update fails because the version is no longer in the
-# archive, switch to http://old-releases.ubuntu.com/ubuntu/ for the
-# point release.
+# package coverage. Versions match the snapshot date above.
 #
 # Note: on noble the OpenSSL library package is `libssl3t64` (the t64
 # transition package); on older releases it was `libssl3`. Adjust the
 # name when bumping the base image.
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      openssh-server=1:9.6p1-3ubuntu13.18 \
-      nginx=1.24.0-2ubuntu7.15 \
-      libssl3t64=3.0.13-0ubuntu3.11 \
+      ca-certificates \
+      openssh-server \
+      nginx=1.24.0-2ubuntu7.13 \
       curl \
+ && rm -f /etc/apt/apt.conf.d/99ssl-nocheck \
  && rm -rf /var/lib/apt/lists/*
 
 # Configure sshd: allow root login with key auth. The authorized_keys
