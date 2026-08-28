@@ -15,7 +15,7 @@ require (
 	github.com/riverqueue/river v0.43.0
 	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.43.0
 	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.43.0
-	github.com/riverqueue/river/rivertype v0.43.0
+	github.com/riverqueue/river/rivertype v0.44.1
 	github.com/samber/do/v2 v2.1.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
@@ -25,7 +25,7 @@ require (
 	go.patchbase.net/dashboard v0.0.0
 	go.patchbase.net/proto/agent v0.0.0-00010101000000-000000000000
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.53.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20260604135805-d37c95e27de6
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
@@ -112,6 +112,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
+	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
