@@ -25,8 +25,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/docker/docker/api/types/container"
-	"github.com/docker/go-connections/nat"
+	"github.com/moby/moby/api/types/container"
 	"github.com/samber/do/v2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -150,7 +149,7 @@ func Start(t *testing.T, ctx context.Context, opts StartOptions) *Container {
 			_ = tc.Terminate(context.Background())
 			t.Fatalf("start sshd: %v", err)
 		}
-		mapped, err := tc.MappedPort(ctx, nat.Port("22/tcp"))
+		mapped, err := tc.MappedPort(ctx, "22/tcp")
 		if err != nil {
 			_ = tc.Terminate(context.Background())
 			t.Fatalf("get mapped ssh port: %v", err)

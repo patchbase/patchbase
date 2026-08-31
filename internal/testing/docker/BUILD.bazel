@@ -32,8 +32,7 @@ go_library(
     deps = [
         "//internal/services",
         "//internal/testing",
-        "@com_github_docker_docker//api/types/container",
-        "@com_github_docker_go_connections//nat",
+        "@com_github_moby_moby_api//types/container",
         "@com_github_samber_do_v2//:do",
         "@com_github_stretchr_testify//assert",
         "@com_github_stretchr_testify//require",
