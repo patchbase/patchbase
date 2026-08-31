@@ -15,6 +15,13 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: "build(deps)"
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
 
   # NPM / pnpm (Frontend Dashboard)
   - package-ecosystem: "npm"
