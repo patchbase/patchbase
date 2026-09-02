@@ -10,11 +10,11 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/matoous/go-nanoid/v2 v2.1.0
 	github.com/moby/moby/api v1.55.0
-	github.com/pressly/goose/v3 v3.27.1
-	github.com/riverqueue/river v0.44.1
-	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.44.1
-	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.44.1
-	github.com/riverqueue/river/rivertype v0.44.1
+	github.com/pressly/goose/v3 v3.27.3
+	github.com/riverqueue/river v0.45.0
+	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.45.0
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.45.0
+	github.com/riverqueue/river/rivertype v0.45.0
 	github.com/samber/do/v2 v2.1.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
@@ -28,7 +28,7 @@ require (
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20260604135805-d37c95e27de6
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/yaml.v3 v3.0.1
-	modernc.org/sqlite v1.56.0
+	modernc.org/sqlite v1.57.0
 )
 
 require (
@@ -50,7 +50,7 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
-	github.com/go-logr/logr v1.4.3 // indirect
+	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-viper/mapstructure/v2 v2.4.0 // indirect
@@ -60,7 +60,7 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
-	github.com/klauspost/compress v1.18.6 // indirect
+	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/lib/pq v1.12.3 // indirect
 	github.com/lufia/plan9stats v0.0.0-20260330125221-c963978e514e // indirect
 	github.com/magiconair/properties v1.8.10 // indirect
@@ -80,11 +80,11 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/riverqueue/river/riverdriver v0.44.1 // indirect
-	github.com/riverqueue/river/rivershared v0.44.1 // indirect
+	github.com/riverqueue/river/riverdriver v0.45.0 // indirect
+	github.com/riverqueue/river/rivershared v0.45.0 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/samber/go-type-to-string v1.8.0 // indirect
-	github.com/sethvargo/go-retry v0.3.0 // indirect
+	github.com/sethvargo/go-retry v0.4.0 // indirect
 	github.com/shirou/gopsutil/v4 v4.26.6 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/sourcegraph/conc v0.3.1-0.20240121214520-5f936abd7ae8 // indirect
