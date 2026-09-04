@@ -11,10 +11,10 @@ require (
 	github.com/matoous/go-nanoid/v2 v2.1.0
 	github.com/moby/moby/api v1.55.0
 	github.com/pressly/goose/v3 v3.27.3
-	github.com/riverqueue/river v0.45.0
-	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.45.0
-	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.45.0
-	github.com/riverqueue/river/rivertype v0.45.0
+	github.com/riverqueue/river v0.47.0
+	github.com/riverqueue/river/riverdriver/riverdatabasesql v0.47.0
+	github.com/riverqueue/river/riverdriver/riverpgxv5 v0.47.0
+	github.com/riverqueue/river/rivertype v0.47.0
 	github.com/samber/do/v2 v2.1.0
 	github.com/spf13/afero v1.15.0
 	github.com/spf13/cobra v1.10.2
@@ -80,8 +80,8 @@ require (
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
-	github.com/riverqueue/river/riverdriver v0.45.0 // indirect
-	github.com/riverqueue/river/rivershared v0.45.0 // indirect
+	github.com/riverqueue/river/riverdriver v0.47.0 // indirect
+	github.com/riverqueue/river/rivershared v0.47.0 // indirect
 	github.com/sagikazarmark/locafero v0.11.0 // indirect
 	github.com/samber/go-type-to-string v1.8.0 // indirect
 	github.com/sethvargo/go-retry v0.4.0 // indirect
