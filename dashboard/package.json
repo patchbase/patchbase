@@ -12,11 +12,11 @@
     "@sveltejs/adapter-static": "^3.0.8",
     "@sveltejs/kit": "^2.70.3",
     "@sveltejs/vite-plugin-svelte": "^7.3.0",
-    "oxfmt": "^0.65.0",
-    "oxlint": "^1.80.0",
+    "oxfmt": "^0.68.0",
+    "oxlint": "^1.83.0",
     "svelte": "^5.57.0",
     "typescript": "^6.0.2",
-    "vite": "^8.2.2"
+    "vite": "^8.3.0"
   },
   "packageManager": "pnpm@10.32.1",
   "pnpm": {
