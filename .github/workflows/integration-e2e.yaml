@@ -24,7 +24,7 @@ jobs:
           repository-cache: true
 
       - name: Start Test Database
-        uses: hoverkraft-tech/compose-action@ee6af68587292d72db67743171809c19787df4c9 # v3
+        uses: hoverkraft-tech/compose-action@b659c744ee9bed25aea2307c017ad849bd104433 # v3
         with:
           compose-file: "./compose.test.yaml"
 
