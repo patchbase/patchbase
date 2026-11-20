@@ -14,8 +14,8 @@ require (
 	github.com/envoyproxy/protoc-gen-validate v1.3.3 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
-	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/text v0.42.0 // indirect
+	go.yaml.in/yaml/v3 v3.0.6 // indirect
+	golang.org/x/text v0.44.0 // indirect
 )
 
 replace go.patchbase.net/proto/agent => ../proto/agent
