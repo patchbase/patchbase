@@ -25,7 +25,7 @@ jobs:
           disk-cache: ${{ github.workflow }}
           repository-cache: true
       - name: Start Test Database
-        uses: hoverkraft-tech/compose-action@b659c744ee9bed25aea2307c017ad849bd104433 # v3
+        uses: hoverkraft-tech/compose-action@cdaf49f2d715a87c3387e86cb35c772b14f0efe0 # v3
         with:
           compose-file: "./compose.test.yaml"
       - name: Build Targets
